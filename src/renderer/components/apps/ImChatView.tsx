@@ -9,19 +9,18 @@
  * Reuses the same atomic chat components as AppChatView for consistency.
  */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Loader2, AlertCircle, Radio, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Loader2, AlertCircle, Radio, Eraser } from 'lucide-react'
 import { api } from '../../api'
 import { useChatStore } from '../../stores/chat.store'
-import { MessageItem } from '../chat/MessageItem'
-import { CollapsedThoughtProcess } from '../chat/CollapsedThoughtProcess'
-import { ThoughtProcess } from '../chat/ThoughtProcess'
-import { StreamingBubble } from '../chat/StreamingBubble'
-import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
+import { useSmartScroll } from '../../hooks/useSmartScroll'
+import { MessageRow } from '../chat/MessageRow'
+import { StreamingSection } from '../chat/StreamingSection'
+import { useBrowserToolCalls } from '../chat/useBrowserToolCalls'
 import { InterruptedBubble } from '../chat/InterruptedBubble'
 import { CompactNotice } from '../chat/CompactNotice'
 import { useTranslation } from '../../i18n'
-import type { Message, Thought } from '../../types'
+import type { Message } from '../../types'
 import type { ImSessionRecord } from '../../../shared/types/im-channel'
 
 interface ImChatViewProps {
@@ -66,19 +65,15 @@ export function ImChatView({ appId, spaceId, session, clearKey }: ImChatViewProp
     textBlockVersion,
   } = chatSession
 
+  // ── Smart scroll: auto-follow during streaming, snap after message load ──
+  const { scrollToBottom, handleScroll } = useSmartScroll({
+    containerRef: scrollRef,
+    deps: [streamingContent, thoughts.length, isStreaming, isThinking, messages],
+    behavior: 'auto',
+  })
+
   // Browser tool calls from streaming thoughts
-  const streamingBrowserToolCalls = useMemo(() => {
-    return thoughts
-      .filter(t => t.type === 'tool_use' && t.toolName && isBrowserTool(t.toolName))
-      .map(t => ({
-        id: t.id,
-        name: t.toolName!,
-        status: t.toolResult
-          ? (t.toolResult.isError ? 'error' as const : 'success' as const)
-          : 'running' as const,
-        input: t.toolInput || {},
-      }))
-  }, [thoughts])
+  const streamingBrowserToolCalls = useBrowserToolCalls(thoughts)
 
   // Load persisted messages
   useEffect(() => {
@@ -109,28 +104,24 @@ export function ImChatView({ appId, spaceId, session, clearKey }: ImChatViewProp
   // thinking begins) and when generation completes (to show the assistant response).
   const prevIsGeneratingRef = useRef(isGenerating)
   useEffect(() => {
+    let cancelled = false
     const wasGenerating = prevIsGeneratingRef.current
     prevIsGeneratingRef.current = isGenerating
 
     if (wasGenerating !== isGenerating) {
       api.appImChatMessages(appId, spaceId, session.channel, session.chatType, session.chatId)
         .then(res => {
+          if (cancelled) return
           if (res.success && res.data) {
             const msgs = (res.data as Message[]) ?? []
             setMessages(msgs)
             setLoadState(msgs.length > 0 ? 'loaded' : 'empty')
           }
         })
-        .catch(err => console.error('[ImChatView] Reload error:', err))
+        .catch(err => { if (!cancelled) console.error('[ImChatView] Reload error:', err) })
     }
+    return () => { cancelled = true }
   }, [isGenerating, appId, spaceId, session.channel, session.chatType, session.chatId])
-
-  // Auto-scroll during streaming
-  useEffect(() => {
-    if (isStreaming || isThinking) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-    }
-  }, [streamingContent, thoughts.length, isStreaming, isThinking])
 
   // ── Clear session (with confirmation) ──
   const resetSession = useChatStore(s => s.resetSession)
@@ -202,7 +193,7 @@ export function ImChatView({ appId, spaceId, session, clearKey }: ImChatViewProp
       />
 
       {/* Message area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
         <div className="max-w-3xl mx-auto py-6 px-4">
           {/* Empty state */}
           {loadState === 'empty' && !hasStreamingContent && (
@@ -212,54 +203,25 @@ export function ImChatView({ appId, spaceId, session, clearKey }: ImChatViewProp
           )}
 
           {/* Persisted messages */}
-          {messages.map((message) => {
-            const hasInlineThoughts = Array.isArray(message.thoughts) && message.thoughts.length > 0
-            if (message.role === 'assistant' && hasInlineThoughts) {
-              return (
-                <div key={message.id} className="flex justify-start pb-4">
-                  <div className="w-[85%]">
-                    <CollapsedThoughtProcess
-                      thoughts={message.thoughts as Thought[]}
-                      defaultExpanded={false}
-                    />
-                    {message.content && (
-                      <MessageItem message={message} hideThoughts isInContainer hideBrowserViewButton />
-                    )}
-                  </div>
-                </div>
-              )
-            }
-            return (
-              <div key={message.id} className="pb-4">
-                <MessageItem message={message} hideBrowserViewButton />
-              </div>
-            )
-          })}
+          {messages.map((message) => (
+            <MessageRow
+              key={message.id}
+              message={message}
+              hideBrowserViewButton
+            />
+          ))}
 
           {/* Live streaming content */}
           {hasStreamingContent && (
-            <div className="flex justify-start pb-4 animate-fade-in">
-              <div className="w-[85%]">
-                {(thoughts.length > 0 || isThinking) && (
-                  <ThoughtProcess thoughts={thoughts} isThinking={isThinking} />
-                )}
-                {streamingBrowserToolCalls.length > 0 && (
-                  <div className="mb-4">
-                    <BrowserTaskCard
-                      browserToolCalls={streamingBrowserToolCalls}
-                      isActive={isThinking}
-                      showViewButton={false}
-                    />
-                  </div>
-                )}
-                <StreamingBubble
-                  content={streamingContent}
-                  isStreaming={isStreaming}
-                  thoughts={thoughts}
-                  textBlockVersion={textBlockVersion}
-                />
-              </div>
-            </div>
+            <StreamingSection
+              streamingContent={streamingContent}
+              isStreaming={isStreaming}
+              thoughts={thoughts}
+              isThinking={isThinking}
+              textBlockVersion={textBlockVersion}
+              browserToolCalls={streamingBrowserToolCalls}
+              showBrowserViewButton={false}
+            />
           )}
 
           {/* Interrupted error */}
@@ -346,7 +308,7 @@ function ImChatInfoBar({ name, channel, chatType, isGenerating, hasMessages, sho
                 className="p-1 rounded hover:bg-secondary transition-colors"
                 title={t('Clear session')}
               >
-                <Trash2 className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground" />
+                <Eraser className="w-3.5 h-3.5 text-muted-foreground/60 hover:text-muted-foreground" />
               </button>
             )}
             <span>{t('Read-only · Interact via IM channel')}</span>

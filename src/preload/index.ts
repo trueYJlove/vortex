@@ -342,9 +342,16 @@ export interface HaloAPI {
   testNotificationChannel: (channelType: string) => Promise<IpcResponse>
   clearNotificationChannelCache: () => Promise<IpcResponse>
 
-  // WeCom Bot (企业微信智能机器人)
+  // WeCom Bot (企业微信智能机器人) — legacy compat
   getWecomBotStatus: () => Promise<IpcResponse>
   reconnectWecomBot: () => Promise<IpcResponse>
+
+  // IM Channels (multi-instance)
+  imChannelsStatus: () => Promise<IpcResponse>
+  imChannelsInstanceStatus: (instanceId: string) => Promise<IpcResponse>
+  imChannelsReconnect: (instanceId: string) => Promise<IpcResponse>
+  imChannelsReload: () => Promise<IpcResponse>
+  imChannelsProviders: () => Promise<IpcResponse>
 
   // IM Sessions (会话管理)
   imSessionsList: (appId?: string) => Promise<IpcResponse>
@@ -688,9 +695,16 @@ const api: HaloAPI = {
   testNotificationChannel: (channelType: string) => ipcRenderer.invoke('notify-channels:test', channelType),
   clearNotificationChannelCache: () => ipcRenderer.invoke('notify-channels:clear-cache'),
 
-  // WeCom Bot (企业微信智能机器人)
+  // WeCom Bot (企业微信智能机器人) — legacy compat
   getWecomBotStatus: () => ipcRenderer.invoke('wecom-bot:status'),
   reconnectWecomBot: () => ipcRenderer.invoke('wecom-bot:reconnect'),
+
+  // IM Channels (multi-instance)
+  imChannelsStatus: () => ipcRenderer.invoke('im-channels:status'),
+  imChannelsInstanceStatus: (instanceId: string) => ipcRenderer.invoke('im-channels:instance-status', instanceId),
+  imChannelsReconnect: (instanceId: string) => ipcRenderer.invoke('im-channels:reconnect', instanceId),
+  imChannelsReload: () => ipcRenderer.invoke('im-channels:reload'),
+  imChannelsProviders: () => ipcRenderer.invoke('im-channels:providers'),
 
   // IM Sessions (会话管理)
   imSessionsList: (appId) => ipcRenderer.invoke('im-sessions:list', appId),

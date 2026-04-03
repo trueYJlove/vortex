@@ -188,6 +188,7 @@ interface ChatState {
 
   // Session management
   resetSession: (conversationId: string) => void
+  setSessionError: (conversationId: string, error: string) => void
 
   // Cleanup
   reset: () => void
@@ -1388,6 +1389,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const newSessions = new Map(state.sessions)
       newSessions.set(conversationId, createEmptySessionState())
+      return { sessions: newSessions }
+    })
+  },
+
+  // Set error state on a session (e.g., app chat send failure)
+  setSessionError: (conversationId: string, error: string) => {
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        error,
+        isGenerating: false,
+        isThinking: false,
+      })
       return { sessions: newSessions }
     })
   },

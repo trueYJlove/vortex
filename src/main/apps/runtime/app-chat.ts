@@ -425,6 +425,20 @@ export async function sendAppChatMessage(
   } finally {
     // Clean up active session (but keep V2 session for reuse)
     unregisterActiveSession(conversationId)
+
+    // For IM sessions (not the native app-chat key), destroy scoped browser context
+    // on successful completion. The native app-chat key reuses its context across messages,
+    // but IM sessions can accumulate unboundedly — clean up to prevent memory leaks.
+    const defaultConvId = getAppChatConversationId(appId)
+    if (conversationId !== defaultConvId) {
+      const ctx = scopedContexts.get(conversationId)
+      if (ctx) {
+        ctx.destroy()
+        scopedContexts.delete(conversationId)
+        console.log(`[AppChat][${appId}] IM scoped browser context destroyed (completion)`)
+      }
+    }
+
     console.log(`[AppChat][${appId}] Active session cleaned up`)
   }
 }

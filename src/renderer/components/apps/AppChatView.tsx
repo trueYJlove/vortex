@@ -11,25 +11,23 @@
  *   to chat.store.ts sessions by conversationId. App chat events automatically
  *   flow to sessions.get("app-chat:{appId}") without any extra wiring.
  * - Persisted messages loaded from JSONL via app:chat-messages IPC
- * - Reuses atomic UI components from main chat (StreamingBubble, BrowserTaskCard,
- *   AskUserQuestionCard, ThoughtProcess, etc.) for feature parity.
+ * - Reuses shared rendering components (MessageRow, StreamingSection) from main chat
+ *   for consistent message and streaming display across all chat views.
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Loader2, AlertCircle, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Loader2, AlertCircle, Eraser } from 'lucide-react'
 import { api } from '../../api'
 import { useChatStore } from '../../stores/chat.store'
-import { MessageItem } from '../chat/MessageItem'
-import { CollapsedThoughtProcess } from '../chat/CollapsedThoughtProcess'
-import { ThoughtProcess } from '../chat/ThoughtProcess'
-import { StreamingBubble } from '../chat/StreamingBubble'
-import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
-import { AskUserQuestionCard } from '../chat/AskUserQuestionCard'
+import { useSmartScroll } from '../../hooks/useSmartScroll'
+import { MessageRow } from '../chat/MessageRow'
+import { StreamingSection } from '../chat/StreamingSection'
+import { useBrowserToolCalls } from '../chat/useBrowserToolCalls'
 import { InterruptedBubble } from '../chat/InterruptedBubble'
 import { CompactNotice } from '../chat/CompactNotice'
 import { InputArea } from '../chat/InputArea'
 import { useTranslation } from '../../i18n'
-import type { Message, Thought, ImageAttachment } from '../../types'
+import type { Message, ImageAttachment } from '../../types'
 
 interface AppChatViewProps {
   /** App ID */
@@ -75,20 +73,15 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
     textBlockVersion,
   } = session
 
-  // ── Extract browser tool calls from streaming thoughts (same as MessageList) ──
-  const streamingBrowserToolCalls = useMemo(() => {
-    return thoughts
-      .filter(t => t.type === 'tool_use' && t.toolName && isBrowserTool(t.toolName))
-      .map(t => ({
-        id: t.id,
-        name: t.toolName!,
-        // Determine status from merged toolResult (set by backend via agent:thought-delta)
-        status: t.toolResult
-          ? (t.toolResult.isError ? 'error' as const : 'success' as const)
-          : 'running' as const,
-        input: t.toolInput || {},
-      }))
-  }, [thoughts])
+  // ── Smart scroll: auto-follow during streaming, snap after message load ──
+  const { scrollToBottom, handleScroll } = useSmartScroll({
+    containerRef: scrollRef,
+    deps: [streamingContent, thoughts.length, isStreaming, isThinking, pendingQuestion, messages],
+    behavior: 'auto',
+  })
+
+  // ── Extract browser tool calls from streaming thoughts ──
+  const streamingBrowserToolCalls = useBrowserToolCalls(thoughts)
 
   // ── Load persisted chat messages on mount ──
   useEffect(() => {
@@ -124,30 +117,23 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
   // This ensures the persisted messages include the latest assistant response
   const prevIsGeneratingRef = useRef(isGenerating)
   useEffect(() => {
+    let cancelled = false
     if (prevIsGeneratingRef.current && !isGenerating) {
       // Generation just completed — reload messages from JSONL
       api.appChatMessages(appId, spaceId).then(res => {
+        if (cancelled) return
         if (res.success && res.data) {
           const msgs = (res.data as Message[]) ?? []
           setMessages(msgs)
           setLoadState(msgs.length > 0 ? 'loaded' : 'empty')
         }
       }).catch(err => {
-        console.error('[AppChatView] Failed to reload messages after completion:', err)
+        if (!cancelled) console.error('[AppChatView] Failed to reload messages after completion:', err)
       })
     }
     prevIsGeneratingRef.current = isGenerating
+    return () => { cancelled = true }
   }, [isGenerating, appId, spaceId])
-
-  // ── Auto-scroll to bottom when streaming ──
-  useEffect(() => {
-    if (isStreaming || isThinking) {
-      const el = scrollRef.current
-      if (el) {
-        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-      }
-    }
-  }, [streamingContent, thoughts.length, isStreaming, isThinking, pendingQuestion])
 
   // ── Clear chat (with confirmation) ──
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -174,6 +160,16 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
     // from a previous conversation (mirrors normal chat's sendMessage behavior)
     resetSession(conversationId)
 
+    // Optimistically add user message before API call for instant feedback
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, userMsg])
+    setLoadState('loaded')
+
     try {
       // Map ImageAttachment[] to API format { type, media_type, data }
       const apiImages = images && images.length > 0
@@ -188,25 +184,17 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
       })
       if (!res.success) {
         console.error('[AppChatView] Send failed:', res.error)
+        // Surface error via chat store session state (rendered by error UI below)
+        useChatStore.getState().setSessionError(conversationId, String(res.error || t('Failed to send message')))
       }
-      // Optimistically add user message to local list
-      const userMsg: Message = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content,
-        timestamp: new Date().toISOString(),
-      }
-      setMessages(prev => [...prev, userMsg])
-      setLoadState('loaded')
 
       // Scroll to bottom after sending
-      requestAnimationFrame(() => {
-        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-      })
+      requestAnimationFrame(() => scrollToBottom('auto'))
     } catch (err) {
       console.error('[AppChatView] Send error:', err)
+      useChatStore.getState().setSessionError(conversationId, String((err as Error).message || t('Failed to send message')))
     }
-  }, [appId, spaceId, conversationId, resetSession])
+  }, [appId, spaceId, conversationId, resetSession, t])
 
   // ── Stop generation ──
   const handleStop = useCallback(async () => {
@@ -275,7 +263,7 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Message area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
         <div className="max-w-3xl mx-auto py-6 px-4">
           {/* Empty state hint */}
           {loadState === 'empty' && !hasStreamingContent && (
@@ -285,77 +273,27 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
           )}
 
           {/* Persisted messages */}
-          {messages.map((message) => {
-            const hasInlineThoughts = Array.isArray(message.thoughts) && message.thoughts.length > 0
-
-            if (message.role === 'assistant' && hasInlineThoughts) {
-              return (
-                <div key={message.id} className="flex justify-start pb-4">
-                  <div className="w-[85%]">
-                    <CollapsedThoughtProcess
-                      thoughts={message.thoughts as Thought[]}
-                      defaultExpanded={false}
-                    />
-                    {/* Only render the message bubble if there is text content.
-                        Assistant events with only tool_use/thinking blocks have empty content —
-                        rendering MessageItem for those would produce empty visible bubbles. */}
-                    {message.content && (
-                      <MessageItem
-                        message={message}
-                        hideThoughts
-                        isInContainer
-                        hideBrowserViewButton
-                      />
-                    )}
-                  </div>
-                </div>
-              )
-            }
-
-            return (
-              <div key={message.id} className="pb-4">
-                <MessageItem message={message} hideBrowserViewButton />
-              </div>
-            )
-          })}
+          {messages.map((message) => (
+            <MessageRow
+              key={message.id}
+              message={message}
+              hideBrowserViewButton
+            />
+          ))}
 
           {/* Live streaming content */}
           {hasStreamingContent && (
-            <div className="flex justify-start pb-4 animate-fade-in">
-              <div className="w-[85%]">
-                {/* Real-time thought process */}
-                {(thoughts.length > 0 || isThinking) && (
-                  <ThoughtProcess thoughts={thoughts} isThinking={isThinking} />
-                )}
-
-                {/* Real-time browser task card */}
-                {streamingBrowserToolCalls.length > 0 && (
-                  <div className="mb-4">
-                    <BrowserTaskCard
-                      browserToolCalls={streamingBrowserToolCalls}
-                      isActive={isThinking}
-                      showViewButton={false}
-                    />
-                  </div>
-                )}
-
-                {/* Streaming text content with scroll animation */}
-                <StreamingBubble
-                  content={streamingContent}
-                  isStreaming={isStreaming}
-                  thoughts={thoughts}
-                  textBlockVersion={textBlockVersion}
-                />
-
-                {/* AskUserQuestion card */}
-                {pendingQuestion && (
-                  <AskUserQuestionCard
-                    pendingQuestion={pendingQuestion}
-                    onAnswer={handleAnswerQuestion}
-                  />
-                )}
-              </div>
-            </div>
+            <StreamingSection
+              streamingContent={streamingContent}
+              isStreaming={isStreaming}
+              thoughts={thoughts}
+              isThinking={isThinking}
+              textBlockVersion={textBlockVersion}
+              browserToolCalls={streamingBrowserToolCalls}
+              showBrowserViewButton={false}
+              pendingQuestion={pendingQuestion}
+              onAnswerQuestion={handleAnswerQuestion}
+            />
           )}
 
           {/* Interrupted error (special friendly UI) */}
@@ -416,7 +354,7 @@ export function AppChatView({ appId, spaceId }: AppChatViewProps) {
                   className="flex items-center gap-1 px-2 py-1 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
                   title={t('Clear chat history')}
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Eraser className="w-3 h-3" />
                   {t('Clear chat')}
                 </button>
               </div>

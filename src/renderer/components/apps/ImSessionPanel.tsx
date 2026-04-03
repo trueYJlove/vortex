@@ -11,7 +11,7 @@
  * Supports clearing individual IM sessions via a confirmation dialog.
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
 import { MessageSquare, X } from 'lucide-react'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -36,9 +36,6 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
     imSessions, fetchImSessions,
   } = useAppsPageStore()
   const resetSession = useChatStore(s => s.resetSession)
-
-  // ── Clear confirmation state ──
-  const [clearingSession, setClearingSession] = useState<ImSessionRecord | null>(null)
 
   // Fetch + poll from shared store
   useEffect(() => {
@@ -68,31 +65,18 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
     if (isMobile) toggleImPanel()
   }
 
-  const handleClearRequest = useCallback((session: ImSessionRecord) => {
-    setClearingSession(session)
-  }, [])
-
-  const handleClearConfirm = useCallback(async () => {
-    if (!clearingSession) return
-    const session = clearingSession
+  const handleClearConfirm = useCallback(async (session: ImSessionRecord) => {
     try {
       const res = await api.appImChatClear(appId, spaceId, session.channel, session.chatType, session.chatId)
       if (res.success) {
-        // Reset streaming state for the cleared session
         const conversationId = `app-chat:${appId}:${session.channel}:${session.chatType}:${session.chatId}`
         resetSession(conversationId)
         onSessionCleared?.(session)
       }
     } catch (err) {
       console.error('[ImSessionPanel] Clear session error:', err)
-    } finally {
-      setClearingSession(null)
     }
-  }, [clearingSession, appId, spaceId, resetSession, onSessionCleared])
-
-  const handleClearCancel = useCallback(() => {
-    setClearingSession(null)
-  }, [])
+  }, [appId, spaceId, resetSession, onSessionCleared])
 
   const isHaloChatSelected = selectedImSession === null
 
@@ -109,29 +93,6 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
         </button>
       </div>
 
-      {/* Clear confirmation banner */}
-      {clearingSession && (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 bg-destructive/5 border-b border-destructive/20 flex-shrink-0">
-          <span className="text-[11px] text-muted-foreground truncate">
-            {t('Clear session history?')}
-          </span>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <button
-              onClick={handleClearConfirm}
-              className="px-2 py-0.5 text-[11px] text-destructive hover:bg-destructive/10 rounded transition-colors"
-            >
-              {t('Confirm')}
-            </button>
-            <button
-              onClick={handleClearCancel}
-              className="px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-secondary rounded transition-colors"
-            >
-              {t('Cancel')}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Session list */}
       <div className="flex-1 overflow-y-auto">
         {/* Fixed: Halo Chat (native conversation) */}
@@ -145,7 +106,12 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
         >
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary flex-shrink-0" />
-            <span className="text-sm font-medium">{t('Halo Chat')}</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">{t('Halo Chat')}</div>
+              <div className="text-[11px] text-muted-foreground/60 mt-0.5">
+                {t('Native conversation')}
+              </div>
+            </div>
           </div>
         </button>
 
@@ -162,7 +128,7 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
               selectedImSession?.chatId === session.chatId
             }
             onClick={() => handleSelectImSession(session)}
-            onClear={handleClearRequest}
+            onClearConfirm={handleClearConfirm}
           />
         ))}
 

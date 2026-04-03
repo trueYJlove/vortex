@@ -9,7 +9,8 @@
  * from a hover-revealed clear button.
  */
 
-import { Trash2, User, Users } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Eraser, User, Users } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chat.store'
 import type { ImSessionRecord } from '../../../shared/types/im-channel'
@@ -18,8 +19,8 @@ interface ImSessionItemProps {
   session: ImSessionRecord
   isSelected: boolean
   onClick: () => void
-  /** Called when the user clicks the clear button on this session */
-  onClear?: (session: ImSessionRecord) => void
+  /** Called when the user confirms clearing this session */
+  onClearConfirm?: (session: ImSessionRecord) => void
 }
 
 /** Channel identifier → display label */
@@ -41,8 +42,9 @@ function formatRelativeTime(epochMs: number): string {
   return `${days}d`
 }
 
-export function ImSessionItem({ session, isSelected, onClick, onClear }: ImSessionItemProps) {
+export function ImSessionItem({ session, isSelected, onClick, onClearConfirm }: ImSessionItemProps) {
   const { t } = useTranslation()
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   // Build conversationId to check streaming state
   const conversationId = `app-chat:${session.appId}:${session.channel}:${session.chatType}:${session.chatId}`
@@ -52,6 +54,22 @@ export function ImSessionItem({ session, isSelected, onClick, onClear }: ImSessi
   const channelLabel = CHANNEL_LABELS[session.channel] ?? session.channel
   const chatTypeLabel = session.chatType === 'group' ? t('Group') : t('Direct')
   const ChatTypeIcon = session.chatType === 'group' ? Users : User
+
+  const handleClearClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowClearConfirm(true)
+  }, [])
+
+  const handleConfirm = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    onClearConfirm?.(session)
+    setShowClearConfirm(false)
+  }, [session, onClearConfirm])
+
+  const handleCancel = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setShowClearConfirm(false)
+  }, [])
 
   return (
     <button
@@ -88,22 +106,38 @@ export function ImSessionItem({ session, isSelected, onClick, onClear }: ImSessi
           )}
         </div>
 
-        {/* Time + Clear button */}
+        {/* Time + Clear button / Inline confirmation */}
         <div className="flex flex-col items-end gap-1 flex-shrink-0 self-start mt-0.5">
-          <span className="text-[10px] text-muted-foreground/50">
-            {formatRelativeTime(session.lastActiveAt)}
-          </span>
-          {onClear && !isGenerating && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onClear(session)
-              }}
-              className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-secondary transition-all"
-              title={t('Clear session')}
-            >
-              <Trash2 className="w-3 h-3 text-muted-foreground/60 hover:text-destructive" />
-            </button>
+          {showClearConfirm ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleConfirm}
+                className="px-1.5 py-0.5 text-[11px] text-destructive hover:bg-destructive/10 rounded transition-colors"
+              >
+                {t('Confirm')}
+              </button>
+              <button
+                onClick={handleCancel}
+                className="px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-secondary rounded transition-colors"
+              >
+                {t('Cancel')}
+              </button>
+            </div>
+          ) : (
+            <>
+              <span className="text-[10px] text-muted-foreground/50">
+                {formatRelativeTime(session.lastActiveAt)}
+              </span>
+              {onClearConfirm && !isGenerating && (
+                <button
+                  onClick={handleClearClick}
+                  className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-secondary transition-all"
+                  title={t('Clear session')}
+                >
+                  <Eraser className="w-3 h-3 text-muted-foreground/60 hover:text-destructive" />
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -905,7 +905,7 @@ export const api = {
     return httpRequest('POST', '/api/notify-channels/clear-cache')
   },
 
-  // ===== WeCom Bot (企业微信智能机器人) =====
+  // ===== WeCom Bot (legacy compat) =====
   getWecomBotStatus: async (): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.halo.getWecomBotStatus()
@@ -920,12 +920,48 @@ export const api = {
     return httpRequest('POST', '/api/wecom-bot/reconnect')
   },
 
+  // ===== IM Channels (multi-instance) =====
+  imChannelsStatus: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.imChannelsStatus()
+    }
+    return httpRequest('GET', '/api/im-channels/status')
+  },
+
+  imChannelsInstanceStatus: async (instanceId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.imChannelsInstanceStatus(instanceId)
+    }
+    return httpRequest('GET', `/api/im-channels/status?instanceId=${encodeURIComponent(instanceId)}`)
+  },
+
+  imChannelsReconnect: async (instanceId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.imChannelsReconnect(instanceId)
+    }
+    return httpRequest('POST', '/api/im-channels/reconnect', { instanceId })
+  },
+
+  imChannelsReload: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.imChannelsReload()
+    }
+    return httpRequest('POST', '/api/im-channels/reload')
+  },
+
+  imChannelsProviders: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.imChannelsProviders()
+    }
+    return httpRequest('GET', '/api/im-channels/providers')
+  },
+
   // ===== IM Sessions (会话管理) =====
   imSessionsList: async (appId?: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.halo.imSessionsList(appId)
     }
-    const path = appId ? `/api/im-sessions/${appId}` : '/api/im-sessions'
+    const path = appId ? `/api/im-sessions?appId=${encodeURIComponent(appId)}` : '/api/im-sessions'
     return httpRequest('GET', path)
   },
 

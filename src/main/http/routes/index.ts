@@ -33,7 +33,7 @@ import {
 import { getTempSpacePath, getSpacesDir, getConfig as getServiceConfig } from '../../services/config.service'
 import { getSpace, getAllSpacePaths } from '../../services/space.service'
 import { getAppManager } from '../../apps/manager'
-import { getAppRuntime, getWecomBotSource, sendAppChatMessage, stopAppChat, isAppChatGenerating, loadAppChatMessages, loadImChatMessages, getAppChatSessionState, getAppChatConversationId, clearAppChat, clearImSession } from '../../apps/runtime'
+import { getAppRuntime, getImChannelManager, sendAppChatMessage, stopAppChat, isAppChatGenerating, loadAppChatMessages, loadImChatMessages, getAppChatSessionState, getAppChatConversationId, clearAppChat, clearImSession } from '../../apps/runtime'
 import type { AppListFilter, UninstallOptions, InstalledApp } from '../../apps/manager'
 import type { ActivityQueryOptions, EscalationResponse, AppChatRequest } from '../../apps/runtime'
 import { readSessionMessages } from '../../apps/runtime/session-store'
@@ -749,19 +749,22 @@ export function registerApiRoutes(app: Express): void {
     }
   })
 
-  // ===== WeCom Bot Routes (企业微信智能机器人) =====
+  // ===== WeCom Bot Routes (legacy compat — delegates to ImChannelManager) =====
 
-  // GET /api/wecom-bot/status — get connection status
   app.get('/api/wecom-bot/status', async (req: Request, res: Response) => {
     try {
-      const source = getWecomBotSource()
-      const config = getServiceConfig().wecomBot
+      const manager = getImChannelManager()
+      if (!manager) {
+        res.json({ success: true, data: { configured: false, enabled: false, connected: false } })
+        return
+      }
+      const statuses = manager.getAllStatuses().filter(s => s.type === 'wecom-bot')
       res.json({
         success: true,
         data: {
-          configured: !!(config?.botId && config?.secret),
-          enabled: config?.enabled ?? false,
-          connected: source?.isConnected() ?? false,
+          configured: statuses.length > 0,
+          enabled: statuses.some(s => s.enabled),
+          connected: statuses.some(s => s.connected),
         }
       })
     } catch (error) {
@@ -769,16 +772,87 @@ export function registerApiRoutes(app: Express): void {
     }
   })
 
-  // POST /api/wecom-bot/reconnect — reconnect with current config
   app.post('/api/wecom-bot/reconnect', async (req: Request, res: Response) => {
     try {
-      const source = getWecomBotSource()
-      if (!source) {
-        res.status(503).json({ success: false, error: 'WecomBotSource not initialized' })
+      const manager = getImChannelManager()
+      if (!manager) {
+        res.status(503).json({ success: false, error: 'ImChannelManager not initialized' })
         return
       }
-      source.reconnectWithConfig()
+      for (const s of manager.getAllStatuses().filter(s => s.type === 'wecom-bot')) {
+        manager.reconnectInstance(s.id)
+      }
       res.json({ success: true })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // ===== IM Channel Routes (multi-instance) =====
+
+  // GET /api/im-channels/status — all instance statuses
+  app.get('/api/im-channels/status', async (req: Request, res: Response) => {
+    try {
+      const manager = getImChannelManager()
+      res.json({ success: true, data: manager?.getAllStatuses() ?? [] })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // POST /api/im-channels/reconnect — reconnect a specific instance
+  app.post('/api/im-channels/reconnect', async (req: Request, res: Response) => {
+    try {
+      const { instanceId } = req.body
+      if (!instanceId) {
+        res.status(400).json({ success: false, error: 'instanceId is required' })
+        return
+      }
+      const manager = getImChannelManager()
+      if (!manager) {
+        res.status(503).json({ success: false, error: 'ImChannelManager not initialized' })
+        return
+      }
+      const ok = manager.reconnectInstance(instanceId)
+      res.json({ success: ok, error: ok ? undefined : `Instance "${instanceId}" not found` })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // POST /api/im-channels/reload — reload all instances from config
+  app.post('/api/im-channels/reload', async (req: Request, res: Response) => {
+    try {
+      const manager = getImChannelManager()
+      if (!manager) {
+        res.status(503).json({ success: false, error: 'ImChannelManager not initialized' })
+        return
+      }
+      const config = getServiceConfig()
+      const instances = config.imChannels?.instances ?? []
+      const { dispatchInboundMessage } = require('../../apps/runtime/dispatch-inbound')
+      manager.applyConfig(instances, (instanceId: string, appId: string, msg: any, reply: any) => {
+        dispatchInboundMessage(msg, reply, appId, instanceId)
+      })
+      res.json({ success: true })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // GET /api/im-channels/providers — available provider types
+  app.get('/api/im-channels/providers', async (req: Request, res: Response) => {
+    try {
+      const manager = getImChannelManager()
+      const providers = manager?.getAllProviders().map(p => ({
+        type: p.type,
+        displayName: p.displayName,
+        description: p.description,
+        direction: p.direction,
+        configFields: p.configFields,
+        defaultConfig: p.defaultConfig,
+      })) ?? []
+      res.json({ success: true, data: providers })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
     }

@@ -28,6 +28,7 @@ import { getOnboardingPrompt } from '../onboarding/onboardingData'
 import { ImageAttachmentPreview } from './ImageAttachmentPreview'
 import { processImage, isValidImageType, formatFileSize } from '../../utils/imageProcessor'
 import type { ImageAttachment, Artifact } from '../../types'
+import { getCurrentSource, supportsVision } from '../../types'
 import { useTranslation } from '../../i18n'
 import { SlashCommandMenu, filterSlashCommands } from './SlashCommandMenu'
 import type { SlashCommandItem } from '../../types/slash-command'
@@ -96,6 +97,16 @@ interface ImageError {
 export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact = false, slashCommands = [], mentionArtifacts = [] }: InputAreaProps) {
   const { t } = useTranslation()
   const sendKeyMode = useAppStore(state => state.config?.chat?.sendKeyMode ?? 'enter')
+
+  // Vision support detection — block image input for non-multimodal models
+  const aiSources = useAppStore(state => state.config?.aiSources)
+  const visionEnabled = useMemo(() => {
+    if (!aiSources) return true
+    const source = getCurrentSource(aiSources)
+    if (!source) return true
+    const model = source.availableModels.find(m => m.id === source.model)
+    return model ? supportsVision(model) : true
+  }, [aiSources])
   const [content, setContent] = useState('')
   const [isFocused, setIsFocused] = useState(false)
   const [images, setImages] = useState<ImageAttachment[]>([])
@@ -231,6 +242,10 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
 
     if (imageFiles.length > 0) {
       e.preventDefault()  // Prevent default only if we're handling images
+      if (!visionEnabled) {
+        showError(t('Current model does not support image input'))
+        return
+      }
       await addImages(imageFiles)
     }
   }
@@ -285,6 +300,10 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
     const files = Array.from(e.dataTransfer.files).filter(file => isValidImageType(file))
 
     if (files.length > 0) {
+      if (!visionEnabled) {
+        showError(t('Current model does not support image input'))
+        return
+      }
       await addImages(files)
     }
   }
@@ -303,6 +322,11 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
 
   // Handle image button click (from attachment menu)
   const handleImageButtonClick = () => {
+    if (!visionEnabled) {
+      showError(t('Current model does not support image input'))
+      setShowAttachMenu(false)
+      return
+    }
     setShowAttachMenu(false)
     fileInputRef.current?.click()
   }
@@ -737,6 +761,7 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
             onSend={handleSend}
             onStop={onStop}
             sendKeyMode={sendKeyMode}
+            visionEnabled={visionEnabled}
           />
         </div>
       </div>
@@ -768,6 +793,7 @@ interface InputToolbarProps {
   onSend: () => void
   onStop: () => void
   sendKeyMode: 'enter' | 'ctrl-enter'
+  visionEnabled: boolean
 }
 
 function InputToolbar({
@@ -787,7 +813,8 @@ function InputToolbar({
   canSend,
   onSend,
   onStop,
-  sendKeyMode
+  sendKeyMode,
+  visionEnabled
 }: InputToolbarProps) {
   const { t } = useTranslation()
   return (
@@ -819,18 +846,24 @@ function InputToolbar({
                 rounded-xl shadow-lg min-w-[160px] z-20 animate-fade-in">
                 <button
                   onClick={onImageClick}
-                  disabled={imageCount >= maxImages}
+                  disabled={!visionEnabled || imageCount >= maxImages}
                   className={`w-full px-3 py-2 flex items-center gap-3 text-sm
                     transition-colors duration-150
-                    ${imageCount >= maxImages
+                    ${!visionEnabled || imageCount >= maxImages
                       ? 'text-muted-foreground/40 cursor-not-allowed'
                       : 'text-foreground hover:bg-muted/50'
                     }
                   `}
+                  title={!visionEnabled ? t('Current model does not support image input') : undefined}
                 >
                   <ImagePlus size={16} className="text-muted-foreground" />
                   <span>{t('Add image')}</span>
-                  {imageCount > 0 && (
+                  {!visionEnabled && (
+                    <span className="ml-auto text-xs text-muted-foreground/60">
+                      {t('Not supported')}
+                    </span>
+                  )}
+                  {visionEnabled && imageCount > 0 && (
                     <span className="ml-auto text-xs text-muted-foreground">
                       {imageCount}/{maxImages}
                     </span>

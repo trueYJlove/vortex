@@ -16,7 +16,7 @@
  * - Mobile (<640px): Panel as full-screen overlay
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { PanelRight } from 'lucide-react'
 import { useAppsPageStore } from '../../stores/apps-page.store'
 import { useChatStore } from '../../stores/chat.store'
@@ -68,20 +68,22 @@ export function AppChatContainer({ appId, spaceId }: AppChatContainerProps) {
     <div className="flex h-full">
       {/* Main conversation area */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Toggle button bar */}
-        <div className="flex items-center justify-end px-2 py-1 flex-shrink-0">
-          <button
-            onClick={toggleImPanel}
-            className="relative p-1.5 rounded hover:bg-secondary transition-colors"
-            title={t('Conversations')}
-          >
-            <PanelRight className="w-4 h-4 text-muted-foreground" />
-            {/* Active badge when panel is closed and IM sessions are active */}
-            {!imPanelOpen && hasActiveImSession && (
-              <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
-            )}
-          </button>
-        </div>
+        {/* Toggle button bar — only when panel is closed */}
+        {!imPanelOpen && (
+          <div className="flex items-center justify-end px-2 py-1 flex-shrink-0">
+            <button
+              onClick={toggleImPanel}
+              className="relative p-1.5 rounded hover:bg-secondary transition-colors"
+              title={t('Conversations')}
+            >
+              <PanelRight className="w-4 h-4 text-muted-foreground" />
+              {/* Active badge when IM sessions are active */}
+              {hasActiveImSession && (
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary animate-pulse" />
+              )}
+            </button>
+          </div>
+        )}
 
         {/* Conversation content */}
         <div className="flex-1 overflow-hidden">
@@ -124,18 +126,24 @@ export function AppChatContainer({ appId, spaceId }: AppChatContainerProps) {
 function useImActiveIndicator(appId: string): boolean {
   const imSessions = useAppsPageStore(s => s.imSessions)
 
-  // Build the set of conversationIds to watch
-  const convIds = imSessions.map(
-    s => `app-chat:${appId}:${s.channel}:${s.chatType}:${s.chatId}`
+  // Stabilize convIds — only rebuild when imSessions or appId changes,
+  // avoiding a new array (and new selector closure) on every render.
+  const convIds = useMemo(
+    () => imSessions.map(s => `app-chat:${appId}:${s.channel}:${s.chatType}:${s.chatId}`),
+    [imSessions, appId]
   )
 
-  // Subscribe reactively to the sessions map in chat store.
-  // The selector returns true if ANY of the convIds is generating.
-  return useChatStore(state => {
-    for (const id of convIds) {
-      const session = state.sessions.get(id)
-      if (session?.isGenerating) return true
-    }
-    return false
-  })
+  // Stabilize the selector — only rebuild when convIds changes.
+  // This allows Zustand to skip re-execution when the selector ref is stable.
+  const selector = useCallback(
+    (state: { sessions: Map<string, { isGenerating?: boolean }> }) => {
+      for (const id of convIds) {
+        if (state.sessions.get(id)?.isGenerating) return true
+      }
+      return false
+    },
+    [convIds]
+  )
+
+  return useChatStore(selector)
 }

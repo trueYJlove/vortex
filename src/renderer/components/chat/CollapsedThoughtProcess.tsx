@@ -30,6 +30,8 @@ import { getCurrentLanguage, useTranslation } from '../../i18n'
 interface CollapsedThoughtProcessProps {
   thoughts: Thought[]
   defaultExpanded?: boolean
+  /** Start in full-height mode (max-h-[80vh] instead of 300px). Useful for debugging views. */
+  defaultMaximized?: boolean
 }
 
 
@@ -175,10 +177,10 @@ function LazyCollapsedThoughtItem({
   )
 }
 
-export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false }: CollapsedThoughtProcessProps) {
+export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, defaultMaximized = false }: CollapsedThoughtProcessProps) {
   const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  const [isMaximized, setIsMaximized] = useState(false)
+  const [isMaximized, setIsMaximized] = useState(defaultMaximized)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Get latest todo data (only render one TodoCard at bottom)

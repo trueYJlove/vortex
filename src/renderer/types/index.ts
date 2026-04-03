@@ -67,6 +67,9 @@ export {
   type BuiltinProvider
 } from '../../shared/constants/providers';
 
+// Re-export model capabilities
+export { supportsVision } from '../../shared/constants/model-capabilities';
+
 // Permission Level
 export type PermissionLevel = 'allow' | 'ask' | 'deny';
 
@@ -246,8 +249,9 @@ export interface HaloConfig {
   mcpServers: McpServersConfig;  // MCP servers configuration
   notifications?: NotificationConfig;  // Notification preferences
   notificationChannels?: NotificationChannelsConfig;  // External notification channels
-  wecomBot?: import('../../../shared/types/notification-channels').WecomBotConfig;  // WeCom Intelligent Bot
-  imChannels?: import('../../../shared/types/notification-channels').ImChannelsConfig;  // Global IM channel config
+  /** @deprecated Migrated to imChannels.instances[] */
+  wecomBot?: import('../../../shared/types/notification-channels').WecomBotConfig;
+  imChannels?: import('../../../shared/types/notification-channels').ImChannelsConfig;  // IM channels (multi-instance)
   agent?: AgentConfig;  // Agent behavior settings
   layout?: LayoutConfig;  // Global layout preferences (panel sizes and visibility)
   chat?: ChatConfig;  // Chat behavior preferences
