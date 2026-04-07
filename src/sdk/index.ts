@@ -42,6 +42,7 @@ import type { SDKMessage } from './core/query-loop.js';
 import { resolveQueryConfig } from './core/context.js';
 import { getAllTools, filterTools } from './tools/registry.js';
 import { extractSdkMcpTools, connectExternalMcpServers } from './tools/mcp/bridge.js';
+import { initOrchestrator } from './orchestrator/init.js';
 
 /**
  * The Query object — an AsyncGenerator<SDKMessage> with additional
@@ -147,6 +148,13 @@ export function query(params: {
       console.warn(`[SDK] External MCP connection error: ${msg}`);
     }
 
+    // Initialize orchestrator (wires AgentTool spawner + SendMessage router)
+    const orchestrator = initOrchestrator({
+      provider,
+      config: configWithSignal,
+      tools,
+    });
+
     try {
       if (typeof prompt === 'string') {
         yield* queryLoop(configWithSignal, provider, tools, prompt);
@@ -161,6 +169,8 @@ export function query(params: {
         yield* queryLoop(configWithSignal, provider, tools, firstPrompt);
       }
     } finally {
+      // Dispose orchestrator (abort sub-agents, reset stubs)
+      orchestrator.dispose();
       // Disconnect external MCP servers on completion or error
       disconnectMcp?.();
     }
@@ -352,6 +362,20 @@ export type {
   JsonRpcResponse,
   JsonRpcError,
 } from './tools/mcp/jsonrpc.js';
+
+// Orchestrator
+export { initOrchestrator } from './orchestrator/init.js';
+export type { OrchestratorHandle } from './orchestrator/init.js';
+export { AgentRegistry } from './orchestrator/registry.js';
+export type { AgentEntry, AgentStatus } from './orchestrator/registry.js';
+export { createSpawner } from './orchestrator/spawner.js';
+export type { SpawnerDeps } from './orchestrator/spawner.js';
+
+// Agent tool injection
+export { setSpawner } from './tools/agent/index.js';
+export type { AgentSpawner, AgentSpawnRequest } from './tools/agent/index.js';
+export { setMessageRouter } from './tools/send-message/index.js';
+export type { MessageRouter, AgentMessage } from './tools/send-message/index.js';
 
 // ---------------------------------------------------------------------------
 // Prompt

@@ -13,9 +13,7 @@ tsc --noEmit passes. Core architecture (types, LLM providers, tools, query loop,
 - Public API: query(), createSession(), unstable_v2_createSession()
 
 ### What's Missing / Stub
-- **orchestrator/** — empty directory. No Worker Thread sub-agent support.
 - **WebSearchTool** — stub, returns placeholder message.
-- **AgentTool** — stub when no spawner registered (orchestrator dependency).
 - **TeamCreateTool** — stub when no agent runner registered.
 - **Hook system** — defined in config but never invoked in query loop.
 - **Effort level** — accepted in config but not mapped to provider request.
@@ -25,7 +23,6 @@ tsc --noEmit passes. Core architecture (types, LLM providers, tools, query loop,
 - microCompact skips array-typed tool_result content (only handles string)
 - Anthropic listModels() is hardcoded (3 models, no API call)
 - OpenAI-compat listModels() hardcodes contextWindow/maxOutputTokens for all models
-- TodoWrite schema expects `id` field but LLM sends `activeForm` field
 - TaskStopTool only updates metadata, doesn't actually kill processes
 - TaskOutputTool `block` parameter is a no-op
 - GlobTool skips all hidden directories
@@ -44,9 +41,35 @@ tsc --noEmit passes. Core architecture (types, LLM providers, tools, query loop,
 - **Session/query lifecycle** — external MCP servers auto-connected at startup, disconnected on close.
 - **Graceful degradation** — individual server failures are logged and skipped, don't block others.
 
+### What Works (added Run 4)
+- **Orchestrator** — in-process sub-agent spawning (foreground + background). `orchestrator/` is no longer empty.
+- **AgentTool** — fully wired to the real spawner via `initOrchestrator()`. Sub-agents run their own query loop.
+- **Background agents** — fire-and-forget mode with `AgentRegistry` for tracking status/result.
+- **TodoWrite** — fixed schema mismatch (`id` → `activeForm`), tool was completely broken before.
+- **Exports** — `initOrchestrator`, `AgentRegistry`, `createSpawner`, `setSpawner`, `setMessageRouter` all public.
+
 ---
 
 ## Changelog
+
+### 2026-04-08 — Run 4: Orchestrator + TodoWrite fix
+
+**Implemented in-process sub-agent spawning (foreground + background) and fixed TodoWrite**
+
+Two critical improvements: (1) the orchestrator/ directory was empty — now it contains the full agent spawning infrastructure, (2) TodoWrite was completely non-functional because the LLM sends `{content, status, activeForm}` but the tool expected `{id, content, status}`.
+
+**New files:**
+- `orchestrator/registry.ts` — `AgentRegistry` class: tracks running/completed/failed/stopped agents with abort, lifecycle timestamps, collected messages, and done promise.
+- `orchestrator/spawner.ts` — `createSpawner()` factory: builds an `AgentSpawner` that runs child `queryLoop()` in-process. Supports foreground (blocking) and background (fire-and-forget) modes. Resolves model aliases (sonnet/opus/haiku), filters tools (excludes Agent to prevent recursion), builds sub-agent system prompt from AgentDefinition or defaults.
+- `orchestrator/init.ts` — `initOrchestrator()`: one-call setup that wires `setSpawner()` on AgentTool and `setMessageRouter()` on SendMessageTool. Returns `OrchestratorHandle` with dispose for cleanup.
+
+**Changes:**
+- `core/session.ts` — `createSession()` now calls `initOrchestrator()` after building tools, `close()` disposes the orchestrator before aborting.
+- `index.ts` — `query()` now initializes/disposes orchestrator around the query loop. Exports all orchestrator types and injection functions.
+- `tools/agent/index.ts` — `setSpawner()` now accepts `null` for reset. Updated JSDoc (no longer "Phase 3 stub").
+- `tools/send-message/index.ts` — `setMessageRouter()` now accepts `null` for reset.
+- `tools/todo-write/schema.ts` — replaced `id` property with `activeForm`, updated `required` to `['content', 'status', 'activeForm']`.
+- `tools/todo-write/index.ts` — replaced `TodoItem.id` with `TodoItem.activeForm`, deduplication keyed by `content`, transition validation keyed by `content`, output shows `activeForm` for in-progress items.
 
 ### 2026-04-08 — Run 3: External MCP transport (P0 compatibility)
 

@@ -15,6 +15,8 @@ import type { SDKMessage } from './query-loop.js';
 import { getAllTools, filterTools } from '../tools/registry.js';
 import { extractSdkMcpTools, connectExternalMcpServers } from '../tools/mcp/bridge.js';
 import type { ExternalMcpConnection } from '../tools/mcp/bridge.js';
+import { initOrchestrator } from '../orchestrator/init.js';
+import type { OrchestratorHandle } from '../orchestrator/init.js';
 
 // ---------------------------------------------------------------------------
 // SDKSession interface
@@ -62,6 +64,8 @@ interface SessionState {
   activeStream: AsyncGenerator<SDKMessage, void, undefined> | null;
   /** External MCP connection (for cleanup on close). */
   externalMcp: ExternalMcpConnection | null;
+  /** Orchestrator handle (for sub-agent lifecycle). */
+  orchestrator: OrchestratorHandle | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,9 +139,17 @@ export async function createSession(options: Options): Promise<SDKSession> {
     disallowedTools: config.disallowedTools,
   });
 
+  // Initialize the orchestrator (wires AgentTool spawner + SendMessage router)
+  const configWithSignal = { ...config, abortSignal: abortController.signal };
+  const orchestrator = initOrchestrator({
+    provider,
+    config: configWithSignal,
+    tools,
+  });
+
   const state: SessionState = {
     sessionId,
-    config: { ...config, abortSignal: abortController.signal },
+    config: configWithSignal,
     provider,
     tools,
     messages: [],
@@ -146,6 +158,7 @@ export async function createSession(options: Options): Promise<SDKSession> {
     pendingMessages: [],
     activeStream: null,
     externalMcp,
+    orchestrator,
   };
 
   return createSessionProxy(state);
@@ -247,6 +260,12 @@ function createSessionProxy(state: SessionState): SDKSession {
       if (!state.closed) {
         state.closed = true;
         state.abortController.abort();
+
+        // Dispose orchestrator (abort sub-agents, reset stubs)
+        if (state.orchestrator) {
+          state.orchestrator.dispose();
+          state.orchestrator = null;
+        }
 
         // Disconnect external MCP servers
         if (state.externalMcp) {
