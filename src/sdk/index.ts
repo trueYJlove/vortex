@@ -18,6 +18,7 @@ export type { SDKSession } from './core/session.js';
 export { queryLoop } from './core/query-loop.js';
 export type { SDKMessage } from './core/query-loop.js';
 export { CostTracker } from './core/cost.js';
+export type { ModelUsageEntry } from './core/cost.js';
 export { TokenBudget } from './core/token-budget.js';
 export { resolveQueryConfig, createAgentContext } from './core/context.js';
 export {

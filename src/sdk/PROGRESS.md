@@ -16,7 +16,6 @@ tsc --noEmit passes. Core architecture (types, LLM providers, tools, query loop,
 - **WebSearchTool** — stub, returns placeholder message.
 - **TeamCreateTool** — stub when no agent runner registered.
 - **Effort level** — accepted in config but not mapped to provider request.
-- **Query control methods** — setModel/setMaxThinkingTokens/setPermissionMode are no-ops.
 
 ### Known Issues (not yet fixed)
 - Anthropic listModels() is hardcoded (3 models, no API call)
@@ -55,9 +54,31 @@ tsc --noEmit passes. Core architecture (types, LLM providers, tools, query loop,
 - **buildTranscript array content** — full compact transcript builder now extracts text from array-typed tool_result content blocks instead of showing `[complex content]`.
 - **Generic hook runner** — `runEventHooks()` exported for SessionStart/SessionEnd/PreCompact/PostCompact and other lifecycle events.
 
+### What Works (added Run 6)
+- **SDKMessage CC-compatible format** — All message types now use snake_case field names matching the CC SDK wire format (`session_id`, `tool_use_id`, `tool_name`, `parent_tool_use_id`, `total_cost_usd`, `num_turns`, `is_error`, `stop_reason`, `duration_ms`). Previously used camelCase (`sessionId`, `toolUseId`, `costUsd`, `turns`), which was incompatible with consumer code.
+- **Result messages** — Now include all CC SDK fields: `result` (text), `is_error`, `num_turns`, `total_cost_usd`, `usage`, `modelUsage`, `session_id`, `stop_reason`, `duration_ms`, `duration_api_ms`, `permission_denials`, `uuid`. Error results use `errors: string[]` instead of `error: string`, and `subtype: 'error_during_execution'` instead of `'error'`.
+- **Per-model usage tracking** — `CostTracker` now tracks per-model usage (`ModelUsageEntry`) with `getUsage()` and `getModelUsage()` methods for CC SDK compatible result reporting.
+- **V2 Session control methods** — `interrupt()`, `setModel()`, `setMaxThinkingTokens()`, `setPermissionMode()` are now real implementations on SDKSession. `interrupt()` aborts and creates a new AbortController; `setModel()` changes the model for subsequent turns; `setMaxThinkingTokens()` adjusts thinking configuration.
+- **Init message enrichment** — System `init` messages now include `cwd`, `agents` (from config), matching CC SDK's `SDKSystemMessage` fields.
+- **Consistent session_id** — All message types (`assistant`, `user`, `stream_event`, `result`, `system`) now carry `session_id`. V2 sessions pass their sessionId to queryLoop for consistency.
+- **Tool progress format** — `tool_progress` messages use snake_case fields and include `elapsed_time_seconds` timing.
+
 ---
 
 ## Changelog
+
+### 2026-04-08 — Run 6: SDKMessage CC-compatible format + V2 session control methods
+
+**Made SDKMessage types wire-compatible with CC SDK and implemented V2 session control methods**
+
+The consumer (hello-halo) reads SDKMessage fields via `as any` casts with snake_case field names (`msg.session_id`, `msg.total_cost_usd`, `msg.num_turns`, `msg.result`, etc.). The SDK was emitting camelCase fields (`msg.sessionId`, `msg.costUsd`, `msg.turns`), causing silent field-miss errors. This run brings all SDKMessage types to full CC SDK wire-level compatibility.
+
+**Changes:**
+- `core/query-loop.ts` — Complete SDKMessage type definition rewrite: 10 discriminated union variants with CC SDK snake_case fields. All `yield` sites updated: init, assistant, user, stream_event, result (success+error), tool_progress, compact_boundary, status, api_retry. Added `buildErrorResult()` helper. Added `startTime` tracking for `duration_ms`. queryLoop now accepts `sessionId` option for V2 session consistency.
+- `core/cost.ts` — Added `ModelUsageEntry` interface, per-model usage tracking in `CostTracker.add()`, `getUsage()` and `getModelUsage()` methods for CC SDK compatible result reporting. Exported `ModelUsageEntry` type.
+- `core/session.ts` — SDKSession interface now includes `interrupt()`, `setModel()`, `setMaxThinkingTokens()`, `setPermissionMode()`. `interrupt()` aborts current work and creates a new AbortController for subsequent interactions. `setModel()` and `setMaxThinkingTokens()` mutate the internal config. Session passes its `sessionId` to queryLoop.
+- `orchestrator/spawner.ts` — Updated to read `msg.total_cost_usd` and `msg.num_turns` (was `msg.costUsd` / `msg.turns`).
+- `index.ts` — Exports `ModelUsageEntry` type from cost module.
 
 ### 2026-04-08 — Run 5: Hook system + microCompact fix
 

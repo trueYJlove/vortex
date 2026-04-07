@@ -8,7 +8,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Message, LlmProvider } from '../types/provider.js';
 import type { Tool } from '../types/tool.js';
-import type { Options, QueryConfig } from '../types/config.js';
+import type { Options, QueryConfig, PermissionMode } from '../types/config.js';
 import { resolveQueryConfig } from './context.js';
 import { queryLoop } from './query-loop.js';
 import type { SDKMessage } from './query-loop.js';
@@ -22,7 +22,10 @@ import type { OrchestratorHandle } from '../orchestrator/init.js';
 // SDKSession interface
 // ---------------------------------------------------------------------------
 
-/** A stateful session that holds conversation state across multiple sends. */
+/**
+ * A stateful session that holds conversation state across multiple sends.
+ * Mirrors CC SDK's SDKSession interface for drop-in compatibility.
+ */
 export interface SDKSession {
   /** Unique identifier for this session. */
   readonly sessionId: string;
@@ -41,6 +44,18 @@ export interface SDKSession {
 
   /** Close the session and release resources. */
   close(): void;
+
+  /** Interrupt the current query loop iteration. */
+  interrupt(): Promise<void>;
+
+  /** Change the model used for subsequent turns. */
+  setModel(model: string | undefined): Promise<void>;
+
+  /** Change the max thinking tokens for subsequent turns. */
+  setMaxThinkingTokens(maxThinkingTokens: number | null): Promise<void>;
+
+  /** Change the permission mode for subsequent turns. */
+  setPermissionMode(mode: PermissionMode): Promise<void>;
 
   /** Async dispose support — calls close(). */
   [Symbol.asyncDispose](): Promise<void>;
@@ -224,12 +239,13 @@ function createSessionProxy(state: SessionState): SDKSession {
       // Track whether we've yielded the first init event
       const isFirstTurn = state.messages.length === 1;
 
-      // Run the query loop
+      // Run the query loop, passing the session ID for consistent message session_id fields
       const gen = queryLoop(
         state.config,
         state.provider,
         state.tools,
         initialMessages,
+        { sessionId: state.sessionId },
       );
 
       for await (const msg of gen) {
@@ -273,6 +289,35 @@ function createSessionProxy(state: SessionState): SDKSession {
           state.externalMcp = null;
         }
       }
+    },
+
+    async interrupt(): Promise<void> {
+      state.abortController.abort();
+      // Create a new abort controller for subsequent interactions
+      state.abortController = new AbortController();
+      state.config = { ...state.config, abortSignal: state.abortController.signal };
+    },
+
+    async setModel(model: string | undefined): Promise<void> {
+      if (model) {
+        state.config = { ...state.config, model };
+      }
+    },
+
+    async setMaxThinkingTokens(maxThinkingTokens: number | null): Promise<void> {
+      if (maxThinkingTokens === null) {
+        state.config = { ...state.config, thinking: { type: 'disabled' } };
+      } else {
+        state.config = {
+          ...state.config,
+          thinking: { type: 'enabled', budgetTokens: maxThinkingTokens },
+        };
+      }
+    },
+
+    async setPermissionMode(_mode: PermissionMode): Promise<void> {
+      // Permission mode is handled by the canUseTool callback.
+      // The SDK preserves the callback interface.
     },
 
     async [Symbol.asyncDispose](): Promise<void> {

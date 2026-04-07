@@ -18,6 +18,7 @@ import { toToolDefinition } from '../types/tool.js';
 import type { Tool, ToolContext } from '../types/tool.js';
 import type { QueryConfig } from '../types/config.js';
 import { CostTracker } from './cost.js';
+import type { ModelUsageEntry } from './cost.js';
 import { TokenBudget } from './token-budget.js';
 import { buildUserMessage, buildToolResultMessage, extractToolUseBlocks } from './messages.js';
 import { microCompact, apiCompact, autoCompactIfNeeded, AutoCompactState } from './compact.js';
@@ -40,14 +41,120 @@ import {
 // SDKMessage — events yielded by the query loop
 // ---------------------------------------------------------------------------
 
+/**
+ * SDKMessage — events yielded by the query loop.
+ *
+ * Field naming follows CC SDK's snake_case convention for wire-level
+ * compatibility with consumer code (hello-halo, agent-workspace-backend, etc.).
+ */
 export type SDKMessage =
-  | { type: 'system'; subtype: 'init'; sessionId: string; tools: string[]; model: string }
-  | { type: 'assistant'; message: { role: 'assistant'; content: ContentBlock[] }; uuid: string; usage?: UsageInfo }
-  | { type: 'user'; message: { role: 'user'; content: ContentBlock[] }; uuid: string }
-  | { type: 'stream_event'; event: StreamEvent }
-  | { type: 'result'; subtype: 'success' | 'error_max_turns' | 'error_max_budget_usd' | 'error'; error?: string; costUsd: number; turns: number; sessionId: string }
-  | { type: 'tool_progress'; toolName: string; toolUseId: string; status: 'running' | 'completed' | 'error'; content?: string }
-  | { type: 'system'; subtype: 'compact_boundary'; summary: string };
+  // System init
+  | {
+      type: 'system';
+      subtype: 'init';
+      session_id: string;
+      tools: string[];
+      model: string;
+      mcp_servers?: Array<{ name: string; status: string }>;
+      cwd?: string;
+      permissionMode?: string;
+      slash_commands?: Array<{ name: string; description: string }>;
+      skills?: string[];
+      agents?: Array<{ name: string; description: string; model?: string }>;
+    }
+  // Assistant message
+  | {
+      type: 'assistant';
+      message: { role: 'assistant'; content: ContentBlock[] };
+      parent_tool_use_id: string | null;
+      uuid: string;
+      session_id: string;
+      usage?: UsageInfo;
+      error?: string;
+    }
+  // User message (tool results)
+  | {
+      type: 'user';
+      message: { role: 'user'; content: ContentBlock[] };
+      parent_tool_use_id: string | null;
+      uuid: string;
+      session_id: string;
+    }
+  // Streaming event (partial messages)
+  | {
+      type: 'stream_event';
+      event: StreamEvent;
+      parent_tool_use_id: string | null;
+      uuid: string;
+      session_id: string;
+    }
+  // Result — success
+  | {
+      type: 'result';
+      subtype: 'success';
+      result: string;
+      is_error: false;
+      num_turns: number;
+      total_cost_usd: number;
+      usage: UsageInfo;
+      modelUsage: Record<string, ModelUsageEntry>;
+      session_id: string;
+      stop_reason: string | null;
+      duration_ms: number;
+      duration_api_ms: number;
+      permission_denials: unknown[];
+      uuid: string;
+    }
+  // Result — error
+  | {
+      type: 'result';
+      subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd';
+      errors: string[];
+      is_error: true;
+      num_turns: number;
+      total_cost_usd: number;
+      usage: UsageInfo;
+      modelUsage: Record<string, ModelUsageEntry>;
+      session_id: string;
+      duration_ms: number;
+      duration_api_ms: number;
+      permission_denials: unknown[];
+      uuid: string;
+    }
+  // Tool progress
+  | {
+      type: 'tool_progress';
+      tool_name: string;
+      tool_use_id: string;
+      parent_tool_use_id: string | null;
+      elapsed_time_seconds?: number;
+      task_id?: string;
+    }
+  // System — compact boundary
+  | {
+      type: 'system';
+      subtype: 'compact_boundary';
+      summary: string;
+      session_id: string;
+    }
+  // System — status
+  | {
+      type: 'system';
+      subtype: 'status';
+      status: string | null;
+      session_id: string;
+      permissionMode?: string;
+    }
+  // System — api_retry
+  | {
+      type: 'system';
+      subtype: 'api_retry';
+      attempt: number;
+      max_retries: number;
+      retry_delay_ms: number;
+      error_status: number | null;
+      session_id: string;
+    };
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -277,12 +384,13 @@ export async function* queryLoop(
   provider: LlmProvider,
   tools: Tool[],
   initialPrompt: string | Message[],
-  options?: { onProgress?: (msg: SDKMessage) => void },
+  options?: { onProgress?: (msg: SDKMessage) => void; sessionId?: string },
 ): AsyncGenerator<SDKMessage, void, undefined> {
-  const sessionId = randomUUID();
+  const sessionId = options?.sessionId ?? randomUUID();
   const costTracker = new CostTracker(config.model);
   const compactState = new AutoCompactState();
   const tokenBudget = new TokenBudget(config.model, config.maxTokens);
+  const startTime = Date.now();
 
   // Build system prompt
   const systemPrompt = buildSystemPrompt(config, tools);
@@ -298,16 +406,50 @@ export async function* queryLoop(
     messages.push(...initialPrompt);
   }
 
+  // Build agent info from config.agents
+  const agentInfos = config.agents
+    ? Object.entries(config.agents).map(([name, def]) => ({
+        name,
+        description: def.description,
+        model: def.model,
+      }))
+    : undefined;
+
   // Yield init event
   const initMsg: SDKMessage = {
     type: 'system',
     subtype: 'init',
-    sessionId,
+    session_id: sessionId,
     tools: tools.map((t) => t.name),
     model: config.model,
+    cwd: config.cwd,
+    agents: agentInfos,
   };
   yield initMsg;
   options?.onProgress?.(initMsg);
+
+  /** Helper to build an error result message. */
+  function buildErrorResult(
+    subtype: 'error_during_execution' | 'error_max_turns' | 'error_max_budget_usd',
+    errors: string[],
+    numTurns: number,
+  ): SDKMessage {
+    return {
+      type: 'result',
+      subtype,
+      errors,
+      is_error: true,
+      num_turns: numTurns,
+      total_cost_usd: costTracker.totalCostUsd,
+      usage: costTracker.getUsage(),
+      modelUsage: costTracker.getModelUsage(),
+      session_id: sessionId,
+      duration_ms: Date.now() - startTime,
+      duration_api_ms: Date.now() - startTime,
+      permission_denials: [],
+      uuid: randomUUID(),
+    };
+  }
 
   let turn = 0;
   let maxTokensRecoveryCount = 0;
@@ -323,14 +465,11 @@ export async function* queryLoop(
 
     // Check max turns
     if (turn > config.maxTurns) {
-      const resultMsg: SDKMessage = {
-        type: 'result',
-        subtype: 'error_max_turns',
-        error: `Max turns exceeded: ${turn - 1} turns completed, limit is ${config.maxTurns}`,
-        costUsd: costTracker.totalCostUsd,
-        turns: turn - 1,
-        sessionId,
-      };
+      const resultMsg = buildErrorResult(
+        'error_max_turns',
+        [`Max turns exceeded: ${turn - 1} turns completed, limit is ${config.maxTurns}`],
+        turn - 1,
+      );
       yield resultMsg;
       options?.onProgress?.(resultMsg);
       return;
@@ -338,14 +477,11 @@ export async function* queryLoop(
 
     // Check budget
     if (costTracker.isOverBudget(config.maxBudgetUsd)) {
-      const resultMsg: SDKMessage = {
-        type: 'result',
-        subtype: 'error_max_budget_usd',
-        error: `Budget exceeded: $${costTracker.totalCostUsd.toFixed(4)} spent, limit is $${config.maxBudgetUsd.toFixed(4)}`,
-        costUsd: costTracker.totalCostUsd,
-        turns: turn - 1,
-        sessionId,
-      };
+      const resultMsg = buildErrorResult(
+        'error_max_budget_usd',
+        [`Budget exceeded: $${costTracker.totalCostUsd.toFixed(4)} spent, limit is $${config.maxBudgetUsd.toFixed(4)}`],
+        turn - 1,
+      );
       yield resultMsg;
       options?.onProgress?.(resultMsg);
       return;
@@ -382,7 +518,13 @@ export async function* queryLoop(
     try {
       const streamEventEmitter = config.includePartialMessages
         ? (event: StreamEvent) => {
-            const streamMsg: SDKMessage = { type: 'stream_event', event };
+            const streamMsg: SDKMessage = {
+              type: 'stream_event',
+              event,
+              parent_tool_use_id: null,
+              uuid: randomUUID(),
+              session_id: sessionId,
+            };
             pendingStreamEvents.push(streamMsg);
             options?.onProgress?.(streamMsg);
           }
@@ -423,14 +565,11 @@ export async function* queryLoop(
 
       // Handle abort
       if (err instanceof AbortError || (err instanceof Error && err.name === 'AbortError')) {
-        const resultMsg: SDKMessage = {
-          type: 'result',
-          subtype: 'error',
-          error: 'Operation was aborted',
-          costUsd: costTracker.totalCostUsd,
-          turns: turn - 1,
-          sessionId,
-        };
+        const resultMsg = buildErrorResult(
+          'error_during_execution',
+          ['Operation was aborted'],
+          turn - 1,
+        );
         yield resultMsg;
         options?.onProgress?.(resultMsg);
         return;
@@ -438,14 +577,11 @@ export async function* queryLoop(
 
       // Unrecoverable error
       const errorMessage = err instanceof Error ? err.message : String(err);
-      const resultMsg: SDKMessage = {
-        type: 'result',
-        subtype: 'error',
-        error: errorMessage,
-        costUsd: costTracker.totalCostUsd,
-        turns: turn - 1,
-        sessionId,
-      };
+      const resultMsg = buildErrorResult(
+        'error_during_execution',
+        [errorMessage],
+        turn - 1,
+      );
       yield resultMsg;
       options?.onProgress?.(resultMsg);
       return;
@@ -472,7 +608,9 @@ export async function* queryLoop(
     const assistantMsg: SDKMessage = {
       type: 'assistant',
       message: { role: 'assistant', content: accumulated.content },
+      parent_tool_use_id: null,
       uuid: assistantUuid,
+      session_id: sessionId,
       usage: accumulated.usage,
     };
     yield assistantMsg;
@@ -495,6 +633,7 @@ export async function* queryLoop(
           type: 'system',
           subtype: 'compact_boundary',
           summary: compactResult.summary,
+          session_id: sessionId,
         };
         yield compactMsg;
         options?.onProgress?.(compactMsg);
@@ -515,13 +654,29 @@ export async function* queryLoop(
         }
       }
 
-      // Success — model completed its turn
+      // Success — model completed its turn.
+      // Extract text from the last assistant message as the result string.
+      const lastContent = accumulated.content;
+      const textBlocks = lastContent.filter((b) => b.type === 'text');
+      const resultText = textBlocks
+        .map((b) => (b as { type: 'text'; text: string }).text)
+        .join('\n');
+
       const resultMsg: SDKMessage = {
         type: 'result',
         subtype: 'success',
-        costUsd: costTracker.totalCostUsd,
-        turns: turn,
-        sessionId,
+        result: resultText,
+        is_error: false,
+        num_turns: turn,
+        total_cost_usd: costTracker.totalCostUsd,
+        usage: costTracker.getUsage(),
+        modelUsage: costTracker.getModelUsage(),
+        session_id: sessionId,
+        stop_reason: accumulated.stopReason,
+        duration_ms: Date.now() - startTime,
+        duration_api_ms: Date.now() - startTime,
+        permission_denials: [],
+        uuid: randomUUID(),
       };
       yield resultMsg;
       options?.onProgress?.(resultMsg);
@@ -535,27 +690,31 @@ export async function* queryLoop(
     const toolCtx = buildToolContext(config, sessionId, costTracker, turn);
     const pendingToolProgress: SDKMessage[] = [];
 
+    const toolStartTimes = new Map<string, number>();
+
     const toolResultPromises = toolUseBlocks.map(async (toolUse) => {
       const tool = findTool(tools, toolUse.name);
+      toolStartTimes.set(toolUse.id, Date.now());
 
       // Emit tool_progress: running
       const runningMsg: SDKMessage = {
         type: 'tool_progress',
-        toolName: toolUse.name,
-        toolUseId: toolUse.id,
-        status: 'running',
+        tool_name: toolUse.name,
+        tool_use_id: toolUse.id,
+        parent_tool_use_id: null,
       };
       pendingToolProgress.push(runningMsg);
       options?.onProgress?.(runningMsg);
 
       if (!tool) {
         const errorContent = `Tool "${toolUse.name}" not found. Available tools: ${tools.map((t) => t.name).join(', ')}`;
+        const elapsed = (Date.now() - (toolStartTimes.get(toolUse.id) ?? Date.now())) / 1000;
         const doneMsg: SDKMessage = {
           type: 'tool_progress',
-          toolName: toolUse.name,
-          toolUseId: toolUse.id,
-          status: 'error',
-          content: errorContent,
+          tool_name: toolUse.name,
+          tool_use_id: toolUse.id,
+          parent_tool_use_id: null,
+          elapsed_time_seconds: elapsed,
         };
         pendingToolProgress.push(doneMsg);
         options?.onProgress?.(doneMsg);
@@ -576,12 +735,13 @@ export async function* queryLoop(
       // Hook can deny tool execution
       if (preHookResult.decision === 'deny') {
         const reason = preHookResult.decisionReason || 'Denied by PreToolUse hook';
+        const elapsed = (Date.now() - (toolStartTimes.get(toolUse.id) ?? Date.now())) / 1000;
         const doneMsg: SDKMessage = {
           type: 'tool_progress',
-          toolName: toolUse.name,
-          toolUseId: toolUse.id,
-          status: 'error',
-          content: reason,
+          tool_name: toolUse.name,
+          tool_use_id: toolUse.id,
+          parent_tool_use_id: null,
+          elapsed_time_seconds: elapsed,
         };
         pendingToolProgress.push(doneMsg);
         options?.onProgress?.(doneMsg);
@@ -602,12 +762,13 @@ export async function* queryLoop(
           });
           if (permResult.behavior === 'deny') {
             const deniedContent = `Permission denied: ${permResult.message}`;
+            const elapsed = (Date.now() - (toolStartTimes.get(toolUse.id) ?? Date.now())) / 1000;
             const doneMsg: SDKMessage = {
               type: 'tool_progress',
-              toolName: toolUse.name,
-              toolUseId: toolUse.id,
-              status: 'error',
-              content: deniedContent,
+              tool_name: toolUse.name,
+              tool_use_id: toolUse.id,
+              parent_tool_use_id: null,
+              elapsed_time_seconds: elapsed,
             };
             pendingToolProgress.push(doneMsg);
             options?.onProgress?.(doneMsg);
@@ -660,12 +821,13 @@ export async function* queryLoop(
         result.content = `${preHookResult.additionalContext}\n\n${result.content}`;
       }
 
+      const elapsed = (Date.now() - (toolStartTimes.get(toolUse.id) ?? Date.now())) / 1000;
       const completedMsg: SDKMessage = {
         type: 'tool_progress',
-        toolName: toolUse.name,
-        toolUseId: toolUse.id,
-        status: result.isError ? 'error' : 'completed',
-        content: result.content,
+        tool_name: toolUse.name,
+        tool_use_id: toolUse.id,
+        parent_tool_use_id: null,
+        elapsed_time_seconds: elapsed,
       };
       pendingToolProgress.push(completedMsg);
       options?.onProgress?.(completedMsg);
@@ -689,7 +851,9 @@ export async function* queryLoop(
     const userMsg: SDKMessage = {
       type: 'user',
       message: toolResultMessage as { role: 'user'; content: ContentBlock[] },
+      parent_tool_use_id: null,
       uuid: userUuid,
+      session_id: sessionId,
     };
     yield userMsg;
     options?.onProgress?.(userMsg);

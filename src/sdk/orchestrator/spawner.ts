@@ -148,8 +148,8 @@ async function runSubAgent(
       collected.push(msg);
 
       if (msg.type === 'result') {
-        costUsd = msg.costUsd;
-        turns = msg.turns;
+        costUsd = msg.total_cost_usd;
+        turns = msg.num_turns;
       }
     }
   } finally {
