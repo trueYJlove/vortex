@@ -431,6 +431,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'agent:compact': 'onAgentCompact',
       'agent:ask-question': 'onAgentAskQuestion',
       'agent:session-info': 'onAgentSessionInfo',
+      'agent:turn-start': 'onAgentTurnStart',
       'remote:status-change': 'onRemoteStatusChange',
       'browser:state-change': 'onBrowserStateChange',
       'browser:zoom-changed': 'onBrowserZoomChanged',

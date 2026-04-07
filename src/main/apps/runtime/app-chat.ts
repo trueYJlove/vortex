@@ -266,7 +266,6 @@ export async function sendAppChatMessage(
     electronPath,
     spaceId,
     conversationId,
-    abortController,
     stderrHandler: (data: string) => {
       console.error(`[AppChat][${appId}] CLI stderr:`, data)
     },

@@ -417,6 +417,7 @@ export interface Message {
     fileChanges?: FileChangesSummary;  // Lightweight file changes for immediate display
   };
   error?: string;  // Error message when assistant response failed (e.g., 429 rate limit)
+  source?: 'injection';  // How the message entered the conversation (SDK-agnostic)
 }
 
 // ============================================
@@ -502,6 +503,21 @@ export interface Thought {
     isError: boolean;
     timestamp: string;
   };
+  // Sub-agent support: links this thought to a parent Task tool_use
+  parentToolUseId?: string;
+  // Task/Agent tool progress (updated via task lifecycle events)
+  taskProgress?: TaskProgress;
+}
+
+/** Progress tracking for a Task/Agent tool_use thought */
+export interface TaskProgress {
+  taskId: string;
+  status: 'running' | 'completed' | 'failed' | 'stopped';
+  lastToolName?: string;
+  toolCount: number;
+  durationMs: number;
+  summary?: string;
+  totalTokens?: number;
 }
 
 // Legacy alias for backwards compatibility
@@ -647,6 +663,7 @@ export type AgentEvent =
   | AgentCompleteEvent
   | AgentCompactEvent;
 
+// ============================================
 // ============================================
 // App State Types
 // ============================================

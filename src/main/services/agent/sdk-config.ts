@@ -76,8 +76,6 @@ export interface BaseSdkOptionsParams {
   spaceId: string
   /** Conversation ID */
   conversationId: string
-  /** Abort controller for cancellation */
-  abortController: AbortController
   /** Optional stderr handler (for error accumulation) */
   stderrHandler?: (data: string) => void
   /** Optional MCP servers configuration */
@@ -296,11 +294,19 @@ export function buildSdkEnv(params: SdkEnvParams): Record<string, string | numbe
     DISABLE_COST_WARNINGS: '1',
     CLAUDE_CODE_DISABLE_COMMAND_INJECTION_CHECK: '1',
 
+    // Align entrypoint with hardcoded User-Agent (external, cli) so billing header
+    // and User-Agent are consistent — matches a regular CLI OAuth user's fingerprint.
+    // Without this, main.tsx would auto-set it to 'sdk-cli' (non-interactive mode).
+    CLAUDE_CODE_ENTRYPOINT: 'cli',
+
     // Performance: skip warmup calls + raise V8 heap ceiling
     CLAUDE_CODE_REMOTE: 'true',
 
     // Performance: skip file snapshot I/O (Halo doesn't expose /rewind)
     CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING: '1',
+
+    // Enable Agent Teams (multi-agent collaboration with named teammates)
+    CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: '1',
 
     // Windows: pass through Git Bash path (set by git-bash.service during startup)
     // This was stripped by getCleanUserEnv() along with all CLAUDE_* vars
@@ -398,7 +404,6 @@ export function buildBaseSdkOptions(params: BaseSdkOptionsParams): Record<string
     electronPath,
     spaceId,
     conversationId,
-    abortController,
     stderrHandler,
     mcpServers
   } = params
@@ -419,7 +424,6 @@ export function buildBaseSdkOptions(params: BaseSdkOptionsParams): Record<string
   const sdkOptions: Record<string, any> = {
     model: credentials.sdkModel,
     cwd: workDir,
-    abortController,
     env,
     pathToClaudeCodeExecutable: cliPath,
     extraArgs: {

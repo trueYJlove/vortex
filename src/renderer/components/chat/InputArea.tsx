@@ -74,6 +74,8 @@ function formatArtifactReference(relativePath: string): string {
 
 interface InputAreaProps {
   onSend: (content: string, images?: ImageAttachment[], thinkingEnabled?: boolean) => void
+  /** Called when user submits a message while generation is in progress (mid-turn inject) */
+  onInject?: (content: string) => void
   onStop: () => void
   isGenerating: boolean
   placeholder?: string
@@ -94,7 +96,7 @@ interface ImageError {
   message: string
 }
 
-export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact = false, slashCommands = [], mentionArtifacts = [] }: InputAreaProps) {
+export function InputArea({ onSend, onInject, onStop, isGenerating, placeholder, isCompact = false, slashCommands = [], mentionArtifacts = [] }: InputAreaProps) {
   const { t } = useTranslation()
   const sendKeyMode = useAppStore(state => state.config?.chat?.sendKeyMode ?? 'enter')
 
@@ -451,12 +453,24 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
     })
   }
 
-  // Handle send
+  // Handle send — routes to inject path when generation is in progress
   const handleSend = () => {
     const textToSend = isOnboardingSendStep ? onboardingPrompt : content.trim()
-    const hasContent = textToSend || images.length > 0
 
-    if (hasContent && !isGenerating) {
+    if (isGenerating) {
+      // Mid-turn inject: text only (no images, no thinking toggle)
+      if (textToSend && onInject) {
+        onInject(textToSend)
+        setContent('')
+        handleMentionClose()
+        handleSlashClose()
+        if (textareaRef.current) textareaRef.current.style.height = 'auto'
+      }
+      return
+    }
+
+    const hasContent = textToSend || images.length > 0
+    if (hasContent) {
       onSend(textToSend, images.length > 0 ? images : undefined, thinkingEnabled)
 
       if (!isOnboardingSendStep) {
@@ -573,7 +587,13 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
 
   // In onboarding mode, can always send (prefilled content)
   // Can send if has text OR has images (and not processing/generating)
-  const canSend = isOnboardingSendStep || ((content.trim().length > 0 || images.length > 0) && !isGenerating && !isProcessingImages)
+  // During generation (inject mode): only plain text is allowed, no images
+  // Normal mode: text or images, not currently processing
+  const canSend = isOnboardingSendStep ||
+    (isGenerating
+      ? (content.trim().length > 0 && !!onInject)
+      : ((content.trim().length > 0 || images.length > 0) && !isProcessingImages)
+    )
   const hasImages = images.length > 0
 
   return (
@@ -610,7 +630,6 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
               ? 'ring-1 ring-primary/30 bg-card shadow-sm'
               : 'bg-secondary/50 hover:bg-secondary/70'
             }
-            ${isGenerating ? 'opacity-60' : ''}
             ${isDragOver ? 'ring-2 ring-primary/50 bg-primary/5' : ''}
           `}
           onDragOver={handleDragOver}
@@ -731,7 +750,6 @@ export function InputArea({ onSend, onStop, isGenerating, placeholder, isCompact
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder={placeholder || t('Type a message, let Halo help you...')}
-              disabled={isGenerating}
               readOnly={isOnboardingSendStep}
               rows={1}
               className={`w-full bg-transparent resize-none
@@ -916,9 +934,9 @@ function InputToolbar({
         )}
       </div>
 
-      {/* Right section: action button only */}
-      <div className="flex items-center">
-        {isGenerating ? (
+      {/* Right section: Stop (when generating) + Send */}
+      <div className="flex items-center gap-1">
+        {isGenerating && (
           <button
             onClick={onStop}
             className="w-8 h-8 flex items-center justify-center
@@ -929,7 +947,8 @@ function InputToolbar({
           >
             <div className="w-3 h-3 border-2 border-current rounded-sm" />
           </button>
-        ) : (
+        )}
+        {!isOnboarding && (
           <button
             data-onboarding="send-button"
             onClick={onSend}
@@ -942,9 +961,11 @@ function InputToolbar({
               }
             `}
             title={
-              sendKeyMode === 'ctrl-enter'
-                ? (thinkingEnabled ? t('Send (Deep Thinking) — Ctrl+Enter') : t('Send — Ctrl+Enter'))
-                : (thinkingEnabled ? t('Send (Deep Thinking) — Enter') : t('Send — Enter'))
+              isGenerating
+                ? t('Add to queue')
+                : sendKeyMode === 'ctrl-enter'
+                  ? (thinkingEnabled ? t('Send (Deep Thinking) — Ctrl+Enter') : t('Send — Ctrl+Enter'))
+                  : (thinkingEnabled ? t('Send (Deep Thinking) — Enter') : t('Send — Enter'))
             }
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

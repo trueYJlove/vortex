@@ -67,9 +67,14 @@ interface StreamingRevision {
 }
 
 function StreamingFooterContent({ revisionRef }: { revisionRef: React.RefObject<StreamingRevision> }) {
-  // Subscribe to session changes so this component re-renders when thoughts/streaming update.
+  // Subscribe to full session changes so this component re-renders when thoughts/streaming update.
   // Data is read from the ref (always fresh); this selector just triggers the re-render.
-  useChatStore(s => s.sessions.get(s.getCurrentSpaceState().currentConversationId ?? ''))
+  // IMPORTANT: Must watch the entire session object — watching only queuedMessages breaks
+  // streaming re-renders because queuedMessages never changes during normal streaming.
+  const session = useChatStore(s =>
+    s.sessions.get(s.getCurrentSpaceState().currentConversationId ?? '')
+  )
+  const queuedMessages = session?.queuedMessages ?? []
 
   const rev = revisionRef.current!
   return (
@@ -82,6 +87,7 @@ function StreamingFooterContent({ revisionRef }: { revisionRef: React.RefObject<
       browserToolCalls={rev.streamingBrowserToolCalls}
       pendingQuestion={rev.pendingQuestion}
       onAnswerQuestion={rev.onAnswerQuestion}
+      queuedMessages={queuedMessages}
     />
   )
 }
@@ -133,18 +139,42 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     },
   }), [])
 
-  // Filter out empty assistant placeholder message during generation
-  // (Backend adds empty assistant message as placeholder, we show streaming content instead)
+  // Filter out injection messages (shown as annotations on assistant bubbles, not as independent bubbles)
+  // and empty assistant placeholder message during generation
   const displayMessages = useMemo(() => {
+    let filtered = messages.filter(msg => msg.source !== 'injection')
     if (isGenerating) {
-      return messages.filter((msg, idx) => {
-        const isLastMessage = idx === messages.length - 1
+      filtered = filtered.filter((msg, idx) => {
+        const isLastMessage = idx === filtered.length - 1
         const isEmptyAssistant = msg.role === 'assistant' && !msg.content
         return !(isLastMessage && isEmptyAssistant)
       })
     }
-    return messages
+    return filtered
   }, [messages, isGenerating])
+
+  // Pre-compute injection map: assistant message ID → injection messages that follow it.
+  // Injection messages are consecutive user messages with source='injection' after an assistant message.
+  // O(n) scan, recomputed only when messages change.
+  const injectionMap = useMemo(() => {
+    const map = new Map<string, Message[]>()
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === 'assistant') {
+        const injections: Message[] = []
+        for (let j = i + 1; j < messages.length; j++) {
+          if (messages[j].source === 'injection') {
+            injections.push(messages[j])
+          } else {
+            break
+          }
+        }
+        if (injections.length > 0) {
+          map.set(messages[i].id, injections)
+        }
+      }
+    }
+    return map
+  }, [messages])
 
   // Pre-compute cost map: index → previous assistant cost (O(n) once, then O(1) per lookup)
   // This avoids a useCallback dependency on displayMessages that would cascade to itemContent
@@ -219,10 +249,11 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
             ? loadMessageThoughts(currentSpaceId, currentConversationId, messageId)
             : Promise.resolve([])
         }}
+        injectionMessages={injectionMap.get(message.id)}
         className={contentWidthClass}
       />
     )
-  }, [previousCostMap, currentSpaceId, currentConversationId, loadMessageThoughts, contentWidthClass])
+  }, [previousCostMap, currentSpaceId, currentConversationId, loadMessageThoughts, injectionMap, contentWidthClass])
 
   // Ref for onContinue — keeps Footer callback stable when parent re-renders
   const onContinueRef = useRef(onContinue)

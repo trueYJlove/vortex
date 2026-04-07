@@ -550,6 +550,14 @@ export const api = {
     return httpRequest('POST', '/api/agent/answer-question', data)
   },
 
+  // Inject a mid-turn message into an active session (Agent Team mode)
+  injectMessage: async (data: { conversationId: string; message: string }): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.injectMessage(data)
+    }
+    return httpRequest('POST', '/api/agent/inject-message', data)
+  },
+
   // Test MCP server connections
   testMcpConnections: async (): Promise<{ success: boolean; servers: unknown[]; error?: string }> => {
     if (isElectron()) {
@@ -1009,6 +1017,8 @@ export const api = {
     onEvent('agent:ask-question', callback),
   onAgentSessionInfo: (callback: (data: unknown) => void) =>
     onEvent('agent:session-info', callback),
+  onAgentTurnStart: (callback: (data: unknown) => void) =>
+    onEvent('agent:turn-start', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
 

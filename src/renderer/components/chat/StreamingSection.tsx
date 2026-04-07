@@ -11,6 +11,8 @@ import { ThoughtProcess } from './ThoughtProcess'
 import { StreamingBubble } from './StreamingBubble'
 import { BrowserTaskCard } from '../tool/BrowserTaskCard'
 import { AskUserQuestionCard } from './AskUserQuestionCard'
+import { TeamPanel } from './TeamPanel'
+import { QueuedMessagesPanel } from './QueuedMessagesPanel'
 import type { Thought, PendingQuestion } from '../../types'
 import type { BrowserToolCall } from './useBrowserToolCalls'
 
@@ -45,6 +47,9 @@ export interface StreamingSectionProps {
 
   /** Additional className for the outer wrapper */
   className?: string
+
+  /** Messages queued for mid-turn injection (shown below StreamingBubble) */
+  queuedMessages?: string[]
 }
 
 export function StreamingSection({
@@ -58,6 +63,7 @@ export function StreamingSection({
   pendingQuestion,
   onAnswerQuestion,
   className = '',
+  queuedMessages = [],
 }: StreamingSectionProps) {
   return (
     <div className={`flex justify-start animate-fade-in pb-4 ${className}`}>
@@ -66,6 +72,9 @@ export function StreamingSection({
         {(thoughts.length > 0 || isThinking) && (
           <ThoughtProcess thoughts={thoughts} isThinking={isThinking} />
         )}
+
+        {/* Agent Team panel — multi-agent collaboration status */}
+        <TeamPanel thoughts={thoughts} />
 
         {/* Real-time browser task card */}
         {browserToolCalls.length > 0 && (
@@ -93,6 +102,9 @@ export function StreamingSection({
             onAnswer={onAnswerQuestion}
           />
         )}
+
+        {/* Mid-turn queued messages — shown while user types during active generation */}
+        <QueuedMessagesPanel messages={queuedMessages} />
       </div>
     </div>
   )
