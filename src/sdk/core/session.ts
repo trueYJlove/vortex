@@ -14,8 +14,11 @@ import { queryLoop } from './query-loop.js';
 import type { SDKMessage, QueryLoopOptions } from './query-loop.js';
 import type { McpServerConnectionStatus } from '../tools/mcp/bridge.js';
 import { getAllTools, filterTools } from '../tools/registry.js';
-import { extractSdkMcpTools, connectExternalMcpServers } from '../tools/mcp/bridge.js';
-import type { ExternalMcpConnection } from '../tools/mcp/bridge.js';
+import { extractSdkMcpTools } from '../tools/mcp/bridge.js';
+import {
+  McpConnectionManager,
+  createMcpConnectionManager,
+} from '../tools/mcp/connection-manager.js';
 import { initOrchestrator } from '../orchestrator/init.js';
 import type { OrchestratorHandle } from '../orchestrator/init.js';
 
@@ -78,8 +81,8 @@ interface SessionState {
   pendingMessages: Array<string | Message>;
   /** Active stream generator (only one at a time). */
   activeStream: AsyncGenerator<SDKMessage, void, undefined> | null;
-  /** External MCP connection (for cleanup on close). */
-  externalMcp: ExternalMcpConnection | null;
+  /** MCP connection manager (for reconnection + cleanup). */
+  mcpManager: McpConnectionManager | null;
   /** All MCP server connection statuses (SDK + external). */
   mcpServerStatuses: McpServerConnectionStatus[];
   /** Orchestrator handle (for sub-agent lifecycle). */
@@ -147,19 +150,21 @@ export async function createSession(options: Options): Promise<SDKSession> {
     }
   }
 
-  // Connect external MCP servers (async — stdio/sse/http)
-  let externalMcp: ExternalMcpConnection | null = null;
+  // Connect external MCP servers via the connection manager (with reconnection support)
+  let mcpManager: McpConnectionManager | null = null;
   try {
-    externalMcp = await connectExternalMcpServers(
+    mcpManager = createMcpConnectionManager(
       options.mcpServers as Record<string, unknown> | undefined,
     );
-    if (externalMcp.tools.length > 0) {
-      const extToolNames = new Set(externalMcp.tools.map((t) => t.name));
+    await mcpManager.connectAll();
+    const extTools = mcpManager.getBridgedTools();
+    if (extTools.length > 0) {
+      const extToolNames = new Set(extTools.map((t) => t.name));
       tools = tools.filter((t) => !extToolNames.has(t.name));
-      tools.push(...externalMcp.tools);
+      tools.push(...extTools);
     }
     // Merge external server statuses
-    mcpServerStatuses.push(...externalMcp.serverStatuses);
+    mcpServerStatuses.push(...mcpManager.getStatuses());
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[SDK] External MCP connection error: ${msg}`);
@@ -188,7 +193,7 @@ export async function createSession(options: Options): Promise<SDKSession> {
     closed: false,
     pendingMessages: [],
     activeStream: null,
-    externalMcp,
+    mcpManager,
     mcpServerStatuses,
     orchestrator,
   };
@@ -306,10 +311,10 @@ function createSessionProxy(state: SessionState): SDKSession {
           state.orchestrator = null;
         }
 
-        // Disconnect external MCP servers
-        if (state.externalMcp) {
-          state.externalMcp.disconnect();
-          state.externalMcp = null;
+        // Disconnect all external MCP servers (cancels reconnect loops)
+        if (state.mcpManager) {
+          state.mcpManager.disconnectAll();
+          state.mcpManager = null;
         }
       }
     },

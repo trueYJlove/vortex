@@ -69,9 +69,32 @@ tsc --noEmit passes. Core architecture (types, LLM providers, tools, query loop,
 - **ExternalMcpConnection.serverStatuses** — The MCP bridge now tracks per-server connection status (`McpServerConnectionStatus`) during connection, including error messages for failed servers.
 - **QueryLoopOptions interface** — New exported interface for the query loop options parameter, replacing the inline anonymous type. Includes `mcpServerStatuses`, `slashCommands`, `skills` in addition to existing `onProgress` and `sessionId`.
 
+### What Works (added Run 8)
+- **MCP Connection Manager** — `McpConnectionManager` class replaces the fire-and-forget `connectExternalMcpServers()` for external MCP server lifecycle management. Mirrors CC Rust `McpConnectionManager` from `crates/mcp/src/connection_manager.rs`.
+- **Per-server status tracking** — Each server has a live status: `connected`, `connecting`, `disconnected`, or `failed` (with scheduled retry time). Exposed via `getStatus()`, `getAllStatuses()`, and `getStatuses()` (CC SDK compatible).
+- **Exponential-backoff reconnection** — Background reconnect loop with 1s → 2s → 4s → … capped at 60s backoff. Loop exits on success or explicit disconnect. Prevents thundering herd on intermittent failures.
+- **Tool-call-level auto-reconnect** — If a bridged MCP tool call fails because the transport died, the manager attempts one immediate reconnect before returning the error to the LLM. If that fails, starts the background reconnect loop for future calls.
+- **Connect / disconnect / restart control plane** — `connectAll()`, `connect(name)`, `disconnect(name)`, `disconnectAll()`, `restart(name)` methods for full lifecycle control.
+- **Session + query integration** — Both `createSession()` and `query()` now use `McpConnectionManager` instead of `connectExternalMcpServers()`. Reconnect timers are properly canceled on session close.
+
 ---
 
 ## Changelog
+
+### 2026-04-08 — Run 8: MCP Connection Manager with reconnection
+
+**Implemented MCP connection manager with per-server status tracking, exponential-backoff reconnection, and tool-call-level auto-reconnect**
+
+External MCP servers (stdio/sse/http) were previously fire-and-forget: if a server process crashed or a network connection dropped, all its tools became permanently unavailable until session restart. This is the #1 reliability gap for production use.
+
+The new `McpConnectionManager` (mirroring CC Rust's implementation) tracks per-server lifecycle, automatically retries failed connections with exponential backoff, and attempts transparent reconnection when a tool call detects a dead transport.
+
+**New files:**
+- `tools/mcp/connection-manager.ts` — `McpConnectionManager` class with: `addServer()`, `connect()`, `connectAll()`, `disconnect()`, `disconnectAll()`, `restart()`, `getStatus()`, `getAllStatuses()`, `getStatuses()`, `isConnected()`, `serverNames()`, `getBridgedTools()`, `startReconnectLoop()`. Also exports `createMcpConnectionManager()` factory and `McpServerLiveStatus` type. Includes transport factory (deduped from bridge.ts) and auto-reconnect tool bridging.
+
+**Changes:**
+- `core/session.ts` — Replaced `ExternalMcpConnection` with `McpConnectionManager`. `createSession()` now creates a connection manager, calls `connectAll()`, and stores it in `SessionState`. `close()` calls `disconnectAll()` which cancels reconnect timers.
+- `index.ts` — `query()` now uses `createMcpConnectionManager()` + `connectAll()` instead of `connectExternalMcpServers()`. `disconnectAll()` in finally block. Exports `McpConnectionManager`, `createMcpConnectionManager`, and `McpServerLiveStatus`.
 
 ### 2026-04-08 — Run 7: Effort level mapping + init message enrichment
 

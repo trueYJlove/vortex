@@ -53,8 +53,11 @@ import { queryLoop } from './core/query-loop.js';
 import type { SDKMessage, QueryLoopOptions } from './core/query-loop.js';
 import { resolveQueryConfig } from './core/context.js';
 import { getAllTools, filterTools } from './tools/registry.js';
-import { extractSdkMcpTools, connectExternalMcpServers } from './tools/mcp/bridge.js';
+import { extractSdkMcpTools } from './tools/mcp/bridge.js';
 import type { McpServerConnectionStatus } from './tools/mcp/bridge.js';
+import {
+  createMcpConnectionManager,
+} from './tools/mcp/connection-manager.js';
 import { initOrchestrator } from './orchestrator/init.js';
 
 /**
@@ -156,18 +159,18 @@ export function query(params: {
   }
 
   const gen = (async function* (): AsyncGenerator<SDKMessage, void, undefined> {
-    // Connect external MCP servers (stdio/sse/http) asynchronously
-    let disconnectMcp: (() => void) | null = null;
+    // Connect external MCP servers via connection manager (with reconnection support)
+    const mcpManager = createMcpConnectionManager(mcpServersConfig);
     try {
-      const externalMcp = await connectExternalMcpServers(mcpServersConfig);
-      disconnectMcp = externalMcp.disconnect;
-      if (externalMcp.tools.length > 0) {
-        const extToolNames = new Set(externalMcp.tools.map((t) => t.name));
+      await mcpManager.connectAll();
+      const extTools = mcpManager.getBridgedTools();
+      if (extTools.length > 0) {
+        const extToolNames = new Set(extTools.map((t) => t.name));
         tools = tools.filter((t) => !extToolNames.has(t.name));
-        tools.push(...externalMcp.tools);
+        tools.push(...extTools);
       }
       // Merge external server statuses
-      mcpStatuses.push(...externalMcp.serverStatuses);
+      mcpStatuses.push(...mcpManager.getStatuses());
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[SDK] External MCP connection error: ${msg}`);
@@ -200,8 +203,8 @@ export function query(params: {
     } finally {
       // Dispose orchestrator (abort sub-agents, reset stubs)
       orchestrator.dispose();
-      // Disconnect external MCP servers on completion or error
-      disconnectMcp?.();
+      // Disconnect all external MCP servers (cancels reconnect loops)
+      mcpManager.disconnectAll();
     }
   })();
 
@@ -369,6 +372,10 @@ export {
   connectExternalMcpServers,
 } from './tools/mcp/bridge.js';
 export type { ExternalMcpConnection, McpServerConnectionStatus } from './tools/mcp/bridge.js';
+
+// MCP connection manager (reconnection + health monitoring)
+export { McpConnectionManager, createMcpConnectionManager } from './tools/mcp/connection-manager.js';
+export type { McpServerLiveStatus } from './tools/mcp/connection-manager.js';
 
 // MCP external transport — client, transports, JSON-RPC
 export { McpClient } from './tools/mcp/client.js';
