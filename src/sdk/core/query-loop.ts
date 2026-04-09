@@ -212,7 +212,7 @@ export type SDKMessage =
       stop_reason: string | null;
       duration_ms: number;
       duration_api_ms: number;
-      permission_denials: unknown[];
+      permission_denials: Array<{ tool_name: string; tool_use_id: string; tool_input: Record<string, unknown> }>;
       uuid: string;
     }
   // Result — error
@@ -232,7 +232,7 @@ export type SDKMessage =
       stop_reason: string | null;
       duration_ms: number;
       duration_api_ms: number;
-      permission_denials: unknown[];
+      permission_denials: Array<{ tool_name: string; tool_use_id: string; tool_input: Record<string, unknown> }>;
       uuid: string;
     }
   // Tool progress
@@ -710,7 +710,7 @@ export async function* queryLoop(
       stop_reason: stopReason,
       duration_ms: Date.now() - startTime,
       duration_api_ms: totalApiTimeMs,
-      permission_denials: [],
+      permission_denials: permissionDenials,
       uuid: randomUUID(),
     };
   }
@@ -723,6 +723,9 @@ export async function* queryLoop(
   // Track cumulative time spent waiting for LLM API calls (excludes tool execution).
   // Used for duration_api_ms in result messages.
   let totalApiTimeMs = 0;
+
+  // Track permission denials for the result message (CC SDK SDKPermissionDenial[])
+  const permissionDenials: Array<{ tool_name: string; tool_use_id: string; tool_input: Record<string, unknown> }> = [];
 
   while (true) {
     turn++;
@@ -1005,7 +1008,7 @@ export async function* queryLoop(
         stop_reason: accumulated.stopReason,
         duration_ms: Date.now() - startTime,
         duration_api_ms: totalApiTimeMs,
-        permission_denials: [],
+        permission_denials: permissionDenials,
         uuid: randomUUID(),
       };
       yield resultMsg;
@@ -1103,6 +1106,13 @@ export async function* queryLoop(
             toolUseID: toolUse.id,
           });
           if (permResult.behavior === 'deny') {
+            // Track denial for the result message (CC SDK SDKPermissionDenial)
+            permissionDenials.push({
+              tool_name: toolUse.name,
+              tool_use_id: toolUse.id,
+              tool_input: { ...toolUse.input },
+            });
+
             const deniedContent = permResult.message
               ? `Permission denied: ${permResult.message}`
               : 'Permission denied';
@@ -1110,7 +1120,8 @@ export async function* queryLoop(
             const doneMsg = toolProgress(toolUse.name, toolUse.id, elapsed);
             pendingToolProgress.push(doneMsg);
             options?.onProgress?.(doneMsg);
-            return { toolUseId: toolUse.id, content: deniedContent, isError: true };
+
+            return { toolUseId: toolUse.id, content: deniedContent, isError: true, interrupt: !!permResult.interrupt };
           }
           // Apply updated input if provided
           if (permResult.updatedInput) {
@@ -1169,6 +1180,9 @@ export async function* queryLoop(
 
     const toolResults = await Promise.all(toolResultPromises);
 
+    // Check if any tool result requested interrupt (permission denied with interrupt: true)
+    const shouldInterrupt = toolResults.some((r) => (r as { interrupt?: boolean }).interrupt);
+
     // Yield all collected tool_progress messages from the generator
     for (const progressMsg of pendingToolProgress) {
       yield progressMsg;
@@ -1201,6 +1215,18 @@ export async function* queryLoop(
     };
     yield userMsg;
     options?.onProgress?.(userMsg);
+
+    // If a permission denial requested interrupt, stop the loop
+    if (shouldInterrupt) {
+      const resultMsg = buildErrorResult(
+        'error_during_execution',
+        ['Interrupted by permission denial'],
+        turn,
+      );
+      yield resultMsg;
+      options?.onProgress?.(resultMsg);
+      return;
+    }
 
     // Continue to next turn
   }

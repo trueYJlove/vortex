@@ -397,7 +397,10 @@ export class AnthropicProvider implements LlmProvider {
           type: 'enabled',
           budget_tokens: request.thinking.budgetTokens,
         };
+      } else if (request.thinking.type === 'adaptive') {
+        body.thinking = { type: 'adaptive' };
       }
+      // 'disabled' → omit thinking param entirely (API default)
     }
 
     return body;

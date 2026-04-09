@@ -403,6 +403,35 @@ Branch: `feature/sdk`
 
 ---
 
+### Run 23 — Adaptive Thinking + Permission Denial Tracking
+
+**Bug fix: adaptive thinking silently ignored by Anthropic provider (`llm/anthropic.ts`)**
+- `buildRequestBody()` only handled `thinking.type === 'enabled'` — when `type === 'adaptive'`
+  (the default for Opus 4.6+ models), no thinking config was sent to the API, causing
+  adaptive thinking to silently fall back to no thinking at all
+- Added `else if (request.thinking.type === 'adaptive')` branch that passes `{ type: 'adaptive' }`
+  directly to the Anthropic API body
+- `type: 'disabled'` correctly omits the thinking param (API default behavior)
+- This fix is critical for any session using Opus 4.6+ where thinking config resolves to `adaptive`
+
+**Enhancement: permission denial tracking (`core/query-loop.ts`)**
+- Added `permissionDenials` array to accumulate denied tool uses throughout the query loop
+- Each denial records `{ tool_name, tool_use_id, tool_input }` matching CC SDK `SDKPermissionDenial` type
+- Updated `permission_denials` field in both success and error result messages from `unknown[]`
+  to the properly typed array — now populated with actual denial records
+- Previously `permission_denials: []` was always empty regardless of denials
+
+**Enhancement: permission denial interrupt support (`core/query-loop.ts`)**
+- When `PermissionResult.interrupt === true`, the tool result carries an `interrupt` flag
+- After all tool results are collected, if any result has `interrupt: true`, the query loop
+  yields an `error_during_execution` result and terminates the turn
+- This allows the consumer's permission handler to signal "stop everything" on a critical denial
+  (e.g., user explicitly rejected a dangerous operation)
+
+- tsc --noEmit passes
+
+---
+
 ## Priority Queue (Next Runs)
 
 ### P1 (Critical)
