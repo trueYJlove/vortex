@@ -269,6 +269,44 @@ Branch: `feature/sdk`
 
 ---
 
+### Run 19 — Multi-Modal send() Fix + Git Worktree Isolation
+
+**Bug fix: `send()` silently drops multi-modal (image) messages (`core/session.ts`)**
+- Consumer sends multi-modal messages using the CC SDK envelope format:
+  `{ type: 'user', message: { role: 'user', content: ContentBlock[] } }`
+- `send()` only accepted `string | { role: 'user'; content: string }` — when the
+  envelope shape was passed, `message.content` resolved to `undefined` because the
+  code read `.content` from the outer envelope, not the inner `message` field.
+- Refactored `send()` to accept `string | Record<string, unknown>` and handle
+  three input shapes:
+  1. Plain string — `"hello"`
+  2. Direct message — `{ role: 'user', content: string | ContentBlock[] }`
+  3. CC SDK envelope — `{ type: 'user', message: { role: 'user', content: ... } }`
+- Multi-modal `ContentBlock[]` content is preserved through the pipeline and
+  pushed as `Message` objects into `pendingMessages` (not stringified).
+- `stream()` updated to drain `pendingMessages` as `Array<string | Message>`,
+  merging multi-modal payloads into a single user Message with combined blocks.
+- `UserPromptSubmit` hook extracts text representation for hook context but
+  injects `additionalContext` as an appended text block (preserves image blocks).
+- `SDKSession.send()` interface type widened to `string | Record<string, unknown>`.
+
+**Feature: Git worktree isolation for sub-agents (`orchestrator/spawner.ts`)**
+- Implemented worktree lifecycle matching the CC Rust agent_tool.rs behavior:
+  - `findGitRoot(start)` — walks up from cwd to locate `.git`
+  - `createWorktree(gitRoot, agentId)` — runs `git worktree add --detach`
+    into `$TMPDIR/claude-agent-<agentId>`, returns path or null on failure
+  - `removeWorktree(gitRoot, worktreeDir)` — force-removes after agent completes
+- `runSubAgent()` now resolves `isolation: 'worktree'` from `AgentSpawnRequest`:
+  - Finds git root, creates worktree, sets `effectiveCwd` to worktree path
+  - Falls back to shared cwd on failure (with warning, no crash)
+  - Cleanup runs in `finally`-like position after query loop and before return
+- Both foreground and background agents support worktree isolation
+- This enables safe parallel file editing when multiple agents are spawned
+
+- tsc --noEmit passes
+
+---
+
 ## Priority Queue (Next Runs)
 
 ### P1 (Critical)
@@ -277,3 +315,4 @@ Branch: `feature/sdk`
 ### P2 (Important)
 - [ ] WebSearchTool real implementation
 - [ ] Agent progress summaries (agentProgressSummaries fork+summarize every 30s)
+- [ ] Typed system subtypes for task_started/task_progress/task_notification in SDKMessage union

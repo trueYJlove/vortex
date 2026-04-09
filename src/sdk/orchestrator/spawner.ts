@@ -10,6 +10,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { LlmProvider, ContentBlock } from '../types/provider.js';
 import type { Tool, ToolContext, ToolResult } from '../types/tool.js';
 import { toolSuccess, toolError } from '../types/tool.js';
@@ -34,6 +38,55 @@ const MODEL_ALIASES: Record<string, string> = {
 function resolveModel(model: string | undefined, parentModel: string): string {
   if (!model) return parentModel;
   return MODEL_ALIASES[model] ?? model;
+}
+
+// ---------------------------------------------------------------------------
+// Git worktree isolation helpers
+// ---------------------------------------------------------------------------
+
+/** Run a git command and return stdout on success, null on failure. */
+function runGit(cwd: string, args: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    execFile('git', args, { cwd }, (err, stdout) => {
+      if (err) {
+        resolve(null);
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+  });
+}
+
+/** Walk up from `start` to find the nearest `.git` directory. */
+function findGitRoot(start: string): string | null {
+  let dir = start;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      const s = statSync(join(dir, '.git'));
+      if (s) return dir;
+    } catch { /* not a git root, keep going */ }
+    const parent = join(dir, '..');
+    if (parent === dir) return null; // reached filesystem root
+    dir = parent;
+  }
+}
+
+/**
+ * Create a detached git worktree for agent isolation.
+ * Returns the worktree directory path on success, null on failure.
+ */
+async function createWorktree(gitRoot: string, agentId: string): Promise<string | null> {
+  const worktreeDir = join(tmpdir(), `claude-agent-${agentId}`);
+  const result = await runGit(gitRoot, [
+    'worktree', 'add', '--detach', worktreeDir, 'HEAD',
+  ]);
+  return result !== null ? worktreeDir : null;
+}
+
+/** Remove a git worktree (force, ignoring errors). */
+async function removeWorktree(gitRoot: string, worktreeDir: string): Promise<void> {
+  await runGit(gitRoot, ['worktree', 'remove', '--force', worktreeDir]);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,12 +173,36 @@ async function runSubAgent(
 
   const systemPrompt = buildSubAgentPrompt(request, agentDef);
 
+  // Resolve worktree isolation if requested
+  const useWorktree = request.isolation === 'worktree';
+  let worktreeDir: string | null = null;
+  let gitRoot: string | null = null;
+  let effectiveCwd = parentConfig.cwd;
+
+  if (useWorktree) {
+    gitRoot = findGitRoot(parentConfig.cwd);
+    if (gitRoot) {
+      worktreeDir = await createWorktree(gitRoot, agentId);
+      if (worktreeDir) {
+        effectiveCwd = worktreeDir;
+      } else {
+        console.warn(
+          `[SDK] Worktree creation failed for agent ${agentId}; using shared cwd`,
+        );
+      }
+    } else {
+      console.warn(
+        `[SDK] No git root found for agent ${agentId}; isolation=worktree ignored`,
+      );
+    }
+  }
+
   // Build sub-agent options
   const subOptions: Options = {
     model,
     maxTurns: request.maxTurns ?? agentDef?.maxTurns ?? parentConfig.maxTurns,
     maxBudgetUsd: parentConfig.maxBudgetUsd,
-    cwd: parentConfig.cwd,
+    cwd: effectiveCwd,
     env: parentConfig.env,
     systemPrompt,
     thinking: parentConfig.thinking,
@@ -235,6 +312,13 @@ async function runSubAgent(
         duration_ms: Date.now() - startedAt,
       },
       summary: extractFinalText(collected),
+    });
+  }
+
+  // Cleanup worktree if one was created
+  if (worktreeDir && gitRoot) {
+    await removeWorktree(gitRoot, worktreeDir).catch(() => {
+      console.warn(`[SDK] Failed to remove worktree ${worktreeDir}`);
     });
   }
 

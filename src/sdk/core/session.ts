@@ -5,7 +5,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { Message, LlmProvider } from '../types/provider.js';
+import type { Message, LlmProvider, ContentBlock } from '../types/provider.js';
 import type { Tool } from '../types/tool.js';
 import type { Options, QueryConfig, PermissionMode, SlashCommand } from '../types/config.js';
 import { resolveQueryConfig } from './context.js';
@@ -38,8 +38,13 @@ export interface SDKSession {
   /**
    * Send a message to the session. The session will process the message
    * through the query loop and yield results via `stream()`.
+   *
+   * Accepts:
+   *   - Plain string
+   *   - Direct message: `{ role: 'user', content: string | ContentBlock[] }`
+   *   - CC SDK envelope: `{ type: 'user', message: { role: 'user', content: ... } }`
    */
-  send(message: string | { role: 'user'; content: string }): Promise<void>;
+  send(message: string | Record<string, unknown>): Promise<void>;
 
   /**
    * Stream events from the session. Returns an async generator that yields
@@ -356,15 +361,60 @@ function createSessionProxy(state: SessionState): SDKSession {
   });
 
   session.send = async function send(
-    message: string | { role: 'user'; content: string },
+    message: string | Record<string, unknown>,
   ): Promise<void> {
     if (state.closed) {
       throw new Error('Session is closed');
     }
 
-    let text = typeof message === 'string' ? message : message.content;
+    // Normalize message into a pending payload (string or Message).
+    // Accepted shapes:
+    //   1. Plain string — "hello"
+    //   2. Direct message — { role: 'user', content: "hello" | ContentBlock[] }
+    //   3. CC SDK envelope — { type: 'user', message: { role: 'user', content: ... } }
+    let payload: string | Message;
 
-    // Fire UserPromptSubmit hook — hooks can inject additionalContext
+    if (typeof message === 'string') {
+      payload = message;
+    } else if (
+      message.type === 'user' &&
+      message.message &&
+      typeof message.message === 'object'
+    ) {
+      // SDKUserMessage envelope: { type: 'user', message: MessageParam }
+      const inner = message.message as Record<string, unknown>;
+      const content = inner.content;
+      if (typeof content === 'string') {
+        payload = content;
+      } else if (Array.isArray(content)) {
+        // Multi-modal content blocks (images, text, etc.)
+        payload = { role: 'user' as const, content: content as ContentBlock[] };
+      } else {
+        payload = String(content ?? '');
+      }
+    } else if (message.role === 'user') {
+      // Direct { role: 'user', content: ... }
+      const content = message.content;
+      if (typeof content === 'string') {
+        payload = content;
+      } else if (Array.isArray(content)) {
+        payload = { role: 'user' as const, content: content as ContentBlock[] };
+      } else {
+        payload = String(content ?? '');
+      }
+    } else {
+      // Fallback — treat as string
+      payload = typeof message === 'string' ? message : JSON.stringify(message);
+    }
+
+    // Fire UserPromptSubmit hook — hooks can inject additionalContext.
+    // Hook always receives the text representation of the message.
+    const hookText = typeof payload === 'string'
+      ? payload
+      : (Array.isArray(payload.content)
+          ? payload.content.filter((b) => b.type === 'text').map((b) => (b as { text: string }).text).join('\n')
+          : String(payload.content));
+
     if (state.config.hooks?.UserPromptSubmit) {
       try {
         const results = await runEventHooks(
@@ -374,7 +424,7 @@ function createSessionProxy(state: SessionState): SDKSession {
             hook_event_name: 'UserPromptSubmit',
             session_id: state.sessionId,
             cwd: state.config.cwd,
-            user_message: text,
+            user_message: hookText,
           },
           state.abortController.signal,
         );
@@ -383,14 +433,28 @@ function createSessionProxy(state: SessionState): SDKSession {
           .map((r) => String(r.additionalContext))
           .join('\n');
         if (ctx) {
-          text = `${text}\n\n${ctx}`;
+          // Inject additional context into the payload
+          if (typeof payload === 'string') {
+            payload = `${payload}\n\n${ctx}`;
+          } else if (Array.isArray(payload.content)) {
+            // Append a text block with the hook context
+            payload = {
+              role: 'user' as const,
+              content: [
+                ...payload.content,
+                { type: 'text' as const, text: ctx },
+              ],
+            };
+          } else {
+            payload = `${payload.content}\n\n${ctx}`;
+          }
         }
       } catch {
         // Advisory — hook errors don't block message delivery
       }
     }
 
-    state.pendingMessages.push(text);
+    state.pendingMessages.push(payload);
     // Wake up stream() if it is waiting for a message.
     state.pendingWakeUp?.();
     state.pendingWakeUp = null;
@@ -410,18 +474,40 @@ function createSessionProxy(state: SessionState): SDKSession {
 
       if (state.closed) return;
 
-      // Drain all pending messages
-      const pendingTexts: string[] = [];
+      // Drain all pending messages.
+      // Payloads can be strings or Message objects (multi-modal).
+      const pendingPayloads: Array<string | Message> = [];
       while (state.pendingMessages.length > 0) {
-        const msg = state.pendingMessages.shift()!;
-        pendingTexts.push(typeof msg === 'string' ? msg : String(msg));
+        pendingPayloads.push(state.pendingMessages.shift()!);
       }
 
-      // Combine pending messages into a single prompt
-      const prompt = pendingTexts.join('\n\n');
-
-      // Add the user message to session history BEFORE running the query loop
-      const userMessage: Message = { role: 'user' as const, content: prompt };
+      // Build the user message for the query loop.
+      // If any payload is a Message (multi-modal content), preserve it;
+      // otherwise combine plain strings.
+      let userMessage: Message;
+      const hasMultiModal = pendingPayloads.some(
+        (p) => typeof p !== 'string' && Array.isArray(p.content),
+      );
+      if (hasMultiModal) {
+        // Merge all payloads into a single Message with ContentBlock[]
+        const blocks: ContentBlock[] = [];
+        for (const p of pendingPayloads) {
+          if (typeof p === 'string') {
+            blocks.push({ type: 'text', text: p } as ContentBlock);
+          } else if (Array.isArray(p.content)) {
+            blocks.push(...(p.content as ContentBlock[]));
+          } else {
+            blocks.push({ type: 'text', text: String(p.content) } as ContentBlock);
+          }
+        }
+        userMessage = { role: 'user' as const, content: blocks };
+      } else {
+        // All payloads are plain strings
+        const prompt = pendingPayloads
+          .map((p) => (typeof p === 'string' ? p : String(p.content)))
+          .join('\n\n');
+        userMessage = { role: 'user' as const, content: prompt };
+      }
       state.messages.push(userMessage);
 
       // Persist user message to transcript (fire-and-forget)
