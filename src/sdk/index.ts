@@ -785,22 +785,22 @@ import {
   transcriptExists,
   getTranscriptPath,
 } from './core/transcript.js';
-import { readdir, readFile, writeFile, stat, mkdir } from 'node:fs/promises';
+import { readdir, readFile, writeFile, stat, mkdir, open } from 'node:fs/promises';
 import { join } from 'node:path';
 import { basename } from 'node:path';
 
 /** Session info returned by listSessions / getSessionInfo. */
 export interface SDKSessionInfo {
   sessionId: string;
-  /** Summary / description of the session. */
+  /** Display title: customTitle ?? firstPrompt ?? sessionId. */
   summary: string;
-  /** ISO timestamp of last modification. */
-  lastModified: string;
+  /** Last modified time in milliseconds since epoch. */
+  lastModified: number;
   /** File size of the transcript in bytes. */
   fileSize?: number;
   /** User-set custom title (via renameSession). */
   customTitle?: string;
-  /** First user prompt in the session. */
+  /** First meaningful user prompt in the session. */
   firstPrompt?: string;
   /** Git branch at session creation time. */
   gitBranch?: string;
@@ -808,8 +808,8 @@ export interface SDKSessionInfo {
   cwd?: string;
   /** User-set tag (via tagSession). */
   tag?: string;
-  /** ISO timestamp of creation. */
-  createdAt?: string;
+  /** Creation time in milliseconds since epoch. */
+  createdAt?: number;
 }
 
 /** Session message returned by getSessionMessages. */
@@ -882,6 +882,48 @@ export interface SessionMutationOptions {
 }
 
 /**
+ * Read the first meaningful user text from a JSONL transcript file.
+ * Scans only the first few KB to avoid loading large transcripts into memory.
+ */
+async function readFirstPrompt(filePath: string): Promise<string | undefined> {
+  try {
+    // Read up to 8 KB — enough to find the first user message in virtually all cases
+    const fd = await open(filePath, 'r');
+    try {
+      const buf = Buffer.alloc(8192);
+      const { bytesRead } = await fd.read(buf, 0, 8192, 0);
+      const slice = buf.slice(0, bytesRead).toString('utf-8');
+      for (const line of slice.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const entry = JSON.parse(trimmed);
+          if (entry.type !== 'user') continue;
+          const msg = entry.message;
+          if (!msg) continue;
+          // Extract text from various content shapes
+          const content = msg.content;
+          if (typeof content === 'string' && content.trim()) {
+            return content.trim().slice(0, 200);
+          }
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (typeof block === 'object' && block !== null && block.type === 'text') {
+                const text = String(block.text ?? '').trim();
+                if (text) return text.slice(0, 200);
+              }
+            }
+          }
+        } catch { /* skip malformed line */ }
+      }
+    } finally {
+      await fd.close();
+    }
+  } catch { /* file unreadable */ }
+  return undefined;
+}
+
+/**
  * List sessions for the given working directory.
  * Scans transcript files in CLAUDE_CONFIG_DIR/projects/<project>/.
  */
@@ -895,19 +937,18 @@ export async function listSessions(options?: ListSessionsOptions): Promise<SDKSe
       if (!file.endsWith('.jsonl')) continue;
       const sessionId = basename(file, '.jsonl');
       const filePath = join(projectDir, file);
-      // Read file stats for metadata
       let fileSize: number | undefined;
-      let lastModified = '';
-      let createdAt: string | undefined;
+      let lastModified = 0;
+      let createdAt: number | undefined;
       try {
         const fstat = await stat(filePath);
         fileSize = fstat.size;
-        lastModified = fstat.mtime.toISOString();
-        createdAt = fstat.birthtime.toISOString();
+        lastModified = fstat.mtimeMs;
+        createdAt = fstat.birthtimeMs;
       } catch { /* stat failure — use defaults */ }
       sessions.push({
         sessionId,
-        summary: '',
+        summary: sessionId,
         lastModified,
         fileSize,
         cwd,
@@ -915,16 +956,21 @@ export async function listSessions(options?: ListSessionsOptions): Promise<SDKSe
       });
     }
     // Sort by lastModified descending (most recent first)
-    sessions.sort((a, b) => (b.lastModified > a.lastModified ? 1 : -1));
+    sessions.sort((a, b) => b.lastModified - a.lastModified);
     // Apply pagination
     const offset = options?.offset ?? 0;
     const limit = options?.limit ?? sessions.length;
     const paged = sessions.slice(offset, offset + limit);
-    // Enrich with sidecar metadata in parallel
+    // Enrich with sidecar metadata + firstPrompt in parallel
     await Promise.all(paged.map(async (s) => {
-      const meta = await readMeta(s.sessionId, cwd);
+      const [meta, firstPrompt] = await Promise.all([
+        readMeta(s.sessionId, cwd),
+        readFirstPrompt(join(projectDir, `${s.sessionId}.jsonl`)),
+      ]);
       if (meta.title) s.customTitle = meta.title;
       if (meta.tag !== undefined && meta.tag !== null) s.tag = meta.tag;
+      if (firstPrompt) s.firstPrompt = firstPrompt;
+      s.summary = s.customTitle ?? s.firstPrompt ?? s.sessionId;
     }));
     return paged;
   } catch {
@@ -943,19 +989,24 @@ export async function getSessionInfo(
   if (!transcriptExists(sessionId, cwd)) return undefined;
   const filePath = getTranscriptPath(sessionId, cwd);
   let fileSize: number | undefined;
-  let lastModified = '';
-  let createdAt: string | undefined;
+  let lastModified = 0;
+  let createdAt: number | undefined;
   try {
     const fstat = await stat(filePath);
     fileSize = fstat.size;
-    lastModified = fstat.mtime.toISOString();
-    createdAt = fstat.birthtime.toISOString();
+    lastModified = fstat.mtimeMs;
+    createdAt = fstat.birthtimeMs;
   } catch { /* stat failure — use defaults */ }
-  const info: SDKSessionInfo = { sessionId, summary: '', lastModified, fileSize, cwd, createdAt };
-  // Enrich with sidecar metadata (custom title / tag)
-  const meta = await readMeta(sessionId, cwd);
+  const info: SDKSessionInfo = { sessionId, summary: sessionId, lastModified, fileSize, cwd, createdAt };
+  // Enrich with sidecar metadata (custom title / tag) and firstPrompt in parallel
+  const [meta, firstPrompt] = await Promise.all([
+    readMeta(sessionId, cwd),
+    readFirstPrompt(filePath),
+  ]);
   if (meta.title) info.customTitle = meta.title;
   if (meta.tag !== undefined && meta.tag !== null) info.tag = meta.tag;
+  if (firstPrompt) info.firstPrompt = firstPrompt;
+  info.summary = info.customTitle ?? info.firstPrompt ?? sessionId;
   return info;
 }
 
