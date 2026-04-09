@@ -68,6 +68,7 @@ import { getAllTools, filterTools } from './tools/registry.js';
 import { extractSdkMcpTools } from './tools/mcp/bridge.js';
 import type { McpServerConnectionStatus } from './tools/mcp/bridge.js';
 import {
+  McpConnectionManager,
   createMcpConnectionManager,
 } from './tools/mcp/connection-manager.js';
 import { initOrchestrator } from './orchestrator/init.js';
@@ -216,9 +217,12 @@ export function query(params: {
     }
   }
 
+  // Hoist the MCP manager so Query control methods (toggleMcpServer/setMcpServers)
+  // can mutate it between turns while the generator is running.
+  const mcpManager = createMcpConnectionManager(mcpServersConfig);
+
   const gen = (async function* (): AsyncGenerator<SDKMessage, void, undefined> {
     // Connect external MCP servers via connection manager (with reconnection support)
-    const mcpManager = createMcpConnectionManager(mcpServersConfig);
     try {
       await mcpManager.connectAll();
       const extTools = mcpManager.getBridgedTools();
@@ -287,7 +291,7 @@ export function query(params: {
     config: configWithSignal,
   };
 
-  return wrapGeneratorAsQuery(gen, abortController, configOverrides, queryMeta);
+  return wrapGeneratorAsQuery(gen, abortController, configOverrides, queryMeta, mcpManager, tools);
 }
 
 /** Internal metadata bag for Query control methods. */
@@ -299,15 +303,48 @@ interface QueryMetadata {
 }
 
 /**
+ * Synchronize external MCP tools from the connection manager into a mutable
+ * tools array. Removes stale manager-owned tools and appends current ones.
+ * In-process (SDK) MCP tools are left untouched.
+ */
+function syncToolsFromManager(tools: Tool[], mgr: McpConnectionManager): void {
+  const managedServers = new Set(mgr.serverNames());
+
+  // Remove tools that belong to any server in the manager
+  let i = tools.length;
+  while (i-- > 0) {
+    const name = tools[i].name;
+    if (!name.startsWith('mcp__')) continue;
+    const sep = name.indexOf('__', 5);
+    if (sep < 0) continue;
+    const srv = name.slice(5, sep);
+    if (managedServers.has(srv)) tools.splice(i, 1);
+  }
+
+  // Append current tools from all connected servers
+  for (const t of mgr.getBridgedTools()) {
+    tools.push(t);
+  }
+}
+
+/**
  * Wrap an AsyncGenerator<SDKMessage> with Query control methods.
  * Control methods write to the shared `overrides` object which the
  * query loop reads at the start of each turn (C1).
+ *
+ * @param mcpManager - Optional external MCP connection manager to expose
+ *   via toggleMcpServer / setMcpServers. When provided, dynamic MCP changes
+ *   are applied to the manager and take effect on the next tool lookup.
+ * @param toolsRef - Mutable tools array shared with the generator closure.
+ *   Dynamic MCP changes update this array in-place.
  */
 function wrapGeneratorAsQuery(
   gen: AsyncGenerator<SDKMessage, void, undefined>,
   abortController: AbortController,
   overrides: MutableConfigOverrides,
   meta: QueryMetadata,
+  mcpManager?: McpConnectionManager,
+  toolsRef?: Tool[],
 ): Query {
   const query = gen as Query;
 
@@ -385,20 +422,27 @@ function wrapGeneratorAsQuery(
     // No-op: read state seeding is a CC subprocess optimization.
   };
 
-  query.reconnectMcpServer = async (_serverName: string) => {
-    // MCP reconnection is handled by the connection manager's auto-reconnect.
-    // Explicit reconnect is a no-op here (the connection manager retries automatically).
+  query.reconnectMcpServer = async (serverName: string) => {
+    if (mcpManager) {
+      await mcpManager.restart(serverName);
+      // Sync updated tools into the shared tools array (in-place splice)
+      if (toolsRef) syncToolsFromManager(toolsRef, mcpManager);
+    }
   };
 
-  query.toggleMcpServer = async (_serverName: string, _enabled: boolean) => {
-    // MCP server toggling is not yet supported in the in-process SDK.
+  query.toggleMcpServer = async (serverName: string, enabled: boolean) => {
+    if (mcpManager) {
+      await mcpManager.toggle(serverName, enabled);
+      if (toolsRef) syncToolsFromManager(toolsRef, mcpManager);
+    }
   };
 
-  query.setMcpServers = async () => ({
-    added: [],
-    removed: [],
-    errors: {},
-  });
+  query.setMcpServers = async (servers: Record<string, Record<string, unknown>>) => {
+    if (!mcpManager) return { added: [], removed: [], errors: {} };
+    const result = await mcpManager.setServers(servers);
+    if (toolsRef) syncToolsFromManager(toolsRef, mcpManager);
+    return result;
+  };
 
   query.stopTask = async (taskId: string) => {
     // Delegate to AgentRegistry for background agent tasks.

@@ -193,6 +193,90 @@ export class McpConnectionManager {
     await this.connect(name);
   }
 
+  /**
+   * Remove a server entirely — disconnect and deregister.
+   * No-op if the server is not registered.
+   */
+  removeServer(name: string): void {
+    this.disconnect(name);
+    this.servers.delete(name);
+  }
+
+  /**
+   * Enable or disable a server by name.
+   *
+   * - `enabled = true` → connect the server (no-op if already connected).
+   * - `enabled = false` → disconnect the server without removing its config,
+   *    so it can be re-enabled later.
+   */
+  async toggle(name: string, enabled: boolean): Promise<void> {
+    const entry = this.servers.get(name);
+    if (!entry) {
+      throw new Error(`MCP server "${name}" is not registered`);
+    }
+
+    if (enabled) {
+      if (entry.status.state !== 'connected') {
+        await this.connect(name);
+      }
+    } else {
+      this.disconnect(name);
+    }
+  }
+
+  /**
+   * Atomically replace the managed server set.
+   *
+   * - Servers present in `configs` but not currently registered → added and connected.
+   * - Servers currently registered but absent from `configs` → disconnected and removed.
+   * - Servers present in both but with a changed config → restarted with new config.
+   * - Servers present in both with identical config → untouched.
+   *
+   * Returns lists of server names that were added and removed.
+   */
+  async setServers(
+    configs: Record<string, Record<string, unknown>>,
+  ): Promise<{ added: string[]; removed: string[]; errors: Record<string, string> }> {
+    const added: string[] = [];
+    const removed: string[] = [];
+    const errors: Record<string, string> = {};
+
+    // Determine removed servers
+    for (const name of this.servers.keys()) {
+      if (!(name in configs)) {
+        this.removeServer(name);
+        removed.push(name);
+      }
+    }
+
+    // Determine added or updated servers
+    for (const [name, config] of Object.entries(configs)) {
+      const existing = this.servers.get(name);
+
+      if (!existing) {
+        // New server — register and connect
+        this.addServer(name, config);
+        added.push(name);
+        await this.connect(name).catch((err: unknown) => {
+          errors[name] = err instanceof Error ? err.message : String(err);
+        });
+      } else {
+        // Check if config changed (shallow JSON comparison)
+        const configChanged = JSON.stringify(existing.config) !== JSON.stringify(config);
+        if (configChanged) {
+          // Update config and restart
+          existing.config = config;
+          await this.restart(name).catch((err: unknown) => {
+            errors[name] = err instanceof Error ? err.message : String(err);
+          });
+        }
+        // Unchanged — leave as-is
+      }
+    }
+
+    return { added, removed, errors };
+  }
+
   // -------------------------------------------------------------------------
   // Queries
   // -------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Message, LlmProvider, ContentBlock } from '../types/provider.js';
 import type { Tool } from '../types/tool.js';
-import type { Options, QueryConfig, PermissionMode, SlashCommand } from '../types/config.js';
+import type { Options, QueryConfig, PermissionMode, SlashCommand, McpSetServersResult } from '../types/config.js';
 import { resolveQueryConfig } from './context.js';
 import { AnthropicProvider } from '../llm/anthropic.js';
 import { queryLoop } from './query-loop.js';
@@ -325,6 +325,48 @@ function createTransportShim(state: SessionState) {
  * CC SDK Query control/metadata methods. The consumer accesses these
  * via `(session as any).query.*`.
  */
+/**
+ * Rebuild the MCP-sourced tools in `state.tools` from the connection manager.
+ *
+ * Called after any dynamic MCP change (toggle / setServers). Replaces
+ * previously bridged external-MCP tools with the current set, preserving
+ * built-in and SDK-MCP tools that are not managed by the connection manager.
+ */
+function refreshMcpToolsFromManager(state: SessionState): void {
+  if (!state.mcpManager) return;
+
+  // Server names managed by the external connection manager
+  const managedServerNames = new Set(state.mcpManager.serverNames());
+
+  // Keep built-in tools + in-process SDK MCP tools (not in the external manager)
+  const nonExternalTools = state.tools.filter(
+    (t) =>
+      !managedServerNames.has(extractMcpServerName(t.name) ?? ''),
+  );
+
+  // Current tools from the external manager (may be empty if all disconnected)
+  const freshExternal = state.mcpManager.getBridgedTools();
+
+  state.tools = [...nonExternalTools, ...freshExternal];
+
+  // Rebuild server statuses: keep non-managed entries, replace managed ones
+  const nonManagedStatuses = state.mcpServerStatuses.filter(
+    (s) => !managedServerNames.has(s.name),
+  );
+  state.mcpServerStatuses = [...nonManagedStatuses, ...state.mcpManager.getStatuses()];
+}
+
+/**
+ * Extract the server name from an MCP tool name (`mcp__<server>__<tool>`).
+ * Returns `null` for non-MCP tool names.
+ */
+function extractMcpServerName(toolName: string): string | null {
+  if (!toolName.startsWith('mcp__')) return null;
+  const rest = toolName.slice('mcp__'.length);
+  const sepIdx = rest.indexOf('__');
+  return sepIdx > 0 ? rest.slice(0, sepIdx) : null;
+}
+
 function createQueryProxy(state: SessionState) {
   const transport = createTransportShim(state);
 
@@ -366,7 +408,27 @@ function createQueryProxy(state: SessionState) {
     async reconnectMcpServer(serverName: string): Promise<void> {
       if (state.mcpManager) {
         await state.mcpManager.restart(serverName);
+        refreshMcpToolsFromManager(state);
       }
+    },
+
+    /** Enable or disable a named MCP server. Rebuilds bridged tools. */
+    async toggleMcpServer(serverName: string, enabled: boolean): Promise<void> {
+      if (!state.mcpManager) return;
+      await state.mcpManager.toggle(serverName, enabled);
+      refreshMcpToolsFromManager(state);
+    },
+
+    /** Replace the set of external MCP servers. Rebuilds bridged tools. */
+    async setMcpServers(
+      servers: Record<string, Record<string, unknown>>,
+    ): Promise<McpSetServersResult> {
+      if (!state.mcpManager) {
+        return { added: [], removed: [], errors: {} };
+      }
+      const result = await state.mcpManager.setServers(servers);
+      refreshMcpToolsFromManager(state);
+      return result;
     },
 
     /** Stop a background task. */
@@ -666,7 +728,28 @@ function createSessionProxy(state: SessionState): SDKSession {
         // init events are always forwarded — the consumer uses them as
         // per-turn boundary signals (see session-consumer.ts onTurnInit).
 
-        yield msg;
+        // In streaming mode (includePartialMessages: true), text content has
+        // already been delivered token-by-token via stream_event messages.
+        // Yielding the assistant message with text blocks intact causes the
+        // consumer (stream-processor.ts) to append the same text again to
+        // lastTextContent, producing duplicate output. Strip text blocks here
+        // so the consumer only uses the assistant message for metadata (usage,
+        // model, id) — matching CC SDK behaviour where text is not re-sent.
+        let yieldMsg = msg;
+        if (msg.type === 'assistant' && state.config.includePartialMessages) {
+          const content = (msg.message as unknown as { content?: unknown[] })?.content;
+          if (Array.isArray(content) && content.some((b: unknown) => (b as { type?: string }).type === 'text')) {
+            yieldMsg = {
+              ...msg,
+              message: {
+                ...(msg.message as object),
+                content: content.filter((b: unknown) => (b as { type?: string }).type !== 'text'),
+              } as typeof msg.message,
+            };
+          }
+        }
+
+        yield yieldMsg;
       }
 
       // Emit session_state_changed: idle (turn complete)
