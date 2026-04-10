@@ -39,6 +39,7 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
 | 26 | `rate_limit_event`/`prompt_suggestion` top-level type fix; `SDKRateLimitInfo`; stream wire format |
 | 27 | **CRITICAL**: `system:init` per-turn fix; `interrupt()` idle wake; session management API |
 | 28 | Full Query interface (16 methods); CC SDK types (ModelInfo, AgentInfo, etc.); `bypassPermissions` |
+| 29–38 | See detailed entries below |
 
 ---
 
@@ -117,6 +118,26 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
   - `ThinkTagParser`: full streaming lifecycle — single chunks, multi-chunk, state tracking
   - `applyStreamQuirks`: passthrough contract
 - **333 tests total** (16 test files)
+
+### Run 38 — openai-compat Unit Tests + GLM Think-Tag Streaming Fix
+- **Bug fix**: `openai-compat.ts` imported/used deprecated `isQwenThinkModel` instead of
+  `isXmlThinkModel` — GLM-Think/GLM-Z1 streaming responses never activated the ThinkTagParser
+- **Fix**: Updated import and `thinkTagParser` construction to use `isXmlThinkModel`
+- **41 new unit tests** (`llm/openai-compat.test.ts`):
+  - `capabilities()` with and without `reasoningField` quirk
+  - `createMessage()` non-streaming: text, tool_calls, finish_reason mapping,
+    tools in request body, temperature, defaultTemperature quirk, reasoning_effort,
+    HTTP 4xx error, 429 retry, empty content placeholder
+  - `createMessageStream()` streaming: text deltas, tool call with input_json_delta fragments,
+    `reasoning_content` field → `reasoning_delta` + thinking block start,
+    Qwen `<think>` tag parsing via ThinkTagParser, **GLM `<think>` tag parsing** (the bug path),
+    usage-only chunk, `includeUsageInStream` → `stream_options`, 4xx throw, 503 retry
+  - `toOpenAiMessages`: string content, system prompt (string + blocks), assistant tool_use,
+    tool_result string content, tool_result ContentBlock[] content, image→image_url
+  - Provider quirks: `toolIdMaxLen`, `toolIdAlphanumericOnly`, `fixToolUserSequence`
+  - `listModels()`: success, HTTP error, network failure, missing id filter
+  - `healthCheck()`: healthy, no-key guard, network failure, localhost no-key bypass
+- **374 tests total** (17 test files)
 
 ---
 

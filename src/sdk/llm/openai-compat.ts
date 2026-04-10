@@ -25,7 +25,7 @@ import type {
   UsageInfo,
 } from '../types/provider.js';
 import { parseSSEStream } from './stream-parser.js';
-import { applyModelQuirks, applyStreamQuirks, isQuirkyModel, isQwenThinkModel, ThinkTagParser } from './model-quirks.js';
+import { applyModelQuirks, applyStreamQuirks, isQuirkyModel, isXmlThinkModel, ThinkTagParser } from './model-quirks.js';
 import {
   DEFAULT_RETRY,
   delayForAttempt,
@@ -250,7 +250,7 @@ export class OpenAiCompatProvider implements LlmProvider {
 
     // Stateful <think> tag parser — one instance per streaming request.
     // Required for Qwen models that embed thinking in XML tags across chunks.
-    const thinkTagParser = isQwenThinkModel(modelId) ? new ThinkTagParser() : null;
+    const thinkTagParser = isXmlThinkModel(modelId) ? new ThinkTagParser() : null;
 
     for await (const chunk of parseSSEStream(response, signal)) {
       // Emit message_start on first chunk
