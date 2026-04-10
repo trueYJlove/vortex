@@ -124,6 +124,14 @@ export default defineConfig({
       use: {
         actionTimeout: 10000
       }
+    },
+    {
+      name: 'skillhub-store',
+      testMatch: '**/skillhub-store.spec.ts',
+      use: {
+        // SkillHub tests make real network requests to api.skillhub.cn
+        actionTimeout: 20000
+      }
     }
   ],
 

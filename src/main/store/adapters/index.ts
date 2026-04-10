@@ -10,6 +10,7 @@ import { HaloAdapter } from './halo.adapter'
 import { McpRegistryAdapter } from './mcp-registry.adapter'
 import { SmitheryAdapter } from './smithery.adapter'
 import { ClaudeSkillsAdapter } from './claude-skills.adapter'
+import { SkillHubAdapter } from './skillhub.adapter'
 import type { RegistrySource } from '../../../shared/store/store-types'
 
 // Singleton adapter instances (stateless, safe to share)
@@ -17,6 +18,7 @@ const haloAdapter = new HaloAdapter()
 const mcpRegistryAdapter = new McpRegistryAdapter()
 const smitheryAdapter = new SmitheryAdapter()
 const claudeSkillsAdapter = new ClaudeSkillsAdapter()
+const skillHubAdapter = new SkillHubAdapter()
 
 /**
  * Return the adapter for the given registry source.
@@ -30,6 +32,8 @@ export function getAdapter(source: RegistrySource): RegistryAdapter {
       return smitheryAdapter
     case 'claude-skills':
       return claudeSkillsAdapter
+    case 'skillhub':
+      return skillHubAdapter
     case 'halo':
     default:
       return haloAdapter

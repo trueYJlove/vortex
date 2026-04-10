@@ -74,6 +74,13 @@ const BUILTIN_REGISTRIES: RegistrySource[] = [
     enabled: true,
     sourceType: 'claude-skills',
   },
+  {
+    id: 'skillhub',
+    name: 'SkillHub (33k+ Skills)',
+    url: 'https://api.skillhub.cn',
+    enabled: true,
+    sourceType: 'skillhub',
+  },
 ]
 
 /** The primary default registry (first in BUILTIN_REGISTRIES) */
@@ -98,7 +105,7 @@ const RegistrySourceSchema = z.object({
   url: z.string().url(),
   enabled: z.boolean(),
   isDefault: z.boolean().optional(),
-  sourceType: z.enum(['halo', 'mcp-registry', 'smithery', 'claude-skills']).optional(),
+  sourceType: z.enum(['halo', 'mcp-registry', 'smithery', 'claude-skills', 'skillhub']).optional(),
   adapterConfig: z.record(z.string(), z.unknown()).optional(),
 })
 
@@ -312,12 +319,12 @@ export async function getAppDetail(slug: string): Promise<StoreAppDetail> {
 
   const { entry, registryId } = found
 
-  // For claude-skills sources, skip the GitHub API fetch at browse time.
+  // For claude-skills and skillhub sources, skip remote fetching at browse time.
   // The detail view only needs entry data (name, description, tags, etc.) which is
-  // already available from the registry index in SQLite — no network call needed.
+  // already available from the registry index — no network call needed.
   // The full spec (with skill_files) is fetched at install time by installFromStore().
   const registry = config.registries.find(r => r.id === registryId)
-  if (registry?.sourceType === 'claude-skills') {
+  if (registry?.sourceType === 'claude-skills' || registry?.sourceType === 'skillhub') {
     return { entry, spec: buildPreviewSpec(entry, registryId), registryId }
   }
 
@@ -555,7 +562,7 @@ export async function installRequiredSkills(
  * The full spec (with skill_files populated) is fetched at install time via
  * installFromStore() → adapter.fetchSpec().
  *
- * Only used for claude-skills sources where the registry index already contains
+ * Used for claude-skills and skillhub sources where the registry index already contains
  * all data needed to render the detail page (name, description, tags, etc.).
  */
 function buildPreviewSpec(entry: RegistryEntry, registryId: string): AppSpec {
