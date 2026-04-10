@@ -103,12 +103,27 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
 - **`basename`** extracted from path inputs so summaries show filenames, not full paths
 - **12 new tests** (buildProgressSummary suite + task_progress integration) — **281 tests total**
 
+### Run 37 — GLM Model Support + model-quirks Unit Tests
+- **GLM model support**: `glm` added to `QUIRKY_PREFIXES`; GLM-Think/GLM-Z1 series (Zhipu AI)
+  use `<think>...</think>` XML tags, same pattern as Qwen — now correctly extracted
+- **`isXmlThinkModel(model)`**: new exported function covering all XML-think models (Qwen + GLM)
+- **`isQwenThinkModel` deprecated** in favour of `isXmlThinkModel` (delegates internally)
+- **`extractXmlThinking`**: renamed from `extractQwenThinking` — generic for all XML-think models
+- **52 new unit tests** (`llm/model-quirks.test.ts`):
+  - `isQuirkyModel` / `isXmlThinkModel` / `isQwenThinkModel` detection across all model families
+  - `applyModelQuirks`: `<think>` extraction for both Qwen and GLM, no-op for DeepSeek/GPT
+  - Generic fixes: missing tool IDs, empty content injection, stopReason correction
+  - DeepSeek argument repair
+  - `ThinkTagParser`: full streaming lifecycle — single chunks, multi-chunk, state tracking
+  - `applyStreamQuirks`: passthrough contract
+- **333 tests total** (16 test files)
+
 ---
 
 ## Priority Queue (Next Runs)
 
-### P1 (Critical)
-- [ ] Full consumer compatibility e2e test (session send+stream, all SDKMessage shapes)
+### P1 (Important)
+- [ ] Worker Thread isolation for background agents (current fire-and-forget Promise model)
 
-### P2 (Important)
-- [ ] Worker Thread isolation for background agents (deferred)
+### P2
+- [ ] Additional LLM provider tests (openai-compat.ts coverage)

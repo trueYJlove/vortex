@@ -22,12 +22,26 @@ import type {
 // ---------------------------------------------------------------------------
 
 /** Known model prefixes that require quirks processing. */
-const QUIRKY_PREFIXES = ['qwen', 'deepseek'];
+const QUIRKY_PREFIXES = ['qwen', 'deepseek', 'glm'];
+
+/**
+ * Model prefixes that use XML-style `<think>...</think>` tags for reasoning.
+ * These models interleave thinking content with regular output using XML tags
+ * rather than a dedicated `reasoning` or `reasoning_content` field.
+ * Covers: Qwen-series (Alibaba), GLM-Think-series (Zhipu AI).
+ */
+const XML_THINK_PREFIXES = ['qwen', 'glm'];
 
 /** Returns `true` if the model is known to need quirks processing. */
 export function isQuirkyModel(model: string): boolean {
   const lower = model.toLowerCase();
   return QUIRKY_PREFIXES.some((prefix) => lower.startsWith(prefix));
+}
+
+/** Returns `true` if the model uses XML `<think>...</think>` tags for reasoning. */
+export function isXmlThinkModel(model: string): boolean {
+  const lower = model.toLowerCase();
+  return XML_THINK_PREFIXES.some((prefix) => lower.startsWith(prefix));
 }
 
 // ---------------------------------------------------------------------------
@@ -52,9 +66,9 @@ export function applyModelQuirks(
   let content = [...response.content];
   let { stopReason } = response;
 
-  // 1. Qwen: <think>...</think> extraction
-  if (lower.startsWith('qwen')) {
-    content = extractQwenThinking(content);
+  // 1. XML think-tag models (Qwen, GLM-Think, etc.): extract <think>…</think>
+  if (isXmlThinkModel(model)) {
+    content = extractXmlThinking(content);
   }
 
   // 2. DeepSeek: repair tool_call arguments
@@ -177,9 +191,12 @@ export function applyStreamQuirks(
   return event;
 }
 
-/** Returns true if the model is a Qwen model that uses `<think>` XML tags. */
+/**
+ * Returns true if the model uses `<think>` XML tags for reasoning.
+ * @deprecated Use `isXmlThinkModel` — covers Qwen and GLM-Think.
+ */
 export function isQwenThinkModel(model: string): boolean {
-  return model.toLowerCase().startsWith('qwen');
+  return isXmlThinkModel(model);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,8 +206,9 @@ export function isQwenThinkModel(model: string): boolean {
 /**
  * Extract `<think>...</think>` blocks from TextBlocks and convert them to
  * ThinkingBlocks. The thinking text is removed from the original TextBlock.
+ * Used for models that embed reasoning in XML tags (Qwen, GLM-Think, etc.).
  */
-function extractQwenThinking(blocks: ContentBlock[]): ContentBlock[] {
+function extractXmlThinking(blocks: ContentBlock[]): ContentBlock[] {
   const result: ContentBlock[] = [];
   const thinkRegex = /<think>([\s\S]*?)<\/think>/g;
 
