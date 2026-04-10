@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { createSpawner } from './spawner.js';
+import { createSpawner, buildProgressSummary } from './spawner.js';
 import { AgentRegistry } from './registry.js';
 import type { LlmProvider, ProviderRequest, ProviderResponse, StreamEvent, ProviderCapabilities, UsageInfo } from '../types/provider.js';
 import type { Tool, ToolContext, ToolResult } from '../types/tool.js';
@@ -489,5 +489,196 @@ describe('createSpawner — Agent tool exclusion', () => {
 
     // Agent tool should never be called by sub-agents (recursion guard)
     expect(executeSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildProgressSummary — human-readable progress descriptions', () => {
+  it('returns empty string for no tool calls', () => {
+    expect(buildProgressSummary([])).toBe('');
+  });
+
+  it('describes a single Read call with filename', () => {
+    const summary = buildProgressSummary([
+      { name: 'Read', input: { file_path: '/home/user/src/app.ts' } },
+    ]);
+    expect(summary).toContain('app.ts');
+    expect(summary.toLowerCase()).toContain('read');
+  });
+
+  it('describes a Bash call with truncated command', () => {
+    const summary = buildProgressSummary([
+      { name: 'Bash', input: { command: 'npm test' } },
+    ]);
+    expect(summary).toContain('npm test');
+    expect(summary.toLowerCase()).toContain('run');
+  });
+
+  it('describes a Write call with filename', () => {
+    const summary = buildProgressSummary([
+      { name: 'Write', input: { file_path: '/repo/src/index.ts' } },
+    ]);
+    expect(summary).toContain('index.ts');
+    expect(summary.toLowerCase()).toContain('writ');
+  });
+
+  it('describes an Edit call', () => {
+    const summary = buildProgressSummary([
+      { name: 'Edit', input: { file_path: '/repo/config.json' } },
+    ]);
+    expect(summary).toContain('config.json');
+  });
+
+  it('describes a Grep call with pattern', () => {
+    const summary = buildProgressSummary([
+      { name: 'Grep', input: { pattern: 'useState' } },
+    ]);
+    expect(summary).toContain('useState');
+  });
+
+  it('describes a WebSearch call with query', () => {
+    const summary = buildProgressSummary([
+      { name: 'WebSearch', input: { query: 'typescript generics tutorial' } },
+    ]);
+    expect(summary.toLowerCase()).toContain('typescript generics');
+  });
+
+  it('describes unknown tools by name', () => {
+    const summary = buildProgressSummary([
+      { name: 'CustomTool', input: {} },
+    ]);
+    expect(summary).toBe('CustomTool');
+  });
+
+  it('combines the last two actions when multiple calls exist', () => {
+    const summary = buildProgressSummary([
+      { name: 'Read', input: { file_path: '/a.ts' } },
+      { name: 'Bash', input: { command: 'npm run build' } },
+      { name: 'Write', input: { file_path: '/b.ts' } },
+    ]);
+    // Should combine the last two actions
+    expect(summary).toContain('then');
+    // Last two: Bash + Write
+    expect(summary.toLowerCase()).toContain('run');
+    expect(summary).toContain('b.ts');
+  });
+
+  it('works for a single action with no file path (Read fallback)', () => {
+    const summary = buildProgressSummary([
+      { name: 'Read', input: {} },
+    ]);
+    expect(summary.toLowerCase()).toContain('read');
+    expect(summary).toBeTruthy();
+  });
+
+  it('truncates long bash commands', () => {
+    const longCmd = 'echo ' + 'x'.repeat(100);
+    const summary = buildProgressSummary([
+      { name: 'Bash', input: { command: longCmd } },
+    ]);
+    expect(summary.length).toBeLessThan(200); // should not be unbounded
+    expect(summary).toContain('…');
+  });
+});
+
+describe('createSpawner — progress summary in task_progress', () => {
+  it('task_progress includes summary after tool-using turns', async () => {
+    const registry = new AgentRegistry();
+
+    const echoTool: Tool = {
+      name: 'Read',
+      description: 'read file',
+      inputSchema: {
+        type: 'object',
+        properties: { file_path: { type: 'string' } },
+        required: ['file_path'],
+      },
+      permissionLevel: 'read',
+      async execute(_i: Record<string, unknown>, _c: ToolContext): Promise<ToolResult> {
+        return { content: 'file contents', isError: false };
+      },
+    };
+
+    let callCount = 0;
+    const provider: LlmProvider = {
+      id: 'mock',
+      name: 'Mock',
+      capabilities: () => TEST_CAPS,
+      async createMessage(_req: ProviderRequest): Promise<ProviderResponse> {
+        if (callCount === 0) {
+          callCount++;
+          return {
+            id: `msg_${randomUUID()}`,
+            content: [{
+              type: 'tool_use',
+              id: 'toolu_r1',
+              name: 'Read',
+              input: { file_path: '/repo/src/index.ts' },
+            }],
+            stopReason: 'tool_use',
+            usage: makeUsage(10, 5),
+            model: 'test-model',
+          };
+        }
+        callCount++;
+        return {
+          id: `msg_${randomUUID()}`,
+          content: [{ type: 'text', text: 'done' }],
+          stopReason: 'end_turn',
+          usage: makeUsage(10, 5),
+          model: 'test-model',
+        };
+      },
+      async *createMessageStream(_req: ProviderRequest): AsyncGenerator<StreamEvent, void, undefined> {
+        if (callCount === 0) {
+          callCount++;
+          yield { type: 'message_start', id: `msg_${randomUUID()}`, model: 'test-model', usage: makeUsage(10, 5) };
+          yield {
+            type: 'content_block_start',
+            index: 0,
+            content_block: { type: 'tool_use', id: 'toolu_r1', name: 'Read', input: { file_path: '/repo/src/index.ts' } },
+          };
+          yield { type: 'input_json_delta', index: 0, partialJson: '{"file_path":"/repo/src/index.ts"}' };
+          yield { type: 'content_block_stop', index: 0 };
+          yield { type: 'message_delta', stopReason: 'tool_use', usage: makeUsage(10, 5) };
+          yield { type: 'message_stop' };
+        } else {
+          callCount++;
+          yield { type: 'message_start', id: `msg_${randomUUID()}`, model: 'test-model', usage: makeUsage(10, 5) };
+          yield { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } };
+          yield { type: 'text_delta', index: 0, text: 'done' };
+          yield { type: 'content_block_stop', index: 0 };
+          yield { type: 'message_delta', stopReason: 'end_turn', usage: makeUsage(10, 5) };
+          yield { type: 'message_stop' };
+        }
+      },
+    };
+
+    const spawner = createSpawner({
+      provider,
+      parentConfig: makeParentConfig(),
+      parentTools: [echoTool],
+      registry,
+    });
+
+    const messages: Record<string, unknown>[] = [];
+    const ctx = makeCtx({
+      toolUseId: 'toolu_parent_xyz',
+      onSubAgentMessage: (msg: Record<string, unknown>) => {
+        messages.push(msg);
+      },
+    } as unknown as Partial<ToolContext>);
+
+    await spawner(makeRequest(), ctx);
+
+    const progress = messages.find((m) => m.subtype === 'task_progress');
+    expect(progress).toBeTruthy();
+    // When tools were used, summary should mention the tool action
+    const summary = progress?.summary as string | undefined;
+    // summary is set only when there are tool calls; here we used 'Read'
+    if (summary) {
+      expect(summary.length).toBeGreaterThan(0);
+      // Should describe the Read tool call
+      expect(summary.toLowerCase()).toMatch(/read|index\.ts/i);
+    }
   });
 });

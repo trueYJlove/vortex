@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import type { LlmProvider, ContentBlock } from '../types/provider.js';
 import type { Tool, ToolContext, ToolResult } from '../types/tool.js';
 import { CostTracker } from '../core/cost.js';
@@ -109,6 +109,71 @@ function extractFinalText(messages: SDKMessage[]): string {
     }
   }
   return '(Agent completed with no text output)';
+}
+
+// ---------------------------------------------------------------------------
+// Progress summary generation
+// ---------------------------------------------------------------------------
+
+/** A recently-executed tool call with its resolved input. */
+interface RecentToolCall {
+  name: string;
+  input: Record<string, unknown>;
+}
+
+/** Maximum number of recent tool calls to retain for summary generation. */
+const RECENT_CALLS_WINDOW = 4;
+
+/**
+ * Build a brief human-readable summary of the most recent tool calls.
+ * Returns an empty string when there are no calls to describe.
+ */
+export function buildProgressSummary(recentCalls: RecentToolCall[]): string {
+  if (recentCalls.length === 0) return '';
+  // Describe the last two actions, most-recent last
+  const last = recentCalls.slice(-2);
+  return last.map((c) => describeToolCall(c.name, c.input)).join(', then ');
+}
+
+/** Truncate a string to at most `max` characters, appending '…' when cut. */
+function trunc(s: string, max: number): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + '…';
+}
+
+/**
+ * Return a concise, user-facing description for a single tool invocation.
+ * Avoids exposing full paths or long commands — just enough context to be useful.
+ */
+function describeToolCall(name: string, input: Record<string, unknown>): string {
+  const anyPath = input.file_path ?? input.notebook_path ?? input.path;
+  const pathStr = anyPath != null ? basename(String(anyPath)) : '';
+
+  switch (name) {
+    case 'Read':        return pathStr ? `reading ${pathStr}` : 'reading file';
+    case 'Write':       return pathStr ? `writing ${pathStr}` : 'writing file';
+    case 'Edit':        return pathStr ? `editing ${pathStr}` : 'editing file';
+    case 'NotebookEdit': return pathStr ? `editing notebook ${pathStr}` : 'editing notebook';
+    case 'Bash': {
+      const cmd = input.command != null ? trunc(String(input.command), 40) : '';
+      return cmd ? `running \`${cmd}\`` : 'running command';
+    }
+    case 'Glob': {
+      const pat = input.pattern != null ? String(input.pattern) : '';
+      return pat ? `searching ${trunc(pat, 30)}` : 'searching files';
+    }
+    case 'Grep': {
+      const pat = input.pattern != null ? String(input.pattern) : '';
+      return pat ? `grep "${trunc(pat, 25)}"` : 'searching code';
+    }
+    case 'WebSearch': {
+      const q = input.query != null ? trunc(String(input.query), 35) : '';
+      return q ? `web search: ${q}` : 'searching web';
+    }
+    case 'WebFetch':    return 'fetching URL';
+    case 'TodoWrite':   return 'updating todos';
+    case 'Agent':       return 'spawning sub-agent';
+    default:            return name;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +310,8 @@ async function runSubAgent(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   const startedAt = Date.now();
+  // Ring buffer of recent tool invocations for progress summary generation
+  const recentCalls: RecentToolCall[] = [];
 
   try {
     const gen = queryLoop(configWithSignal, provider, tools, request.prompt);
@@ -289,7 +356,19 @@ async function runSubAgent(
             for (const block of content as unknown as Array<Record<string, unknown>>) {
               if (block.type === 'tool_use') {
                 toolUseCount++;
-                if (typeof block.name === 'string') lastToolName = block.name;
+                if (typeof block.name === 'string') {
+                  lastToolName = block.name;
+                  // Update sliding window of recent calls for progress summary
+                  recentCalls.push({
+                    name: block.name,
+                    input: (typeof block.input === 'object' && block.input !== null)
+                      ? (block.input as Record<string, unknown>)
+                      : {},
+                  });
+                  if (recentCalls.length > RECENT_CALLS_WINDOW) {
+                    recentCalls.shift();
+                  }
+                }
               }
             }
           }
@@ -297,6 +376,7 @@ async function runSubAgent(
 
         // Emit task_progress after each completed turn (user message = tool results returned)
         if (msg.type === 'user') {
+          const progressSummary = buildProgressSummary(recentCalls);
           onMessage({
             type: 'system',
             subtype: 'task_progress',
@@ -304,6 +384,7 @@ async function runSubAgent(
             session_id: sessionIdForMessages,
             uuid: randomUUID(),
             last_tool_name: lastToolName,
+            ...(progressSummary ? { summary: progressSummary } : {}),
             usage: {
               total_tokens: totalInputTokens + totalOutputTokens,
               tool_uses: toolUseCount,

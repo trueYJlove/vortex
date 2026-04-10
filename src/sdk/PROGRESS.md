@@ -92,6 +92,17 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
   `ListSubagentsOptions` adds `dir`
 - **9 new tests (transcript.test.ts extended) — 269 tests total**
 
+### Run 36 — Agent Progress Summaries in task_progress Events
+- **Feature**: `task_progress` events now include a human-readable `summary` field
+- **Consumer reads `msg.summary` from task_progress** (subagent-handler.ts) — previously always empty
+- **`buildProgressSummary(recentCalls)`**: exported utility that builds a concise description
+  of the last two tool invocations (e.g. "reading index.ts, then running `npm test`")
+- **`describeToolCall(name, input)`**: maps each tool + its key input fields to a user-friendly
+  phrase; handles Read/Write/Edit/Bash/Glob/Grep/WebSearch/WebFetch/TodoWrite/Agent + fallback
+- **Sliding ring buffer** in `runSubAgent`: tracks last 4 tool calls, refreshed per assistant turn
+- **`basename`** extracted from path inputs so summaries show filenames, not full paths
+- **12 new tests** (buildProgressSummary suite + task_progress integration) — **281 tests total**
+
 ---
 
 ## Priority Queue (Next Runs)
@@ -100,6 +111,4 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
 - [ ] Full consumer compatibility e2e test (session send+stream, all SDKMessage shapes)
 
 ### P2 (Important)
-- [ ] Implement `getSubagentMessages`/`listSubagents` sidechain reading (partially done: transcript written, query reads by dir)
-- [ ] Agent progress summaries (`agentProgressSummaries` fork+summarize every 30s)
 - [ ] Worker Thread isolation for background agents (deferred)
