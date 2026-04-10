@@ -139,6 +139,46 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
   - `healthCheck()`: healthy, no-key guard, network failure, localhost no-key bypass
 - **374 tests total** (17 test files)
 
+### Run 39 — Anthropic Provider: Debug Log Removal + Unit Tests
+- **Bug fix**: `stream-parser.ts` and `anthropic.ts` had pervasive debug `console.log` calls
+  left from development — these caused noise in production and impacted performance
+  (per-chunk and per-event logging, read counts, yield counts). Fully removed.
+- **50 new unit tests** (`llm/anthropic.test.ts`):
+  - `capabilities()`: all 9 Anthropic-specific capability flags verified
+  - `createMessage()` (non-streaming facade):
+    - Text response: content, id, model, stopReason, usage assembled from streaming events
+    - Request body: headers (x-api-key, anthropic-version, content-type), stream=true
+    - Tool_use: input_json_delta chunked assembly → correct input object
+    - Thinking + signature: accumulation across multiple deltas
+    - HTTP 401/400 throws with status in message
+    - HTTP 429 retry + success (2-attempt cycle)
+    - Network failure retry + success
+    - Retry-After header respected
+    - baseUrl override
+    - Beta headers (anthropic-beta) joined with comma
+  - `buildRequestBody` (via fetch inspection):
+    - temperature, topP, topK, stopSequences (present/absent)
+    - Tools serialized; empty array → key omitted
+    - thinking: enabled (budget_tokens), adaptive, disabled (omitted)
+    - System prompt: string and block-array forms
+  - `normalizeMessages` (via fetch inspection):
+    - String content passthrough
+    - ContentBlock array: text, thinking+signature, tool_use, tool_result, image, document
+    - tool_result is_error flag
+  - `createMessageStream()`:
+    - Full event sequence with correct types
+    - message_stop terminates early (no [DONE] required, non-closing stream)
+    - Tool call events with input_json_delta
+    - thinking_delta + signature_delta events
+    - Error events yielded (consumer handles throw); createMessage() does throw
+    - Ping events skipped (not yielded)
+    - AbortError not retried (1 call only)
+    - message_delta with no usage field (graceful)
+  - `listModels()`: API success, no key (fallback, no fetch), HTTP error, network error,
+    empty data array, GET method + content-type absent + x-api-key present
+  - `healthCheck()`: with key → healthy; no key → unavailable with reason
+- **424 tests total** (18 test files)
+
 ---
 
 ## Priority Queue (Next Runs)
@@ -147,4 +187,4 @@ In-process execution, OpenAI-compat providers, Worker Thread multi-agent isolati
 - [ ] Worker Thread isolation for background agents (current fire-and-forget Promise model)
 
 ### P2
-- [ ] Additional LLM provider tests (openai-compat.ts coverage)
+- [ ] stream-parser.ts unit tests (chunked SSE, event prefix, [DONE], abort)
