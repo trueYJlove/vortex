@@ -31,6 +31,7 @@ import type {
   HealthExportResponse,
   HealthCheckResponse
 } from '../../shared/types'
+import { getAppChatConversationId } from '../../shared/apps/im-keys'
 
 // Response type
 interface ApiResponse<T = unknown> {
@@ -1716,6 +1717,14 @@ export const api = {
 
   // App Chat
   appChatSend: async (request: { appId: string; spaceId: string; message: string; images?: Array<{ type: string; media_type: string; data: string }>; thinkingEnabled?: boolean }): Promise<ApiResponse> => {
+    // Subscribe to agent events so remote/Capacitor clients receive streaming updates.
+    // The view also subscribes on mount (via useRemoteSubscription), but the API-level
+    // subscription mirrors sendMessage's pattern and ensures coverage if the API is
+    // called before the view mounts (e.g. programmatic triggers).
+    if (!isElectron()) {
+      subscribeToConversation(getAppChatConversationId(request.appId))
+    }
+
     if (isElectron()) {
       return window.halo.appChatSend(request)
     }
