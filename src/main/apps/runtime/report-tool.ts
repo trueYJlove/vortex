@@ -225,7 +225,7 @@ export function createReportToolServer(
         return textResult(
           `Escalation sent to user (entry: ${entryId}). ` +
           'The user has been notified. End this run now — you will be ' +
-          'resumed with the user\'s response in a follow-up execution.'
+          'resumed with the user\'s response once they reply.'
         )
       }
 

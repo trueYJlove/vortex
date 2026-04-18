@@ -1165,13 +1165,16 @@ export function createAppRuntimeService(deps: AppRuntimeDeps): AppRuntimeService
         appManager.updateStatus(appId, 'active')
       }
 
-      // Trigger a follow-up run with the escalation context
+      // Resume the original run with the escalation context.
+      // Unlike creating a new run, we reopen the existing run so the entire
+      // escalation lifecycle (original trigger → AI work → question → response → continuation)
+      // stays as a single run in the Activity Thread and session history.
       if (app) {
         const originalQuestion = entry.content.question || entry.content.summary
 
         // Retrieve session ID from the escalation run for context recovery.
-        // The follow-up run will use this to restore the full conversation
-        // context (reasoning, tool calls, intermediate results) via session resumption.
+        // The follow-up will restore the full conversation context
+        // (reasoning, tool calls, intermediate results) via session resumption.
         const escalationRun = store.getRun(entry.runId)
         const sessionId = escalationRun?.sessionId
         if (sessionId) {
@@ -1180,10 +1183,19 @@ export function createAppRuntimeService(deps: AppRuntimeDeps): AppRuntimeService
           console.warn(`[Runtime] No session ID found for escalation run ${entry.runId}, follow-up will start fresh`)
         }
 
+        // Reopen the original run: waiting_user → running.
+        // This causes getAppState() to return status:'running' + runningRunId
+        // so the UI immediately reflects the live state without a new timeline entry.
+        store.reopenRun(entry.runId)
+        broadcastAppStatus(appId)
+
         const trigger = buildEscalationTriggerContext(app, originalQuestion, response, sessionId)
 
-        // Execute asynchronously (don't block the response)
-        executeWithConcurrency(app, trigger).catch((err) => {
+        // Execute asynchronously, reusing the original run record
+        executeWithConcurrency(app, trigger, {
+          existingRunId: entry.runId,
+          existingSessionKey: escalationRun?.sessionKey,
+        }).catch((err) => {
           console.error(
             `[Runtime] Escalation follow-up run failed: app=${appId}:`,
             err

@@ -27,7 +27,7 @@ import type {
   ActivityEntry,
 } from './types'
 import { RunExecutionError } from './errors'
-import { buildAppSystemPrompt, buildInitialMessage } from './prompt'
+import { buildAppSystemPrompt, buildInitialMessage, buildEscalationResumeMessage } from './prompt'
 import { mergeConfigWithDefaults } from './config-defaults'
 import { createReportToolServer } from './report-tool'
 import type { ReportToolContext } from './report-tool'
@@ -157,9 +157,10 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     throw new RunExecutionError('unknown', 'unknown', `executeRun called for non-automation app type: ${app.spec.type}`)
   }
 
-  // For user-initiated continue, reuse the existing run record.
-  // For all other triggers, generate a new run ID and insert a fresh record.
-  const isContinue = trigger.type === 'continue_followup'
+  // For continue_followup and escalation_followup (with existingRunId), reuse the
+  // existing run record. For all other triggers, generate a new run ID and insert fresh.
+  const isResuming = trigger.type === 'continue_followup' ||
+    (trigger.type === 'escalation_followup' && !!existingRunId)
   const runId = existingRunId ?? randomUUID()
   const sessionKey = existingSessionKey ?? `${SESSION_KEY_PREFIX}-${runId.slice(0, 8)}`
   const startedAt = Date.now()
@@ -168,12 +169,12 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
   console.log(
     `[Runtime][${runTag}] ▶ Starting run: app=${app.id}, trigger=${trigger.type}, ` +
     `appName="${app.spec.name}", spaceId=${app.spaceId}` +
-    (isContinue ? ` (reopening existing run)` : '')
+    (isResuming ? ` (resuming existing run)` : '')
   )
 
-  // Record run start — skip for continue_followup since the run was already
-  // reopened (error → running) by continueFailedRun() before calling executeRun.
-  if (!isContinue) {
+  // Record run start — skip for resuming runs since the run was already
+  // reopened (error/waiting_user → running) by the caller before calling executeRun.
+  if (!isResuming) {
     store.insertRun({
       runId,
       appId: app.id,
@@ -269,17 +270,19 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     await preInsertHistoryHeading(memorySnapshot.memoryFilePath, runTimestamp, memorySnapshot.rawContent)
     console.log(`[Runtime][${runTag}] Pre-inserted History heading: ## ${runTimestamp}`)
 
-    // User-initiated continue sends only "Continue." so the model can resume
-    // naturally from its restored session context. A full trigger message
-    // would interfere with the in-progress task state.
+    // Resuming runs (continue or escalation follow-up) send minimal messages
+    // so the model can resume naturally from its restored session context.
+    // A full trigger message would interfere with the in-progress task state.
     const initialMessage = trigger.type === 'continue_followup'
       ? USER_CONTINUE_MESSAGE
-      : buildInitialMessage({
-          triggerContext: trigger.description,
-          userConfig: mergedConfig,
-          appName: app.spec.name,
-          memorySnapshot,
-        })
+      : (trigger.type === 'escalation_followup' && existingRunId && trigger.escalation)
+        ? buildEscalationResumeMessage(trigger.escalation)
+        : buildInitialMessage({
+            triggerContext: trigger.description,
+            userConfig: mergedConfig,
+            appName: app.spec.name,
+            memorySnapshot,
+          })
 
     console.log(
       `[Runtime][${runTag}] ── INITIAL MESSAGE ────────────────────────\n` +

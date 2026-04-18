@@ -222,12 +222,14 @@ export class ActivityStore {
       UPDATE automation_runs SET session_id = ? WHERE run_id = ?
     `)
 
-    // Reset a failed run back to running state for user-initiated continue.
+    // Reset a failed or waiting run back to running state.
+    // Used by both user-initiated continue and escalation follow-up.
     // Clears finished_at, duration_ms, and error_message so the run appears live again.
+    // Only transitions from 'error' or 'waiting_user' to prevent accidental resets.
     this.stmtReopenRun = db.prepare(`
       UPDATE automation_runs
       SET status = 'running', finished_at = NULL, duration_ms = NULL, error_message = NULL
-      WHERE run_id = ?
+      WHERE run_id = ? AND status IN ('error', 'waiting_user')
     `)
   }
 
@@ -307,10 +309,11 @@ export class ActivityStore {
   }
 
   /**
-   * Reopen a failed run for user-initiated continue.
+   * Reopen a failed or waiting run back to running state.
    *
-   * Transitions status from 'error' back to 'running' and clears
-   * completion fields so the run appears live again in the UI.
+   * Used by user-initiated continue (error → running) and
+   * escalation follow-up (waiting_user → running). Only transitions
+   * from 'error' or 'waiting_user'; other statuses are no-ops.
    */
   reopenRun(runId: string): void {
     this.stmtReopenRun.run(runId)

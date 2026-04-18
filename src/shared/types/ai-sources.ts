@@ -117,6 +117,16 @@ export interface ModelOption {
  */
 export const AVAILABLE_MODELS: ModelOption[] = [
   {
+    id: 'claude-mythos-preview',
+    name: 'Claude Mythos (Preview)',
+    description: 'Next-generation frontier model, preview access'
+  },
+  {
+    id: 'claude-opus-4-7',
+    name: 'Claude Opus 4.7',
+    description: 'Latest and most powerful model, great for complex reasoning and architecture decisions'
+  },
+  {
     id: 'claude-opus-4-6',
     name: 'Claude Opus 4.6',
     description: 'Most powerful model, great for complex reasoning and architecture decisions'
