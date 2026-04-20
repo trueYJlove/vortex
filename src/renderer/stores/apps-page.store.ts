@@ -135,7 +135,7 @@ export const useAppsPageStore = create<AppsPageState>((set, get) => ({
   availableUpdates: [],
 
   // ── IM Session Panel ────────────────────────
-  imPanelOpen: false,
+  imPanelOpen: true,
   selectedImSession: null,
   imSessions: [],
   imSessionsAppId: null,
@@ -190,7 +190,7 @@ export const useAppsPageStore = create<AppsPageState>((set, get) => ({
     initialAppId: null,
     showInstallDialog: false,
     currentTab: 'my-digital-humans',
-    imPanelOpen: false,
+    imPanelOpen: true,
     selectedImSession: null,
     imSessions: [],
     imSessionsAppId: null,
