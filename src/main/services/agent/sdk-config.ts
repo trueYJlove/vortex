@@ -13,7 +13,8 @@ import { resolveClaudeConfigDir } from '../config.service'
 import { ensureOpenAICompatRouter, encodeBackendConfig } from '../../openai-compat-router'
 import type { ApiCredentials } from './types'
 import { inferOpenAIWireApi, credentialsToBackendConfig } from './helpers'
-import { buildSystemPrompt, DEFAULT_ALLOWED_TOOLS } from './system-prompt'
+import { buildSystemPrompt, buildSystemPromptWithAIBrowser, DEFAULT_ALLOWED_TOOLS } from './system-prompt'
+import { AI_BROWSER_SYSTEM_PROMPT } from '../ai-browser'
 import { createCanUseTool } from './permission-handler'
 
 // ============================================
@@ -92,6 +93,8 @@ export interface BaseSdkOptionsParams {
   customConfigDir?: string
   /** Enable Agent Teams (multi-agent collaboration) */
   enableTeams?: boolean
+  /** Whether AI Browser is enabled for this session */
+  aiBrowserEnabled?: boolean
 }
 
 // ============================================
@@ -439,7 +442,13 @@ export function buildBaseSdkOptions(params: BaseSdkOptionsParams): Record<string
       console.error(`[Agent][${conversationId}] CLI stderr:`, data)
     }),
     // Use Halo's custom system prompt instead of SDK's 'claude_code' preset
-    systemPrompt: buildSystemPrompt({ workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile }),
+    // When AI Browser is enabled, appends full browser tool workflow guide
+    systemPrompt: params.aiBrowserEnabled
+      ? buildSystemPromptWithAIBrowser(
+          { workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile, aiBrowserEnabled: true },
+          AI_BROWSER_SYSTEM_PROMPT
+        )
+      : buildSystemPrompt({ workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile }),
     maxTurns: params.maxTurns ?? 50,
     allowedTools: [...DEFAULT_ALLOWED_TOOLS],
     // Enable Skills loading from $CLAUDE_CONFIG_DIR/skills/ and <workspace>/.claude/skills/
