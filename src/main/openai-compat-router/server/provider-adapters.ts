@@ -115,9 +115,13 @@ const openRouterAdapter: ProviderAdapter = {
 /**
  * DeepSeek adapter
  *
- * DeepSeek follows the OpenAI Chat Completions spec closely.
- * No request transformation needed — the converter produces a spec-compliant
- * baseline that DeepSeek accepts without modification.
+ * When thinking mode is active (reasoning_effort is set), DeepSeek requires
+ * `reasoning_content` from previous assistant turns to be echoed back.
+ * Without it, the API returns HTTP 400:
+ *   "The `reasoning_content` in the thinking mode must be passed back to the API."
+ *
+ * When thinking mode is NOT active, reasoning_content must be absent — the
+ * converter already omits it by default, so no stripping is needed.
  *
  * @see https://api-docs.deepseek.com/
  */
@@ -127,6 +131,30 @@ const deepSeekAdapter: ProviderAdapter = {
 
   match(url: string): boolean {
     return url.includes('api.deepseek.com')
+  },
+
+  transformRequest(body: Record<string, unknown>, context?: AdapterContext): void {
+    // Only inject when thinking mode is active (reasoning_effort present).
+    // When inactive, reasoning_content must be absent — the converter already
+    // omits it, so no action needed.
+    if (!body.reasoning_effort) return
+
+    injectReasoningContent(body, context)
+
+    // Ensure every assistant message carries the reasoning_content field.
+    // injectReasoningContent only sets it on turns that have thinking blocks;
+    // turns without (e.g. after context compaction) would be missing the field
+    // entirely, causing DeepSeek to reject the request with HTTP 400.
+    const messages = body.messages
+    if (!Array.isArray(messages)) return
+
+    for (const msg of messages) {
+      if (!msg || typeof msg !== 'object') continue
+      const m = msg as Record<string, unknown>
+      if (m.role === 'assistant' && m.reasoning_content == null) {
+        m.reasoning_content = ''
+      }
+    }
   }
 }
 
