@@ -126,6 +126,7 @@ export interface AgentConfig {
   configDirMode?: 'halo' | 'cc' | 'custom';  // Claude CLI config directory mode
   customConfigDir?: string;  // Custom config dir path (when configDirMode === 'custom')
   enableTeams?: boolean;    // Enable Agent Teams (multi-agent collaboration)
+  enableDigitalHumans?: boolean; // Enable Digital Humans MCP tools (automation app management)
   disabledTools?: string[]; // Tools disabled by user (Extended Capabilities toggles)
   developerMode?: boolean;   // [Developer] Enable verbose diagnostic logging across the system
 }

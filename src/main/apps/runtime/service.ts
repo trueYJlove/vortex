@@ -507,14 +507,23 @@ export function createAppRuntimeService(deps: AppRuntimeDeps): AppRuntimeService
 
       // Desktop notification on run completion (system notification only).
       // External channel notifications are now AI-driven via notify_channel / notify_bot tools.
-      if (outcome !== 'error') {
+      // Respects per-app notificationLevel: 'none' = skip, 'important' = skip (run_complete is not important), 'all' = send.
+      // Only sends if the AI did NOT already call report_to_user (which handles its own notification in report-tool.ts).
+      const notificationLevel = app.userOverrides?.notificationLevel ?? 'important'
+      if (outcome !== 'error' && notificationLevel === 'all') {
         try {
-          const entries = store.getEntriesForApp(app.id, { type: 'run_complete', limit: 1 })
-          const latestComplete = entries[0]
-          const body = latestComplete?.content?.summary ?? `${app.spec.name} completed`
-          notifyAppEvent(app.spec.name, body, {
-            appId: app.id,
-          })
+          // Query entries for THIS run only — avoid showing stale content from previous runs
+          const runEntries = store.getEntriesForRun(result.runId)
+          const completionEntry = runEntries.find(e => e.type === 'run_complete' || e.type === 'output')
+          // Only send if AI didn't report (report-tool.ts already sent its own notification)
+          if (!completionEntry) {
+            const body = result.finalText
+              ? result.finalText.slice(0, 200)
+              : `${app.spec.name} completed`
+            notifyAppEvent(app.spec.name, body, {
+              appId: app.id,
+            })
+          }
         } catch (notifyErr) {
           console.error('[Runtime] Failed to send desktop notification:', notifyErr)
         }

@@ -98,6 +98,8 @@ export interface BaseSdkOptionsParams {
   disabledTools?: string[]
   /** Whether AI Browser is enabled for this session */
   aiBrowserEnabled?: boolean
+  /** Whether Digital Humans MCP tools are enabled */
+  digitalHumansEnabled?: boolean
 }
 
 // ============================================
@@ -494,10 +496,10 @@ export function buildBaseSdkOptions(params: BaseSdkOptionsParams): Record<string
     // When AI Browser is enabled, appends full browser tool workflow guide
     systemPrompt: params.aiBrowserEnabled
       ? buildSystemPromptWithAIBrowser(
-          { workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile, aiBrowserEnabled: true },
+          { workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile, aiBrowserEnabled: true, digitalHumansEnabled: params.digitalHumansEnabled },
           AI_BROWSER_SYSTEM_PROMPT
         )
-      : buildSystemPrompt({ workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile }),
+      : buildSystemPrompt({ workDir, modelInfo: credentials.displayModel, promptProfile: params.promptProfile, digitalHumansEnabled: params.digitalHumansEnabled }),
     maxTurns: params.maxTurns ?? 50,
     allowedTools: [...DEFAULT_ALLOWED_TOOLS],
     // Enable Skills loading from $CLAUDE_CONFIG_DIR/skills/ and <workspace>/.claude/skills/

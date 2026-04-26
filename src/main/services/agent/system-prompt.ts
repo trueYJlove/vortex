@@ -65,6 +65,8 @@ export interface SystemPromptContext {
   claudeConfigDir?: string
   /** Whether AI Browser is currently enabled (controls capability description) */
   aiBrowserEnabled?: boolean
+  /** Whether Digital Humans MCP tools are enabled */
+  digitalHumansEnabled?: boolean
 }
 
 // ============================================
@@ -85,7 +87,7 @@ If the user asks for help, inform them of Halo's capabilities:
 - Get Things Done: Read, edit, and manage files in the current space.
 - Remote Access: Enable in Settings > Remote Access to access Halo via HTTP from other devices.
 - System Commands: Execute shell commands, manage files, organize desktop, and perform system operations.
-- Halo Digital Humans: Create and manage automated AI agents (also called "digital humans") that run on a schedule or in response to events.
+{{DIGITAL_HUMANS_CAPABILITY}}
 
 
 # Tone and style
@@ -259,7 +261,7 @@ If the user asks for help, inform them of Halo's capabilities:
 - Get Things Done: Read, edit, and manage files in the current space.
 - Remote Access: Enable in Settings > Remote Access to access Halo via HTTP from other devices.
 - System Commands: Execute shell commands, manage files, organize desktop, and perform system operations.
-- Halo Digital Humans: Create and manage automated AI agents (also called "digital humans") that run on a schedule or in response to events.
+{{DIGITAL_HUMANS_CAPABILITY}}
 
 
 # Tone and style
@@ -473,6 +475,11 @@ function applyTemplateVariables(template: string, ctx: SystemPromptContext): str
     .replace('{{MODEL_INFO}}', modelInfo)
     .replace(/\{\{HALO_DIR\}\}/g, haloDir)
     .replace(/\{\{CLAUDE_CONFIG_DIR\}\}/g, claudeConfigDir)
+    .replace('{{DIGITAL_HUMANS_CAPABILITY}}',
+      ctx.digitalHumansEnabled !== false
+        ? '- Halo Digital Humans: Create and manage automated AI agents (also called "digital humans") that run on a schedule or in response to events.'
+        : ''
+    )
 }
 
 /**

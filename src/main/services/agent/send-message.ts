@@ -73,6 +73,7 @@ export async function sendMessage(
 
   const config = getConfig()
   const workDir = getWorkingDir(spaceId)
+  const digitalHumansEnabled = config.agent?.enableDigitalHumans !== false
 
   // Accumulate stderr for detailed error messages
   let stderrBuffer = ''
@@ -109,7 +110,9 @@ export async function sendMessage(
     if (aiBrowserEnabled) {
       mcpServers['ai-browser'] = createAIBrowserMcpServer(undefined, workDir)
     }
-    mcpServers['halo-apps'] = createHaloAppsMcpServer(spaceId)
+    if (digitalHumansEnabled) {
+      mcpServers['halo-apps'] = createHaloAppsMcpServer(spaceId)
+    }
     mcpServers['web-search'] = createWebSearchMcpServer()
 
     // Build base SDK options
@@ -131,6 +134,7 @@ export async function sendMessage(
       enableTeams: config.agent?.enableTeams,
       disabledTools: config.agent?.disabledTools,
       aiBrowserEnabled: !!aiBrowserEnabled,
+      digitalHumansEnabled,
     })
 
     // Apply dynamic configurations (Thinking mode)

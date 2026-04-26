@@ -452,6 +452,8 @@ interface HaloConfig {
     /** Experimental: switch agent engine. 'anthropic' = Claude Code SDK (default), 'halo' = Halo SDK. */
     sdkEngine?: 'anthropic' | 'halo'
     enableTeams?: boolean
+    /** Enable Digital Humans MCP tools (automation app management) */
+    enableDigitalHumans?: boolean
     /** Tools disabled by user (Extended Capabilities toggles) */
     disabledTools?: string[]
     /** Developer: enable verbose diagnostic logging (HTTP payloads, session lifecycle, stream events, scheduler) */

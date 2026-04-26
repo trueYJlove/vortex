@@ -633,6 +633,7 @@ export async function ensureSessionWarm(
 
   const config = getConfig()
   const workDir = getWorkingDir(spaceId)
+  const digitalHumansEnabled = config.agent?.enableDigitalHumans !== false
   const conversation = getConversation(spaceId, conversationId)
   const sessionId = conversation?.sessionId
   const electronPath = getHeadlessElectronPath()
@@ -649,7 +650,9 @@ export async function ensureSessionWarm(
 
   // Build MCP servers config (must match sendMessage to avoid session rebuild)
   const mcpServers: Record<string, any> = dbMcpServers ? { ...dbMcpServers } : {}
-  mcpServers['halo-apps'] = createHaloAppsMcpServer(spaceId)
+  if (digitalHumansEnabled) {
+    mcpServers['halo-apps'] = createHaloAppsMcpServer(spaceId)
+  }
   mcpServers['web-search'] = createWebSearchMcpServer()
 
   // Build SDK options using shared configuration
@@ -669,6 +672,7 @@ export async function ensureSessionWarm(
     customConfigDir: config.agent?.customConfigDir,
     enableTeams: config.agent?.enableTeams,
     disabledTools: config.agent?.disabledTools,
+    digitalHumansEnabled,
   })
 
   try {

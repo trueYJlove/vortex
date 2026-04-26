@@ -199,6 +199,7 @@ export type V2SDKSession = {
 export interface SessionConfig {
   aiBrowserEnabled: boolean
   // thinkingEnabled is dynamic via setMaxThinkingTokens, no rebuild needed
+  // digitalHumansEnabled: intentionally excluded — low-frequency toggle, relies on new conversation to take effect (UI hints this)
 }
 
 /**

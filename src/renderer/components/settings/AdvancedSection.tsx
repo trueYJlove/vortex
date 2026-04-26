@@ -10,23 +10,39 @@ import { api } from '../../api'
 import type { HaloConfig } from '../../types'
 import { CLIConfigSection } from './CLIConfigSection'
 import { Switch } from '../ui/Switch'
+import { DEFAULT_DISABLED_TOOLS } from '../../../shared/constants/disabled-tools'
 
-// ─── Extended Capabilities ──────────────────────────────────────────────────────
+// ─── Built-in MCP Extensions ────────────────────────────────────────────────────
 
 /**
- * Capability groups shown in the Extended Capabilities panel.
- * Each group maps a user-facing feature toggle to the underlying CC tools it controls.
+ * Capability groups shown in the Built-in MCP Extensions panel.
  *
- * When a capability is disabled, its tools are added to `config.agent.disabledTools`,
- * which flows to the SDK's `disallowedTools` option — completely hiding them from
- * the model (saving tokens).
+ * Two control mechanisms:
+ * - `tools`: CC SDK tool names → added to `config.agent.disabledTools` when disabled
+ * - `configKey`: Dedicated boolean in `config.agent` → controls MCP server injection or env vars
+ *
+ * Groups may use one or both. When `configKey` is present, it determines the toggle state;
+ * otherwise the toggle state is derived from `disabledTools`.
  */
-const CAPABILITY_GROUPS = [
+interface CapabilityGroup {
+  id: string
+  labelKey: string
+  descKey: string
+  /** CC SDK tools to add/remove from disabledTools (empty for MCP-only capabilities) */
+  tools: readonly string[]
+  /** Optional: dedicated AgentConfig boolean flag (for MCP servers, env vars, etc.) */
+  configKey?: 'enableTeams' | 'enableDigitalHumans'
+  /** Default value when configKey is not set in config (default: false) */
+  configDefault?: boolean
+}
+
+const CAPABILITY_GROUPS: readonly CapabilityGroup[] = [
   {
     id: 'teams',
     labelKey: 'Agent Teams',
     descKey: 'Multi-agent collaboration. Agents can spawn teammates to work in parallel.',
     tools: ['TeamCreate', 'TeamDelete', 'SendMessage'],
+    configKey: 'enableTeams',
   },
   {
     id: 'planMode',
@@ -52,9 +68,15 @@ const CAPABILITY_GROUPS = [
     descKey: 'Jupyter notebook (.ipynb) cell editing.',
     tools: ['NotebookEdit'],
   },
-] as const
-
-import { DEFAULT_DISABLED_TOOLS } from '../../../shared/constants/disabled-tools'
+  {
+    id: 'digitalHumans',
+    labelKey: 'Digital Humans',
+    descKey: 'Create, manage and schedule automation agents.',
+    tools: [],
+    configKey: 'enableDigitalHumans',
+    configDefault: true,
+  },
+]
 
 // ─── Component ──────────────────────────────────────────────────────────────────
 
@@ -73,13 +95,27 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
   const [disabledTools, setDisabledToolsState] = useState<string[]>(
     config?.agent?.disabledTools ?? DEFAULT_DISABLED_TOOLS
   )
+  // Track dedicated config flags for capabilities that use configKey
+  const [configFlags, setConfigFlags] = useState<Record<string, boolean>>(() => {
+    const flags: Record<string, boolean> = {}
+    for (const group of CAPABILITY_GROUPS) {
+      if (group.configKey) {
+        flags[group.configKey] = config?.agent?.[group.configKey] ?? group.configDefault ?? false
+      }
+    }
+    return flags
+  })
   const [developerMode, setDeveloperModeState] = useState(config?.agent?.developerMode ?? false)
   const [capsPanelOpen, setCapsPanelOpen] = useState(false)
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  const isCapabilityEnabled = (group: typeof CAPABILITY_GROUPS[number]) =>
-    group.tools.every(tool => !disabledTools.includes(tool))
+  const isCapabilityEnabled = (group: CapabilityGroup) => {
+    // Groups with configKey: check the dedicated boolean flag
+    if (group.configKey) return configFlags[group.configKey] ?? group.configDefault ?? false
+    // Groups with tools only: check disabledTools
+    return group.tools.every(tool => !disabledTools.includes(tool))
+  }
 
   const saveAgentConfig = async (patch: Partial<NonNullable<HaloConfig['agent']>>) => {
     const updatedConfig = {
@@ -114,32 +150,42 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
     }
   }
 
-  const handleCapabilityToggle = async (group: typeof CAPABILITY_GROUPS[number], enabled: boolean) => {
+  const handleCapabilityToggle = async (group: CapabilityGroup, enabled: boolean) => {
     const currentEnabled = isCapabilityEnabled(group)
     if (currentEnabled === enabled) return
 
+    // Update disabledTools for groups that control SDK tools
     let newDisabled: string[]
     if (enabled) {
-      // Remove this group's tools from disabled list
-      newDisabled = disabledTools.filter(t => !(group.tools as readonly string[]).includes(t))
+      newDisabled = disabledTools.filter(t => !group.tools.includes(t))
     } else {
-      // Add this group's tools to disabled list (dedup)
       const set = new Set(disabledTools)
       for (const tool of group.tools) set.add(tool)
       newDisabled = Array.from(set)
     }
     setDisabledToolsState(newDisabled)
 
+    // Optimistically update dedicated config flag
+    const key = group.configKey
+    if (key) {
+      setConfigFlags(prev => ({ ...prev, [key]: enabled }))
+    }
+
     try {
-      // Agent Teams needs the dedicated enableTeams flag for env var
       const extraPatch: Partial<NonNullable<HaloConfig['agent']>> = {}
-      if (group.id === 'teams') {
-        extraPatch.enableTeams = enabled
+      if (key) {
+        extraPatch[key] = enabled
       }
       await saveAgentConfig({ disabledTools: newDisabled, ...extraPatch })
     } catch (error) {
       console.error('[AdvancedSection] Failed to update capability:', error)
       setDisabledToolsState(config?.agent?.disabledTools ?? DEFAULT_DISABLED_TOOLS)
+      if (key) {
+        setConfigFlags(prev => ({
+          ...prev,
+          [key]: config?.agent?.[key] ?? group.configDefault ?? false,
+        }))
+      }
     }
   }
 
@@ -220,7 +266,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
             >
               <div className="flex items-center gap-2.5">
                 <Puzzle className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium text-sm">{t('Extended Capabilities')}</span>
+                <span className="font-medium text-sm">{t('Built-in MCP Extensions')}</span>
               </div>
               {capsPanelOpen
                 ? <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -232,7 +278,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
               <div className="border-t border-border">
                 {/* Hint */}
                 <p className="px-4 pt-3 pb-2 text-xs text-muted-foreground">
-                  {t('Extra tools consume additional tokens per message. Enable only what you need.')}
+                  {t('Extra tools consume additional tokens per message. Enable only what you need. Please start a new session or restart Halo for changes to take effect.')}
                 </p>
 
                 {/* Capability toggles */}

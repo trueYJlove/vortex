@@ -303,6 +303,7 @@ export async function sendAppChatMessage(
   if (!memory) throw new Error('Memory service not initialized')
 
   const config = getConfig()
+  const digitalHumansEnabled = config.agent?.enableDigitalHumans !== false
   const credentials = app.userOverrides?.modelSourceId
     ? await getApiCredentialsForSource(config, app.userOverrides.modelSourceId, app.userOverrides.modelId)
     : await getApiCredentials(config)
@@ -389,7 +390,7 @@ export async function sendAppChatMessage(
     'halo-memory': memoryMcpServer,
     ...(activityStore ? { 'halo-report': createReportToolServer(activityStore, reportContext) } : {}),
     'halo-notify': notifyMcpServer,
-    'halo-apps': createHaloAppsMcpServer(spaceId),
+    ...(digitalHumansEnabled ? { 'halo-apps': createHaloAppsMcpServer(spaceId) } : {}),
     'web-search': createWebSearchMcpServer(),
     ...(usesAIBrowser ? { 'ai-browser': createAIBrowserMcpServer(scopedBrowserCtx, workDir) } : {}),
     ...(usesEmail && config.notificationChannels?.email?.enabled
