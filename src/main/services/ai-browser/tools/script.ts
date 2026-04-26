@@ -46,7 +46,26 @@ export function buildScriptTools(ctx: BrowserContext) {
 
 const browser_run = tool(
   'browser_run',
-  `Execute a JavaScript file in the current browser page context. The file must contain a single async arrow function: \`async (params) => { ... return result }\`. The tool reads the file from disk, injects it into the page, and returns the JSON result. The page must already be navigated to the target URL (use browser_navigate first). Use this for pre-built, deterministic browser scripts instead of writing inline code with browser_evaluate.`,
+  `Execute a pre-built JavaScript file in the current browser page context. The file must contain a single async arrow function: \`async (params) => { ... return result }\`. The tool reads the file from disk, injects it into the page, and returns the JSON result.
+
+The page must already be navigated to the target URL (use browser_navigate first). Scripts run in the page's own JS context with full DOM and Web API access — same execution environment as browser_evaluate.
+
+Use this for repeatable, tested browser automation scripts instead of writing inline code with browser_evaluate. Ideal for skills that package reusable browser automation logic.
+
+Script file format:
+  async (params) => {
+    const items = document.querySelectorAll(params.selector)
+    return Array.from(items).map(el => el.innerText)
+  }
+
+Allowed script locations:
+  - Skill directories: .claude/skills/ at or above the working directory
+  - Working directory: files within the current space's working directory
+
+Examples:
+  Run a scraping script:  { file: "/path/.claude/skills/search/scrape.js", params: { keyword: "coffee" } }
+  Run with timeout:       { file: "./scripts/auto-fill.js", params: { user: "test" }, timeout: 30000 }
+  Run without params:     { file: "/path/.claude/skills/comment/post.js" }`,
   {
     file: z.string().describe(
       'Absolute path to the .js file to execute. The file must contain a single async arrow function: `async (params) => { ... return result }`'

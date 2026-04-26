@@ -349,17 +349,19 @@ ContentCanvas.tsx          # Main container + tab switching
 
 AI-controlled embedded browser for web automation. Uses Electron BrowserView + CDP.
 
-### 26+ Browser Tools
+### 14 Browser Tools (consolidated from 28)
 
 | Category | Tools |
 |----------|-------|
-| Navigation | `browser_new_page`, `browser_navigate`, `browser_list_pages`, `browser_select_page`, `browser_close_page`, `browser_wait_for` |
-| Input | `browser_click`, `browser_fill`, `browser_fill_form`, `browser_hover`, `browser_drag`, `browser_press_key`, `browser_upload_file`, `browser_handle_dialog` |
-| Snapshot | `browser_snapshot` (core!), `browser_screenshot`, `browser_evaluate` |
-| Debug | `browser_console`, `browser_network_requests`, `browser_network_request` |
-| Emulation | `browser_emulate`, `browser_resize` |
-| Performance | `browser_perf_start`, `browser_perf_stop`, `browser_perf_insight` |
-| Script | `browser_execute_script` |
+| Navigation (2) | `browser_navigate` (includes new tab via `newTab` param), `browser_wait_for` |
+| Input (5) | `browser_click` (includes drag via `dragTo` param), `browser_fill` (includes batch via `elements` param), `browser_hover`, `browser_press_key`, `browser_upload_file` |
+| Snapshot (3) | `browser_snapshot` (core!), `browser_screenshot`, `browser_evaluate` |
+| Tab (1) | `browser_tab` (list/select/close actions) |
+| Inspect (1) | `browser_inspect` (network + console, target param dispatch) |
+| Script (1) | `browser_run` |
+| Download (1) | `browser_download` |
+
+Retired tools (code preserved for future extension): `browser_emulate`, `browser_resize`, `browser_perf_*`. See `src/main/services/ai-browser/DESIGN.md` for full architecture.
 
 ### Accessibility Tree (Core Innovation)
 

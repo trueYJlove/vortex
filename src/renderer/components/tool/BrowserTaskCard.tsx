@@ -179,14 +179,13 @@ export function BrowserTaskCard({ browserToolCalls, isActive, showViewButton = t
 
   const { t } = useTranslation()
   const actionMap = useMemo(() => ({
-    'browser_new_page': {
-      action: t('Open page'),
-      getDescription: (input: Record<string, unknown>) => `${input.url || t('New page')}`
-    },
     'browser_navigate': {
       action: t('Navigate'),
       getDescription: (input: Record<string, unknown>) =>
-        input.action === 'back' ? t('Back') : input.action === 'forward' ? t('Forward') : `${input.url || ''}`
+        input.newTab ? `${t('Open page')} ${input.url || ''}` :
+        input.action === 'back' ? t('Back') :
+        input.action === 'forward' ? t('Forward') :
+        `${input.url || ''}`
     },
     'browser_click': {
       action: t('Click'),
@@ -238,6 +237,45 @@ export function BrowserTaskCard({ browserToolCalls, isActive, showViewButton = t
       action: t('Execute script'),
       getDescription: () => 'JavaScript'
     },
+    'browser_tab': {
+      action: t('Tab'),
+      getDescription: (input: Record<string, unknown>) =>
+        input.action === 'list' ? t('List tabs') :
+        input.action === 'close' ? t('Close tab') :
+        t('Switch tab')
+    },
+    'browser_inspect': {
+      action: t('Inspect'),
+      getDescription: (input: Record<string, unknown>) =>
+        input.target === 'network' ? t('Network requests') : t('Console messages')
+    },
+    'browser_run': {
+      action: t('Run script'),
+      getDescription: (input: Record<string, unknown>) => {
+        const file = String(input.file || '')
+        const name = file.split('/').pop() || file
+        return name.slice(0, 30)
+      }
+    },
+    'browser_download': {
+      action: t('Download'),
+      getDescription: (input: Record<string, unknown>) => {
+        if (input.url) {
+          const url = String(input.url)
+          return url.split('/').pop()?.slice(0, 30) || url.slice(0, 30)
+        }
+        return t('Waiting for download')
+      }
+    },
+    'browser_upload_file': {
+      action: t('Upload'),
+      getDescription: (input: Record<string, unknown>) => {
+        const fp = input.filePath
+        if (Array.isArray(fp)) return `${fp.length} files`
+        const path = String(fp || '')
+        return path.split('/').pop() || path.slice(0, 30)
+      }
+    },
   }), [t])
 
   // Convert tool calls to steps
@@ -250,9 +288,6 @@ export function BrowserTaskCard({ browserToolCalls, isActive, showViewButton = t
     for (let i = browserToolCalls.length - 1; i >= 0; i--) {
       const tc = browserToolCalls[i]
       const input = tc.input as Record<string, unknown>
-      if (tc.name.includes('new_page') && input.url) {
-        return String(input.url)
-      }
       if (tc.name.includes('navigate') && input.url) {
         return String(input.url)
       }

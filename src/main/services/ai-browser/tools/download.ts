@@ -22,10 +22,15 @@ export function buildDownloadTools(ctx: BrowserContext) {
 
 const browser_download = tool(
   'browser_download',
-  'Download a file. If `url` is provided, triggers a direct download from that URL. ' +
-  'If `url` is omitted, waits for a download already in progress or about to start ' +
-  '(e.g. triggered by a previous browser_click on a download button). ' +
-  'Returns the download result including file path, size, and status.',
+  `Download a file from a URL or wait for a download triggered by a previous action.
+
+Direct download:  { url: "https://example.com/report.pdf" }
+  Downloads the file directly. Only HTTP and HTTPS URLs are allowed.
+
+Wait for download:  {} (no parameters)
+  Waits for a download already in progress or about to start (e.g., triggered by a previous browser_click on a download button). Call this immediately after the action that initiates the download.
+
+Returns the local file path, file size, MIME type, and download status on completion. Increase timeout for large files.`,
   {
     url: z.string().optional().describe(
       'URL to download directly. If omitted, waits for a download triggered by a previous action.'
@@ -37,7 +42,7 @@ const browser_download = tool(
   async (args) => {
     const viewId = ctx.getActiveViewId()
     if (!viewId) {
-      return textResult('No active browser page. Use browser_new_page first.', true)
+      return textResult('No active browser page. Use browser_navigate first.', true)
     }
 
     const timeout = (args.timeout && args.timeout > 0) ? args.timeout : DOWNLOAD_TIMEOUT

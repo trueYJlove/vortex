@@ -1,229 +1,224 @@
 /**
- * Navigation Tools (8 tools)
+ * Navigation Tools (2 tools)
  *
- * Page lifecycle and navigation: list, select, create, close, navigate,
- * wait, resize, dialog handling.
+ * Core navigation and wait.
+ *
+ * browser_navigate — URL navigation (current tab or new tab) + history actions.
+ *   Absorbs the former browser_new_page (via newTab parameter).
+ * browser_wait_for — Wait for text to appear on the page.
+ *
+ * Tab management (list/select/close) has moved to tab.ts.
+ * Viewport resize has moved to browser_evaluate (escape hatch).
+ * The original standalone tools remain in their source files for future extension.
+ *
+ * browser_handle_dialog — Removed from registration. Native JS dialogs (alert/confirm/prompt)
+ *   cannot be reliably intercepted in Electron BrowserView. Code preserved below for reference.
  */
 
 import { z } from 'zod'
 import { tool } from '../../agent/resolved-sdk'
 import type { BrowserContext } from '../context'
-import { browserViewManager } from '../../browser-view.service'
-import { type DeviceMode } from '../../browser-view.service'
+import { browserViewManager, type DeviceMode } from '../../browser-view.service'
 import { textResult, NAV_TIMEOUT } from './helpers'
 
 export function buildNavigationTools(ctx: BrowserContext) {
 
-const browser_list_pages = tool(
-  'browser_list_pages',
-  'Get a list of pages open in the browser.',
-  {},
-  async () => {
-    const states = browserViewManager.getAllStates()
-
-    if (states.length === 0) {
-      return textResult('No browser pages are currently open.')
-    }
-
-    const lines = ['Open browser pages:']
-    states.forEach((state, index) => {
-      lines.push(`[${index}] ${state.title || 'Untitled'} - ${state.url || 'about:blank'}`)
-    })
-
-    return textResult(lines.join('\n'))
-  }
-)
-
-const browser_select_page = tool(
-  'browser_select_page',
-  'Select a page as a context for future tool calls.',
-  {
-    pageIdx: z.number().describe('The index of the page to select. Call browser_list_pages to get available pages.'),
-    bringToFront: z.boolean().optional().describe('Whether to focus the page and bring it to the top.')
-  },
-  async (args) => {
-    const states = browserViewManager.getAllStates()
-
-    if (args.pageIdx < 0 || args.pageIdx >= states.length) {
-      return textResult(`Invalid page index: ${args.pageIdx}. Valid range: 0-${states.length - 1}`, true)
-    }
-
-    const state = states[args.pageIdx]
-    ctx.setActiveViewId(state.id)
-
-    return textResult(`Selected page [${args.pageIdx}]: ${state.title || 'Untitled'} - ${state.url}`)
-  }
-)
-
-const browser_new_page = tool(
-  'browser_new_page',
-  'Creates a new browser page and navigates to a URL. Use device="h5" only when the user explicitly requests mobile view, or when the target site is known to be mobile-only (e.g. food delivery apps like Meituan, WeChat-specific pages). Default is PC mode.',
-  {
-    url: z.string().describe('URL to load in a new page.'),
-    device: z.enum(['pc', 'h5']).optional().describe('Device mode: "pc" (default) for desktop, "h5" for mobile (iPhone UA, 390×844 viewport). Use h5 only when mobile view is needed.'),
-    timeout: z.number().int().optional().describe('Maximum wait time in milliseconds. If set to 0, the default timeout will be used.')
-  },
-  async (args) => {
-    const timeout = (args.timeout && args.timeout > 0) ? args.timeout : NAV_TIMEOUT
-    const deviceMode: DeviceMode = args.device ?? 'pc'
-
-    try {
-      const viewId = `ai-browser-${Date.now()}`
-      // Scoped (automation) contexts use the offscreen host window to isolate
-      // view lifecycle from the user's mainWindow.
-      await browserViewManager.create(viewId, args.url, {
-        offscreen: ctx.isScoped,
-        deviceMode,
-      })
-      ctx.trackView(viewId)
-      ctx.setActiveViewId(viewId)
-
-      // Wait for navigation with timeout protection (no busy-wait)
-      await ctx.waitForNavigation(timeout)
-
-      const finalState = browserViewManager.getState(viewId)
-      const modeLabel = deviceMode === 'h5' ? ' [H5 mobile mode]' : ''
-      return textResult(`Created new page${modeLabel}: ${finalState?.title || 'Untitled'} - ${finalState?.url || args.url}`)
-    } catch (error) {
-      return textResult(`Failed to create new page: ${(error as Error).message}`, true)
-    }
-  }
-)
-
-const browser_close_page = tool(
-  'browser_close_page',
-  'Closes the page by its index. The last open page cannot be closed.',
-  {
-    pageIdx: z.number().describe('The index of the page to close. Call list_pages to list pages.')
-  },
-  async (args) => {
-    const states = browserViewManager.getAllStates()
-
-    if (args.pageIdx < 0 || args.pageIdx >= states.length) {
-      return textResult(`Invalid page index: ${args.pageIdx}`, true)
-    }
-
-    if (states.length === 1) {
-      return textResult('The last open page cannot be closed.', true)
-    }
-
-    const state = states[args.pageIdx]
-    browserViewManager.destroy(state.id)
-
-    return textResult(`Closed page [${args.pageIdx}]: ${state.title || 'Untitled'}`)
-  }
-)
-
 const browser_navigate = tool(
   'browser_navigate',
-  'Navigates the currently selected page to a URL.',
+  `Navigate to a URL or control browser history. This is the single entry point for all navigation.
+
+Open a URL (current tab):       { url: "https://example.com" }
+Open a URL (new tab):           { url: "https://example.com", newTab: true }
+Open mobile site (new tab):     { url: "https://m.example.com", newTab: true, device: "h5" }
+Go back in history:             { action: "back" }
+Go forward in history:          { action: "forward" }
+Reload the page:                { action: "reload" }
+
+After any navigation, always take a browser_snapshot to see the loaded page and get element UIDs. If the page is still loading (spinner visible, content incomplete), wait briefly (Bash: sleep 1-2) then snapshot again.
+
+Use newTab: true when you need to keep the current page open (e.g., comparing content across pages, copying data between tabs). Default behavior navigates the current tab.
+
+Use device: "h5" only when the target site is mobile-only or the user explicitly requests mobile view. Default is desktop (PC) mode. Only valid with newTab: true.`,
   {
-    type: z.enum(['url', 'back', 'forward', 'reload']).optional().describe('Navigate the page by URL, back or forward in history, or reload.'),
-    url: z.string().optional().describe('Target URL (only type=url)'),
-    ignoreCache: z.boolean().optional().describe('Whether to ignore cache on reload.'),
-    timeout: z.number().int().optional().describe('Maximum wait time in milliseconds. If set to 0, the default timeout will be used.')
+    url: z.string().optional().describe(
+      'URL to navigate to. Use alone to navigate the current tab, or with newTab: true to open in a new tab.'
+    ),
+    action: z.enum(['back', 'forward', 'reload']).optional().describe(
+      'History navigation or reload. Cannot be used together with url.'
+    ),
+    newTab: z.boolean().optional().describe(
+      'Open the URL in a new tab instead of navigating the current tab. Only valid with url. Default: false.'
+    ),
+    device: z.enum(['pc', 'h5']).optional().describe(
+      'Device mode for new tabs. "h5" emulates mobile (iPhone UA, 390×844 viewport). Only valid with newTab: true. Default: "pc".'
+    ),
+    timeout: z.number().int().optional().describe(
+      'Maximum wait time in milliseconds for page load. Default: 30000. Set to 0 to use default.'
+    )
   },
   async (args) => {
-    const navType = args.type || (args.url ? 'url' : undefined)
     const timeout = (args.timeout && args.timeout > 0) ? args.timeout : NAV_TIMEOUT
 
-    if (!navType && !args.url) {
-      return textResult('Either URL or a type is required.', true)
+    // --- Parameter validation ---
+
+    if (args.url && args.action) {
+      return textResult(
+        'Cannot provide both url and action. Use url to navigate to a page, or action for back/forward/reload.',
+        true
+      )
     }
+
+    if (!args.url && !args.action) {
+      return textResult(
+        'Provide url to navigate to a page, or action (back/forward/reload).',
+        true
+      )
+    }
+
+    if (args.newTab && !args.url) {
+      return textResult('newTab requires a url.', true)
+    }
+
+    if (args.device && !args.newTab) {
+      return textResult('device requires newTab: true.', true)
+    }
+
+    // --- New tab navigation ---
+
+    if (args.url && args.newTab) {
+      const deviceMode: DeviceMode = args.device ?? 'pc'
+
+      try {
+        const viewId = `ai-browser-${Date.now()}`
+        // Scoped (automation) contexts use the offscreen host window to isolate
+        // view lifecycle from the user's mainWindow.
+        await browserViewManager.create(viewId, args.url, {
+          offscreen: ctx.isScoped,
+          deviceMode,
+        })
+        ctx.trackView(viewId)
+        ctx.setActiveViewId(viewId)
+
+        // Wait for navigation with timeout protection
+        await ctx.waitForNavigation(timeout)
+
+        const finalState = browserViewManager.getState(viewId)
+        const modeLabel = deviceMode === 'h5' ? ' [H5 mobile mode]' : ''
+        return textResult(
+          `Created new page${modeLabel}: ${finalState?.title || 'Untitled'} - ${finalState?.url || args.url}`
+        )
+      } catch (error) {
+        return textResult(`Failed to create new page: ${(error as Error).message}`, true)
+      }
+    }
+
+    // --- Current tab URL navigation ---
+
+    if (args.url) {
+      const viewId = ctx.getActiveViewId()
+      if (!viewId) {
+        return textResult(
+          'No active browser page. Use newTab: true to open a URL in a new tab.',
+          true
+        )
+      }
+
+      try {
+        await browserViewManager.navigate(viewId, args.url)
+        await ctx.waitForNavigation(timeout)
+
+        const finalState = browserViewManager.getState(viewId)
+        return textResult(`Navigated to: ${finalState?.url || args.url}`)
+      } catch (error) {
+        return textResult(`Navigation failed: ${(error as Error).message}`, true)
+      }
+    }
+
+    // --- History / reload actions ---
 
     const viewId = ctx.getActiveViewId()
     if (!viewId) {
-      return textResult('No active browser page. Use browser_new_page first.', true)
+      return textResult(
+        'No active browser page. Navigate to a URL first with: { url: "...", newTab: true }',
+        true
+      )
     }
 
     try {
-      switch (navType) {
+      switch (args.action) {
         case 'back':
           browserViewManager.goBack(viewId)
-          await ctx.waitForNavigation(timeout)
-          return textResult(`Successfully navigated back.`)
+          break
         case 'forward':
           browserViewManager.goForward(viewId)
-          await ctx.waitForNavigation(timeout)
-          return textResult(`Successfully navigated forward.`)
+          break
         case 'reload':
           browserViewManager.reload(viewId)
-          await ctx.waitForNavigation(timeout)
-          return textResult(`Successfully reloaded the page.`)
-        case 'url':
-        default:
-          if (!args.url) {
-            return textResult('A URL is required for navigation of type=url.', true)
-          }
-          await browserViewManager.navigate(viewId, args.url)
-          await ctx.waitForNavigation(timeout)
           break
       }
+      await ctx.waitForNavigation(timeout)
 
       const finalState = browserViewManager.getState(viewId)
-      return textResult(`Successfully navigated to ${finalState?.url || args.url}.`)
+      return textResult(`${args.action} completed: ${finalState?.url || '(unknown)'}`)
     } catch (error) {
-      return textResult(`Unable to navigate in the selected page: ${(error as Error).message}.`, true)
+      return textResult(`Navigation ${args.action} failed: ${(error as Error).message}`, true)
     }
   }
 )
 
 const browser_wait_for = tool(
   'browser_wait_for',
-  'Wait for the specified text to appear on the selected page.',
+  `Wait for specific text to appear on the page before proceeding. Useful after actions that trigger asynchronous loading — form submissions, AJAX updates, page transitions, single-page app route changes.
+
+Returns success when the text is found in the page's accessibility tree, or an error on timeout. After success, take a browser_snapshot to see the updated page and get fresh UIDs.
+
+If the text never appears (misspelled, not in the accessibility tree, loaded in an iframe), the tool times out. In that case, take a browser_snapshot anyway to see what actually loaded and adjust your approach.
+
+Default timeout: 30 seconds.`,
   {
-    text: z.string().describe('Text to appear on the page'),
-    timeout: z.number().int().optional().describe('Maximum wait time in milliseconds. If set to 0, the default timeout will be used.')
+    text: z.string().describe('Text to wait for on the page. Must be an exact substring match against the page content.'),
+    timeout: z.number().int().optional().describe(
+      'Maximum wait time in milliseconds. Default: 30000. Set to 0 to use default.'
+    )
   },
   async (args) => {
     const timeout = (args.timeout && args.timeout > 0) ? args.timeout : NAV_TIMEOUT
 
     try {
       await ctx.waitForText(args.text, timeout)
-      return textResult(`Element with text "${args.text}" found.`)
+      return textResult(`Text found: "${args.text}"`)
     } catch {
-      return textResult(`Timeout waiting for text: "${args.text}"`, true)
-    }
-  }
-)
-
-const browser_resize = tool(
-  'browser_resize',
-  "Resizes the selected page's window so that the page has specified dimension",
-  {
-    width: z.number().describe('Page width'),
-    height: z.number().describe('Page height')
-  },
-  async (args) => {
-    if (!ctx.getActiveViewId()) {
-      return textResult('No active browser page.', true)
-    }
-
-    try {
-      await ctx.setViewportSize(args.width, args.height)
-      return textResult(`Viewport resized to: ${args.width}x${args.height}`)
-    } catch (error) {
-      return textResult(`Resize failed: ${(error as Error).message}`, true)
+      return textResult(`Timeout waiting for text: "${args.text}" (waited ${timeout}ms)`, true)
     }
   }
 )
 
 const browser_handle_dialog = tool(
   'browser_handle_dialog',
-  'If a browser dialog was opened, use this command to handle it',
+  `Handle a browser dialog (alert, confirm, prompt). Dialogs block all other page interaction until they are dismissed.
+
+If other browser tools fail unexpectedly, a dialog may be blocking the page — call this tool to check and dismiss it.
+
+For prompt() dialogs that require text input, provide the promptText parameter before accepting.`,
   {
-    action: z.enum(['accept', 'dismiss']).describe('Whether to dismiss or accept the dialog'),
-    promptText: z.string().optional().describe('Optional prompt text to enter into the dialog.')
+    action: z.enum(['accept', 'dismiss']).describe(
+      'Accept (OK/Yes) or dismiss (Cancel/No) the dialog.'
+    ),
+    promptText: z.string().optional().describe(
+      'Text to enter into a prompt() dialog before accepting. Ignored for alert and confirm dialogs.'
+    )
   },
   async (args) => {
     const dialog = ctx.getPendingDialog()
     if (!dialog) {
-      return textResult('No open dialog found', true)
+      return textResult('No open dialog found.', true)
     }
 
     try {
       await ctx.handleDialog(args.action === 'accept', args.promptText)
-      return textResult(`Successfully ${args.action === 'accept' ? 'accepted' : 'dismissed'} the dialog`)
+      return textResult(
+        `Dialog ${args.action === 'accept' ? 'accepted' : 'dismissed'} successfully.`
+      )
     } catch (error) {
       return textResult(`Failed to handle dialog: ${(error as Error).message}`, true)
     }
@@ -231,14 +226,8 @@ const browser_handle_dialog = tool(
 )
 
 return [
-  browser_list_pages,
-  browser_select_page,
-  browser_new_page,
-  browser_close_page,
   browser_navigate,
   browser_wait_for,
-  browser_resize,
-  browser_handle_dialog
 ]
 
 } // end buildNavigationTools

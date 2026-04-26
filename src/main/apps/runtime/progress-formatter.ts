@@ -46,24 +46,23 @@ function truncatePath(p: string | undefined | null, maxLen = 50): string {
  */
 function summarizeBrowserAction(action: string, input: Record<string, unknown>): string {
   switch (action) {
+    // --- Active tools (15) ---
     case 'browser_navigate':
-    case 'browser_new_page':
-      return truncate(input.url as string, 50) || action
-
-    case 'browser_fill':
-      return truncate(input.value as string, 40) || 'Fill input'
-
-    case 'browser_fill_form':
-      return 'Fill form'
+      if (input.newTab) return truncate(input.url as string, 50) || 'Open page'
+      if (input.action === 'back') return 'Back'
+      if (input.action === 'forward') return 'Forward'
+      if (input.action === 'reload') return 'Reload'
+      return truncate(input.url as string, 50) || 'Navigate'
 
     case 'browser_click':
-      return 'Click'
+      return input.dragTo ? 'Drag' : input.dblClick ? 'Double click' : 'Click'
+
+    case 'browser_fill':
+      if (input.elements) return 'Fill form'
+      return truncate(input.value as string, 40) || 'Fill input'
 
     case 'browser_hover':
       return 'Hover'
-
-    case 'browser_drag':
-      return 'Drag'
 
     case 'browser_press_key':
       return `Key: ${input.key ?? '?'}`
@@ -78,27 +77,8 @@ function summarizeBrowserAction(action: string, input: Record<string, unknown>):
       return truncatePath(fp as string) || 'Upload file'
     }
 
-    case 'browser_handle_dialog':
-      return `Dialog: ${input.action ?? '?'}`
-
     case 'browser_wait_for':
-      return truncate(((input.url ?? input.value) as string) ?? '', 40) || 'Wait'
-
-    case 'browser_select_page':
-      return `Select page ${input.pageIdx ?? ''}`
-
-    case 'browser_close_page':
-      return 'Close page'
-
-    case 'browser_emulate':
-      return `Emulate: ${input.device ?? input.deviceName ?? '?'}`
-
-    case 'browser_resize':
-      return `Resize: ${input.width ?? '?'}×${input.height ?? '?'}`
-
-    case 'browser_evaluate':
-    case 'browser_execute_script':
-      return truncate(input.code as string, 40) || 'Evaluate JS'
+      return truncate(input.text as string, 40) || 'Wait'
 
     case 'browser_snapshot':
       return 'Page snapshot'
@@ -106,29 +86,64 @@ function summarizeBrowserAction(action: string, input: Record<string, unknown>):
     case 'browser_screenshot':
       return 'Screenshot'
 
+    case 'browser_evaluate':
+      return truncate(input.function as string, 40) || 'Evaluate JS'
+
+    case 'browser_run':
+      return 'Run script'
+
+    case 'browser_tab':
+      if (input.action === 'list') return 'List tabs'
+      if (input.action === 'close') return 'Close tab'
+      return `Select tab ${input.pageIdx ?? ''}`
+
+    case 'browser_inspect':
+      if (input.target === 'console') return 'Console messages'
+      return 'Network requests'
+
+    case 'browser_download':
+      return truncate(input.url as string, 40) || 'Download'
+
+    case 'browser_handle_dialog':
+      return `Dialog: ${input.action ?? '?'}`
+
+    // --- Retired tools (kept for backward compat with existing conversation history) ---
+    case 'browser_new_page':
+      return truncate(input.url as string, 50) || 'Open page'
+
+    case 'browser_fill_form':
+      return 'Fill form'
+
+    case 'browser_drag':
+      return 'Drag'
+
+    case 'browser_select_page':
+      return `Select page ${input.pageIdx ?? ''}`
+
+    case 'browser_close_page':
+      return 'Close page'
+
     case 'browser_list_pages':
       return 'List pages'
 
     case 'browser_console':
-      return 'Console log'
+    case 'browser_console_message':
+      return 'Console'
 
     case 'browser_network_requests':
-      return 'Network requests'
-
     case 'browser_network_request':
-      return truncate(input.url as string, 40) || 'Network request'
+      return 'Network'
+
+    case 'browser_emulate':
+      return 'Emulate'
+
+    case 'browser_resize':
+      return `Resize: ${input.width ?? '?'}×${input.height ?? '?'}`
 
     case 'browser_perf_start':
-      return 'Perf start'
-
     case 'browser_perf_stop':
-      return 'Perf stop'
-
     case 'browser_perf_insight':
-      return 'Perf insight'
-
-    case 'browser_run':
-      return 'Run script'
+      return 'Performance'
 
     default:
       // Fallback: clean up underscores → readable label

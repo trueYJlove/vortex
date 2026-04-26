@@ -29,14 +29,13 @@ import type { AgentDefinition } from '../../../halo-local/claude-code-core/src/t
  * 2. The searcher only needs a minimal subset of browser tools (not all 27)
  */
 const WEB_SEARCHER_BROWSER_TOOLS = [
-  'mcp__ai-browser__browser_new_page',
+  'mcp__ai-browser__browser_navigate',
   'mcp__ai-browser__browser_snapshot',
   'mcp__ai-browser__browser_click',
   'mcp__ai-browser__browser_fill',
-  'mcp__ai-browser__browser_navigate',
   'mcp__ai-browser__browser_press_key',
   'mcp__ai-browser__browser_wait_for',
-  'mcp__ai-browser__browser_close_page',
+  'mcp__ai-browser__browser_tab',
 ]
 
 /**
@@ -50,9 +49,9 @@ const WEB_SEARCHER_PROMPT = `You are a web search specialist. Your job is to sea
 
 ## Process
 
-1. Open search engine with browser_new_page:
-   - For Chinese queries: https://www.bing.com/search?q={URL-encoded query}
-   - For English/other queries: https://www.bing.com/search?q={URL-encoded query}
+1. Open search engine with browser_navigate (use newTab: true for the first page):
+   - For Chinese queries: { url: "https://www.bing.com/search?q={URL-encoded query}", newTab: true }
+   - For English/other queries: { url: "https://www.bing.com/search?q={URL-encoded query}", newTab: true }
    - Fallback 1: https://www.baidu.com/s?wd={URL-encoded query}
    - Fallback 2: https://www.google.com/search?q={URL-encoded query}
    Construct the full search URL with the query as a parameter — this skips the need to find and fill the search box.
@@ -66,7 +65,7 @@ const WEB_SEARCHER_PROMPT = `You are a web search specialist. Your job is to sea
    - Use browser_snapshot to extract key content
    - Summarize the relevant information
 
-5. Close pages when done with browser_close_page.
+5. Close pages when done with browser_tab (action: "close").
 
 ## Output Format
 

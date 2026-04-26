@@ -21,17 +21,18 @@
  * │ When adding new session-level side effects, add them HERE.     │
  * └─────────────────────────────────────────────────────────────────┘
  *
- * Tool implementations live in tools/ by category:
- *   tools/navigation.ts  — 8 tools (list, select, new, close, navigate, wait, resize, dialog)
- *   tools/input.ts       — 7 tools (click, hover, fill, fill_form, drag, press_key, upload)
+ * Tool implementations live in tools/ by category (14 active tools):
+ *   tools/navigation.ts  — 2 active (navigate, wait_for) + 1 retired (handle_dialog)
+ *   tools/input.ts       — 5 tools (click, fill, hover, press_key, upload_file)
  *   tools/snapshot.ts    — 3 tools (snapshot, screenshot, evaluate)
  *   tools/script.ts      — 1 tool  (run)
- *   tools/network.ts     — 2 tools (network_requests, network_request)
- *   tools/console.ts     — 2 tools (console, console_message)
- *   tools/emulation.ts   — 1 tool  (emulate)
- *   tools/performance.ts — 3 tools (perf_start, perf_stop, perf_insight)
+ *   tools/tab.ts         — 1 tool  (tab: list/select/close)
+ *   tools/inspect.ts     — 1 tool  (inspect: network/console)
  *   tools/download.ts    — 1 tool  (download)
  *   tools/helpers.ts     — shared utilities (withTimeout, textResult, etc.)
+ *
+ * Retired (code preserved, not registered):
+ *   tools/network.ts, tools/console.ts, tools/emulation.ts, tools/performance.ts
  *   tools/index.ts       — aggregation (buildAllTools)
  */
 

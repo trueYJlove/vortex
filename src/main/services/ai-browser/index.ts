@@ -28,61 +28,29 @@ export { createScopedBrowserContext }
  * Append this to the system prompt when AI Browser is enabled
  *
  * Note: Tools are exposed via MCP server with prefix "mcp__ai-browser__"
- * e.g., mcp__ai-browser__browser_new_page
+ * e.g., mcp__ai-browser__browser_navigate
  */
 export const AI_BROWSER_SYSTEM_PROMPT = `
 ## AI Browser
 
-You can now control Halo's embedded real browser. All browser tools are provided via MCP server "ai-browser".
+You can control Halo's embedded real browser. All browser tools are prefixed with mcp__ai-browser__.
 
 ### Core Workflow
-1. Use \`mcp__ai-browser__browser_new_page\` to open a webpage
-2. Use \`mcp__ai-browser__browser_snapshot\` to get page content (accessibility tree)
-3. Find the target element's uid from the snapshot
-4. Use \`mcp__ai-browser__browser_click\`, \`mcp__ai-browser__browser_fill\`, etc. to interact with elements
-5. Re-fetch snapshot after each action to confirm results
+1. \`browser_navigate\` — open a page (current tab or new tab with newTab: true)
+2. \`browser_snapshot\` — see what's on the page (returns element UIDs)
+3. Use UIDs to interact: \`browser_click\`, \`browser_fill\`, \`browser_hover\`, \`browser_press_key\`
+4. \`browser_snapshot\` again — verify the result, get fresh UIDs
+5. Repeat 3-4 until the task is complete
 
-### Available Tools (prefix: mcp__ai-browser__)
-
-**Navigation:**
-- \`browser_new_page\` - Create new page and navigate to URL. Supports optional \`device\` param ("pc" | "h5"). **Default is "pc". Only use "h5" when the user explicitly asks for mobile view, or when the site is known to be mobile-only (e.g. Meituan, WeChat mini-program pages, sites that redirect desktop to mobile).**
-- \`browser_navigate\` - Navigate to URL or execute back/forward/reload
-- \`browser_list_pages\` - List all open pages
-- \`browser_select_page\` - Select active page
-- \`browser_close_page\` - Close page
-- \`browser_wait_for\` - Wait for text to appear
-
-**Input:**
-- \`browser_click\` - Click element
-- \`browser_fill\` - Fill input field
-- \`browser_fill_form\` - Batch fill form fields
-- \`browser_hover\` - Hover over element
-- \`browser_drag\` - Drag element
-- \`browser_press_key\` - Press key (e.g., Enter, Tab)
-- \`browser_upload_file\` - Upload file(s). Supports single path or array of paths for multi-file upload
-- \`browser_handle_dialog\` - Handle dialog
-
-**View:**
-- \`browser_snapshot\` - Get page accessibility tree (most important!)
-- \`browser_screenshot\` - Take screenshot
-- \`browser_evaluate\` - Execute JavaScript
-
-**Debug:**
-- \`browser_console\` - View console messages
-- \`browser_network_requests\` - View network requests
-
-**Emulation:**
-- \`browser_emulate\` - Emulate device/network
-- \`browser_resize\` - Resize viewport
-
-**Download:**
-- \`browser_download\` - Download a file or wait for a download to complete. Provide \`url\` for direct downloads, or omit to wait for a download triggered by a previous click. Returns file path, size, and status.
-
-### Important Notes
-- **Always use the latest snapshot** - UIDs change after page updates
-- Prefer \`browser_snapshot\` over \`browser_screenshot\` (more lightweight)
-- Use \`browser_fill_form\` for batch form filling (more efficient)
-- Ensure element is visible before interacting, scroll if necessary
+### Key Rules
+- Always use the LATEST snapshot's UIDs. After any action that changes the page, re-snapshot before the next interaction.
+- If a page is still loading, use Bash \`sleep 1-2\` then snapshot again. Or use \`browser_wait_for\` to wait for specific text.
+- \`browser_fill\` supports both single fields (uid + value) and batch mode (elements array) for efficient form filling.
+- \`browser_click\` supports drag-and-drop via the dragTo parameter.
+- \`browser_tab\` manages multiple open tabs (list, switch, close).
+- \`browser_inspect\` reveals network requests and console messages — powerful for finding API endpoints or diagnosing errors.
+- \`browser_evaluate\` is the escape hatch — use it for anything other tools can't handle (scrolling, viewport resize, direct API calls, DOM manipulation).
+- For pre-built automation scripts, use \`browser_run\`.
 `
 
 // ============================================

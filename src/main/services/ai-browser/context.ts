@@ -89,6 +89,7 @@ export class BrowserContext implements BrowserContextInterface {
   // Dialog handling state
   private pendingDialog: DialogInfo | null = null
   private dialogResolver: ((result: { accept: boolean; promptText?: string }) => void) | null = null
+  private pageEnabled: boolean = false
 
   // Download tracking state (capped at MAX_DOWNLOAD_HISTORY to prevent unbounded growth)
   private static readonly MAX_DOWNLOAD_HISTORY = 500
@@ -469,6 +470,31 @@ export class BrowserContext implements BrowserContextInterface {
     }
   }
 
+  /**
+   * Enable Page domain for dialog event capture.
+   * Without Page.enable, the CDP event Page.javascriptDialogOpening is never
+   * dispatched, making browser_handle_dialog unable to intercept dialogs.
+   */
+  private async enablePageDomain(): Promise<void> {
+    const webContents = this.getWebContents()
+    if (!webContents || this.pageEnabled) return
+
+    try {
+      try {
+        webContents.debugger.attach('1.3')
+      } catch (e) {
+        // Already attached
+      }
+
+      await webContents.debugger.sendCommand('Page.enable')
+
+      this.pageEnabled = true
+      console.log('[BrowserContext] Page domain enabled (dialog interception active)')
+    } catch (error) {
+      console.error('[BrowserContext] Failed to enable Page domain:', error)
+    }
+  }
+
   private handleConsoleMessage(params: Record<string, unknown>): void {
     const type = params.type as string
     const args = params.args as Array<{ type: string; value?: unknown; description?: string }>
@@ -730,21 +756,33 @@ export class BrowserContext implements BrowserContextInterface {
     const y = box.y + box.height / 2
 
     // Perform click using CDP
-    await this.sendCDPCommand('Input.dispatchMouseEvent', {
-      type: 'mousePressed',
-      x,
-      y,
-      button: 'left',
-      clickCount: options?.dblClick ? 2 : 1
-    })
-
-    await this.sendCDPCommand('Input.dispatchMouseEvent', {
-      type: 'mouseReleased',
-      x,
-      y,
-      button: 'left',
-      clickCount: options?.dblClick ? 2 : 1
-    })
+    if (options?.dblClick) {
+      // Double-click requires two full click cycles.
+      // First click (clickCount 1)
+      await this.sendCDPCommand('Input.dispatchMouseEvent', {
+        type: 'mousePressed', x, y, button: 'left', clickCount: 1
+      })
+      await this.sendCDPCommand('Input.dispatchMouseEvent', {
+        type: 'mouseReleased', x, y, button: 'left', clickCount: 1
+      })
+      // Brief pause between clicks — mirrors real user behavior and gives
+      // Electron's event loop time to process the first click.
+      await new Promise(r => setTimeout(r, 50))
+      // Second click (clickCount 2 signals the OS-level dblclick)
+      await this.sendCDPCommand('Input.dispatchMouseEvent', {
+        type: 'mousePressed', x, y, button: 'left', clickCount: 2
+      })
+      await this.sendCDPCommand('Input.dispatchMouseEvent', {
+        type: 'mouseReleased', x, y, button: 'left', clickCount: 2
+      })
+    } else {
+      await this.sendCDPCommand('Input.dispatchMouseEvent', {
+        type: 'mousePressed', x, y, button: 'left', clickCount: 1
+      })
+      await this.sendCDPCommand('Input.dispatchMouseEvent', {
+        type: 'mouseReleased', x, y, button: 'left', clickCount: 1
+      })
+    }
   }
 
   /**
@@ -944,34 +982,36 @@ export class BrowserContext implements BrowserContextInterface {
     const toX = toBox.x + toBox.width / 2
     const toY = toBox.y + toBox.height / 2
 
-    // Perform drag operation
+    // Move to source element first so the browser registers hover state.
+    // Without this, Electron's CDP bridge may not correctly associate the
+    // subsequent mousePressed with the source element.
     await this.sendCDPCommand('Input.dispatchMouseEvent', {
-      type: 'mousePressed',
-      x: fromX,
-      y: fromY,
-      button: 'left',
-      clickCount: 1
+      type: 'mouseMoved', x: fromX, y: fromY
     })
 
-    // Move in steps for smooth drag
+    // Press on source
+    await this.sendCDPCommand('Input.dispatchMouseEvent', {
+      type: 'mousePressed', x: fromX, y: fromY, button: 'left', clickCount: 1
+    })
+
+    // Move in steps for smooth drag.
+    // A small delay between steps prevents Electron's CDP pipeline from
+    // stalling when many Input.dispatchMouseEvent calls are queued rapidly.
     const steps = 10
+    const stepDelay = 16 // ~one frame at 60fps
     for (let i = 1; i <= steps; i++) {
       const x = fromX + (toX - fromX) * (i / steps)
       const y = fromY + (toY - fromY) * (i / steps)
       await this.sendCDPCommand('Input.dispatchMouseEvent', {
-        type: 'mouseMoved',
-        x,
-        y,
-        button: 'left'
+        type: 'mouseMoved', x, y, button: 'left'
       })
+      if (i < steps) {
+        await new Promise(r => setTimeout(r, stepDelay))
+      }
     }
 
     await this.sendCDPCommand('Input.dispatchMouseEvent', {
-      type: 'mouseReleased',
-      x: toX,
-      y: toY,
-      button: 'left',
-      clickCount: 1
+      type: 'mouseReleased', x: toX, y: toY, button: 'left', clickCount: 1
     })
   }
 
@@ -1432,6 +1472,7 @@ export class BrowserContext implements BrowserContextInterface {
   private async enableMonitoring(): Promise<void> {
     await this.enableNetworkMonitoring()
     await this.enableConsoleMonitoring()
+    await this.enablePageDomain()
   }
 
   /**
@@ -1453,6 +1494,9 @@ export class BrowserContext implements BrowserContextInterface {
         if (this.consoleEnabled) {
           webContents.debugger.sendCommand('Runtime.disable').catch(() => {})
         }
+        if (this.pageEnabled) {
+          webContents.debugger.sendCommand('Page.disable').catch(() => {})
+        }
       } catch (_e) {
         // Ignore errors during domain disable
       }
@@ -1466,6 +1510,7 @@ export class BrowserContext implements BrowserContextInterface {
 
     this.networkEnabled = false
     this.consoleEnabled = false
+    this.pageEnabled = false
     this.isTracing = false
     this.clearNetworkRequests()
     this.clearConsoleMessages()

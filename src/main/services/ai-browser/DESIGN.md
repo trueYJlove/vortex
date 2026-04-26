@@ -4,7 +4,7 @@
 
 ## Architecture
 
-The AI Browser module provides 28 browser control tools via an in-process MCP server.
+The AI Browser module provides 14 browser control tools via an in-process MCP server.
 Tools are exposed with prefix `mcp__ai-browser__` (e.g. `mcp__ai-browser__browser_click`).
 
 ```
@@ -21,9 +21,49 @@ Tools are exposed with prefix `mcp__ai-browser__` (e.g. `mcp__ai-browser__browse
    installDownloadHandler()   buildAllTools(ctx)   ctx.workDir
    (download-handler.ts)      (tools/index.ts)
             │                    │
-   session-level             28 tool functions
+   session-level             15 tool functions
    will-download handler     grouped by category
 ```
+
+## Tool Inventory (14 tools)
+
+| Category | Tools | File |
+|----------|-------|------|
+| Navigation (2) | `browser_navigate`, `browser_wait_for` | `tools/navigation.ts` |
+| Input (5) | `browser_click`, `browser_fill`, `browser_hover`, `browser_press_key`, `browser_upload_file` | `tools/input.ts` |
+| Snapshot (3) | `browser_snapshot`, `browser_screenshot`, `browser_evaluate` | `tools/snapshot.ts` |
+| Script (1) | `browser_run` | `tools/script.ts` |
+| Tab (1) | `browser_tab` | `tools/tab.ts` |
+| Inspect (1) | `browser_inspect` | `tools/inspect.ts` |
+| Download (1) | `browser_download` | `tools/download.ts` |
+
+### Merged Tools (28 → 15)
+
+Several tools were consolidated by intent:
+
+| New Tool | Absorbed | Mechanism |
+|----------|----------|-----------|
+| `browser_navigate` | + `browser_new_page` | `newTab` / `device` params |
+| `browser_click` | + `browser_drag` | `dragTo` param |
+| `browser_fill` | + `browser_fill_form` | `elements` array param |
+| `browser_tab` | `list_pages` + `select_page` + `close_page` | `action` param dispatch |
+| `browser_inspect` | `console` + `console_message` + `network_requests` + `network_request` | `target` param dispatch |
+
+### Retired Tools (code preserved)
+
+The following tools are NOT registered in `buildAllTools()` but their code is
+preserved in source files for future extension (e.g., developer tools mode):
+
+| File | Tools | Reason |
+|------|-------|--------|
+| `tools/navigation.ts` | `browser_handle_dialog` | Electron cannot reliably intercept native JS dialogs |
+| `tools/emulation.ts` | `browser_emulate` | Developer scenario |
+| `tools/performance.ts` | `browser_perf_start`, `browser_perf_stop`, `browser_perf_insight` | Developer scenario |
+| `tools/network.ts` | `browser_network_requests`, `browser_network_request` | Replaced by `browser_inspect` |
+| `tools/console.ts` | `browser_console`, `browser_console_message` | Replaced by `browser_inspect` |
+
+To re-enable any retired tool, import its builder in `tools/index.ts` and
+spread into the `buildAllTools()` return array.
 
 ## Entry Points
 
@@ -75,7 +115,7 @@ download tracking, and monitoring state per agent session.
 | `download-handler.ts` | Session-level `will-download` handler for silent AI downloads |
 | `download-utils.ts` | Shared filename sanitization / unique path resolution |
 | `types.ts` | Type definitions |
-| `tools/` | Tool implementations by category (28 tools) |
+| `tools/` | Tool implementations by category (15 active tools) |
 | `tools/index.ts` | Tool aggregation (`buildAllTools`) |
 | `tools/helpers.ts` | Shared tool utilities |
 
@@ -93,4 +133,12 @@ wc.downloadURL(url)
 ```
 
 The routing uses `contextsByWebContentsId` Map (webContents ID → BrowserContext),
-populated by `ctx.trackView()` when `browser_new_page` creates a view.
+populated by `ctx.trackView()` when `browser_navigate` creates a view with newTab.
+
+## Design Principles
+
+1. **One intent = one tool** — Tools map to AI reasoning intents, not browser primitives.
+2. **Description as teaching** — Each tool description is a complete usage manual with examples, troubleshooting, and cross-references.
+3. **Closed-loop references** — Every interaction tool reminds the AI to re-snapshot after use.
+4. **Escape hatch pattern** — `browser_evaluate` covers any edge case that dedicated tools cannot handle.
+5. **Extensible by re-registration** — Retired tools can be brought back by uncommenting imports in `tools/index.ts`.
