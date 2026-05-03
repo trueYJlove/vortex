@@ -862,7 +862,7 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
               className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary resize-none"
             />
             <p className="text-xs text-muted-foreground">
-              {t('Owners have full access. Others are guests.')}
+              {t('Owners always have full access and are not restricted by the guest settings below.')}
             </p>
           </div>
 
@@ -909,7 +909,7 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
               {guestAccessEnabled && (
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">
-                    {t('Allowed Tools')}
+                    {t('Guest Allowed Tools')}
                   </label>
 
                   {/* Built-in tool tags grouped — unchanged from original */}
