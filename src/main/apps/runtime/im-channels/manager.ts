@@ -33,6 +33,8 @@ export class ImChannelManager {
   private instances = new Map<string, ImChannelInstance>()
   /** Current config snapshot (for change detection) */
   private currentConfigs: ImChannelInstanceConfig[] = []
+  /** Callback fired after each instance is torn down (for resource cleanup). */
+  private onInstanceStop: ((instanceId: string) => void) | null = null
 
   // ── Provider Registration ──────────────────────────────────────
 
@@ -152,6 +154,10 @@ export class ImChannelManager {
     console.log('[ImChannelManager] All instances stopped')
   }
 
+  setOnInstanceStop(handler: ((instanceId: string) => void) | null): void {
+    this.onInstanceStop = handler
+  }
+
   // ── Instance Lookup ────────────────────────────────────────────
 
   /**
@@ -261,6 +267,16 @@ export class ImChannelManager {
         console.error(`[ImChannelManager] Error stopping instance "${id}":`, err)
       }
       this.instances.delete(id)
+      if (this.onInstanceStop) {
+        try {
+          this.onInstanceStop(id)
+        } catch (err) {
+          console.error(
+            `[ImChannelManager] onInstanceStop handler threw for id="${id}":`,
+            err
+          )
+        }
+      }
       console.log(`[ImChannelManager] Instance stopped: id=${id}`)
     }
   }

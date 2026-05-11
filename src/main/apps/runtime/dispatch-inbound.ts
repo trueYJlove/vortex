@@ -51,6 +51,12 @@ const STOP_COMMANDS = new Set(['/halo-stop', '/halo-cancel'])
 /** Commands that clear the conversation context and start fresh. */
 const CLEAR_COMMANDS = new Set(['/halo-clear', '/halo-reset'])
 
+/** Max characters of a supplement body shown in acks / round-switch prompts. */
+const SUPPLEMENT_PREVIEW_MAX = 20
+
+/** Beyond this count the ack switches to "last 3 + more" truncated form. */
+const SUPPLEMENT_ACK_TRUNCATE_THRESHOLD = 5
+
 /** Check whether a message is a stop command (case-insensitive, trimmed). */
 function isStopCommand(body: string): boolean {
   return STOP_COMMANDS.has(body.trim().toLowerCase())
@@ -117,8 +123,259 @@ function resolveImFileSend(
 }
 
 // ============================================
+// Supplement Buffer
+// ============================================
+//
+// When a message arrives while AI is generating, we buffer it (with ack) instead
+// of starting a concurrent generation. On completion, buffered messages are merged
+// into a single new round using the latest entry's ReplyHandle.
+
+interface SupplementEntry {
+  msg: InboundMessage
+  reply: ReplyHandle
+  appId: string
+  instanceId: string
+}
+
+const supplementBuffers = new Map<string, SupplementEntry[]>()
+
+function truncatePreview(body: string): string {
+  const trimmed = body.trim().replace(/\s+/g, ' ')
+  if (trimmed.length <= SUPPLEMENT_PREVIEW_MAX) return trimmed || '(empty)'
+  return trimmed.slice(0, SUPPLEMENT_PREVIEW_MAX) + '...'
+}
+
+function buildSupplementAck(buffer: SupplementEntry[]): string {
+  const count = buffer.length
+
+  if (count === 1) {
+    return [
+      '✏️ 已收到补充消息',
+      'AI 正在这一轮的回应中，你的补充会在下一轮回应时一并理解处理。',
+      '当前已收到补充：1 条',
+      `• ${truncatePreview(buffer[0].msg.body)}`,
+    ].join('\n')
+  }
+
+  if (count <= SUPPLEMENT_ACK_TRUNCATE_THRESHOLD) {
+    const lines = buffer.map((e) => `• ${truncatePreview(e.msg.body)}`)
+    return [
+      '✏️ 又收到补充',
+      '下一轮回应时，会把这些补充合并理解、一起回复：',
+      ...lines,
+    ].join('\n')
+  }
+
+  const recent = buffer.slice(-3).map((e) => `• ${truncatePreview(e.msg.body)}`)
+  return [
+    `✏️ 又收到补充（共 ${count} 条）`,
+    '下一轮回应时合并处理。最近 3 条：',
+    ...recent,
+    '... 更多',
+  ].join('\n')
+}
+
+/** Prefix pushed before the merged supplement round starts streaming. */
+function buildRoundSwitchPrefix(buffer: SupplementEntry[]): string {
+  const lines = buffer.map((e) => `• ${truncatePreview(e.msg.body)}`)
+  return [
+    '（上一轮回应已结束）',
+    '',
+    `现在合并处理你刚才的 ${buffer.length} 条补充：`,
+    ...lines,
+  ].join('\n')
+}
+
+/** Drop all buffered supplements for a conversation, disposing stream sessions. */
+function clearSupplementBuffer(conversationId: string): SupplementEntry[] {
+  const entries = supplementBuffers.get(conversationId)
+  if (!entries || entries.length === 0) {
+    supplementBuffers.delete(conversationId)
+    return []
+  }
+  supplementBuffers.delete(conversationId)
+  for (const e of entries) {
+    try {
+      e.reply.streaming?.dispose?.()
+    } catch (err) {
+      console.error(`${LOG_TAG} clearSupplementBuffer dispose error:`, err)
+    }
+  }
+  return entries
+}
+
+/** Drop supplements bound to a torn-down instance to prevent stale closure leaks. */
+export function clearSupplementBuffersForInstance(instanceId: string): number {
+  let dropped = 0
+  for (const [conversationId, entries] of supplementBuffers) {
+    const kept: SupplementEntry[] = []
+    for (const e of entries) {
+      if (e.instanceId === instanceId) {
+        try {
+          e.reply.streaming?.dispose?.()
+        } catch (err) {
+          console.error(
+            `${LOG_TAG} clearSupplementBuffersForInstance dispose error:`,
+            err
+          )
+        }
+        dropped++
+      } else {
+        kept.push(e)
+      }
+    }
+    if (kept.length === 0) {
+      supplementBuffers.delete(conversationId)
+    } else if (kept.length !== entries.length) {
+      supplementBuffers.set(conversationId, kept)
+    }
+  }
+  if (dropped > 0) {
+    console.log(
+      `${LOG_TAG} Dropped ${dropped} buffered supplement(s) for stopped ` +
+      `instance ${instanceId}`
+    )
+  }
+  return dropped
+}
+
+/** Merge supplement bodies. Groups get per-entry <msg-sender> tags for attribution. */
+function buildMergedMessageText(
+  entries: SupplementEntry[],
+  chatType: 'direct' | 'group'
+): string {
+  if (chatType === 'direct') {
+    return entries
+      .map((e) => e.msg.body)
+      .filter((b) => b && b.length > 0)
+      .join('\n')
+  }
+  return entries
+    .map((e) => {
+      const senderName = e.msg.fromName ?? e.msg.from
+      if (!e.msg.from) return e.msg.body
+      return `<msg-sender id="${e.msg.from}" name="${senderName}" />\n${e.msg.body}`
+    })
+    .filter((b) => b && b.length > 0)
+    .join('\n')
+}
+
+/**
+ * Drain the supplement buffer and dispatch a merged round. No-op if empty.
+ * Re-checks the busy lock to avoid racing with a newly-arrived message;
+ * if busy, defers — the next round's finally will retry.
+ */
+export function flushSupplementBuffer(conversationId: string): void {
+  const entries = supplementBuffers.get(conversationId)
+  if (!entries || entries.length === 0) {
+    supplementBuffers.delete(conversationId)
+    return
+  }
+
+  if (activeSessions.has(conversationId)) {
+    console.log(
+      `${LOG_TAG} flushSupplementBuffer deferred: conv=${conversationId} is ` +
+      `busy (race with newly-arrived message), ${entries.length} supplement(s) ` +
+      `remain queued for the next idle window`
+    )
+    return
+  }
+
+  supplementBuffers.delete(conversationId)
+
+  const last = entries[entries.length - 1]
+
+  // Dispose all stream sessions except the last (used for the merged round)
+  for (let i = 0; i < entries.length - 1; i++) {
+    try {
+      entries[i].reply.streaming?.dispose?.()
+    } catch (err) {
+      console.error(`${LOG_TAG} flush dispose error:`, err)
+    }
+  }
+
+  const mergedAttachments = entries.flatMap((e) => e.msg.attachments ?? [])
+  const mergedImages = entries.flatMap((e) => e.msg.images ?? [])
+  const messageText = buildMergedMessageText(entries, last.msg.chatType)
+
+  // For groups with mixed owners/guests, use the first guest as effective sender
+  // so the merged round runs under guest restrictions (least privilege).
+  const channelManager = getActiveImChannelManager()
+  const cfgForPerm = channelManager?.getInstanceConfig(last.instanceId)
+  const permEnabled = cfgForPerm?.permissionEnabled ?? false
+  const ownerList = permEnabled ? cfgForPerm?.owners ?? [] : []
+  let effectiveFrom = last.msg.from
+  let effectiveFromName = last.msg.fromName
+  if (last.msg.chatType === 'group' && permEnabled && ownerList.length > 0) {
+    const guestEntry = entries.find(
+      (e) => e.msg.from && !ownerList.includes(e.msg.from)
+    )
+    if (guestEntry) {
+      effectiveFrom = guestEntry.msg.from
+      effectiveFromName = guestEntry.msg.fromName ?? guestEntry.msg.from
+    }
+  }
+
+  const merged: InboundMessage = {
+    body: messageText,
+    from: effectiveFrom,
+    fromName: effectiveFromName,
+    channel: last.msg.channel,
+    chatType: last.msg.chatType,
+    chatId: last.msg.chatId,
+    chatName: last.msg.chatName,
+    messageId: last.msg.messageId,
+    timestamp: Date.now(),
+    ...(mergedAttachments.length > 0 ? { attachments: mergedAttachments } : {}),
+    ...(mergedImages.length > 0 ? { images: mergedImages } : {}),
+  }
+
+  const senderIdentity =
+    last.msg.chatType === 'direct' && last.msg.from
+      ? { id: last.msg.from, name: last.msg.fromName ?? last.msg.from }
+      : undefined
+
+  // Push round-switch prefix (non-fatal)
+  const instance = channelManager?.getInstance(last.instanceId)
+  if (instance) {
+    try {
+      instance.pushToChat(
+        merged.chatId,
+        buildRoundSwitchPrefix(entries),
+        merged.chatType
+      )
+    } catch (err) {
+      console.error(`${LOG_TAG} round-switch prefix push failed:`, err)
+    }
+  }
+
+  console.log(
+    `${LOG_TAG} Flushing ${entries.length} supplement(s): conv=${conversationId}, ` +
+    `chat=${merged.chatId}, attachments=${mergedAttachments.length}, ` +
+    `images=${mergedImages.length}`
+  )
+
+  setImmediate(() => {
+    dispatchInboundMessage(merged, last.reply, last.appId, last.instanceId, {
+      skipBusyCheck: true,
+      preBuiltMessageText: messageText,
+      preBuiltSenderIdentity: senderIdentity,
+    }).catch((err) => {
+      console.error(`${LOG_TAG} Supplement flush dispatch failed:`, err)
+    })
+  })
+}
+
+// ============================================
 // Dispatch
 // ============================================
+
+/** Internal options used by flushSupplementBuffer() for pre-merged dispatch. */
+interface DispatchOptions {
+  skipBusyCheck?: boolean
+  preBuiltMessageText?: string
+  preBuiltSenderIdentity?: { id: string; name: string }
+}
 
 /**
  * Dispatch an inbound IM message to a specific digital human.
@@ -130,12 +387,14 @@ function resolveImFileSend(
  * @param reply - Reply handle for sending responses back to the IM channel
  * @param appId - Bound digital human App ID (from instance config)
  * @param instanceId - IM channel instance ID (for session tracking)
+ * @param options - Internal options (set only by flushSupplementBuffer)
  */
 export async function dispatchInboundMessage(
   msg: InboundMessage,
   reply: ReplyHandle,
   appId: string,
-  instanceId: string
+  instanceId: string,
+  options: DispatchOptions = {}
 ): Promise<void> {
   const manager = getAppManager()
   if (!manager) {
@@ -208,11 +467,15 @@ export async function dispatchInboundMessage(
     broadcastToAll('app:im-session-updated', sessionEvent)
   }
 
-  // ── Stop command: abort a stuck or running generation ──
+  // ── Stop command: abort generation, silently drop buffered supplements ──
   if (isStopCommand(msg.body)) {
+    const dropped = clearSupplementBuffer(conversationId)
     const isActive = activeSessions.has(conversationId)
     if (isActive) {
-      console.log(`${LOG_TAG} Stop command received: channel=${msg.channel}, chatId=${msg.chatId}, session=${conversationId}`)
+      console.log(
+        `${LOG_TAG} Stop command received: channel=${msg.channel}, chatId=${msg.chatId}, ` +
+        `session=${conversationId}, droppedSupplements=${dropped.length}`
+      )
       try {
         await stopGeneration(conversationId)
         await reply.send('Generation stopped.')
@@ -226,9 +489,13 @@ export async function dispatchInboundMessage(
     return
   }
 
-  // ── Clear command: reset conversation context ──
+  // ── Clear command: reset context, silently drop buffered supplements ──
   if (isClearCommand(msg.body)) {
-    console.log(`${LOG_TAG} Clear command received: channel=${msg.channel}, chatId=${msg.chatId}, session=${conversationId}`)
+    const dropped = clearSupplementBuffer(conversationId)
+    console.log(
+      `${LOG_TAG} Clear command received: channel=${msg.channel}, chatId=${msg.chatId}, ` +
+      `session=${conversationId}, droppedSupplements=${dropped.length}`
+    )
     try {
       await clearImSession(app.id, app.spaceId!, msg.channel, msg.chatType, msg.chatId)
       clearImPermissionContext(conversationId)
@@ -240,16 +507,41 @@ export async function dispatchInboundMessage(
     return
   }
 
+  // ── Supplement buffering (busy → buffer, flush after generation ends) ──
+  if (!options.skipBusyCheck && activeSessions.has(conversationId)) {
+    const entry: SupplementEntry = { msg, reply, appId, instanceId }
+    const buffer = supplementBuffers.get(conversationId) ?? []
+    buffer.push(entry)
+    supplementBuffers.set(conversationId, buffer)
+
+    // Ack via proactive push (non-fatal)
+    const ackInstance = channelManager?.getInstance(instanceId)
+    if (ackInstance) {
+      try {
+        ackInstance.pushToChat(msg.chatId, buildSupplementAck(buffer), msg.chatType)
+      } catch (err) {
+        console.error(`${LOG_TAG} Supplement ack push failed:`, err)
+      }
+    }
+
+    console.log(
+      `${LOG_TAG} Buffered as supplement: conv=${conversationId}, ` +
+      `bufferSize=${buffer.length}, msgLen=${msg.body.length}`
+    )
+    return
+  }
+
   // ── Identity injection ───────────────────────────────
-  // Direct chat: sender identity goes into the system prompt (via senderIdentity).
-  //   User messages stay clean — slash commands / skills reach the SDK unmodified.
-  //   Anti-injection is preserved because system prompt is tamper-proof.
-  // Group chat: per-message <msg-sender> tag (different senders per turn).
+  // Direct: senderIdentity in system prompt. Group: per-message <msg-sender> tag.
+  // Pre-built paths (from flushSupplementBuffer) short-circuit here.
   const senderName = msg.fromName ?? msg.from
   let messageText: string
   let senderIdentity: { id: string; name: string } | undefined
 
-  if (msg.chatType === 'direct') {
+  if (options.preBuiltMessageText !== undefined) {
+    messageText = options.preBuiltMessageText
+    senderIdentity = options.preBuiltSenderIdentity
+  } else if (msg.chatType === 'direct') {
     messageText = msg.body
     if (msg.from) {
       senderIdentity = { id: msg.from, name: senderName }
