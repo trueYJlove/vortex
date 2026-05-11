@@ -428,16 +428,16 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
         <div className="flex items-center justify-between pt-4 border-t border-border">
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <p className="font-medium">{t(u6279u6ce8u529fu80fd)}</p>
+              <p className="font-medium">{t('Annotations')}</p>
               <span
                 className="inline-flex items-center justify-center w-4 h-4 text-xs rounded-full bg-muted text-muted-foreground cursor-help"
-                title={t(u663eu793au6216u9690u85cfu804au5929u6d88u606fu7684u6279u6ce8u5185u5bb9)}
+                title={t('Show or hide annotation content on chat messages')}
               >
                 ?
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {t(u663eu793au6216u9690u85cfu804au5929u6d88u606fu7684u6279u6ce8u5185u5bb9)}
+              {t('Show or hide annotation content on chat messages')}
             </p>
           </div>
           <Switch

@@ -49,7 +49,7 @@ import { FileWatcherSource } from './sources/file-watcher.source'
 import { WebhookSource, type WebhookSecretResolver } from './sources/webhook.source'
 import { ImChannelManager, WecomBotProvider, WeixinIlinkBotProvider, setActiveImChannelManager } from './im-channels'
 import { ImSessionRegistry, setImSessionRegistry } from './im-session-registry'
-import { dispatchInboundMessage } from './dispatch-inbound'
+import { dispatchInboundMessage, clearSupplementBuffersForInstance } from './dispatch-inbound'
 import { clearAllImPermissionContexts } from './im-permission-registry'
 import { getConfig } from '../../services/config.service'
 import { getDataFolderName } from '../../services/ai-sources/auth-loader'
@@ -250,6 +250,11 @@ export async function initAppRuntime(
   imChannelManager.registerProvider(new WeixinIlinkBotProvider())
   // Future: imChannelManager.registerProvider(new FeishuBotProvider())
   // Future: imChannelManager.registerProvider(new DingTalkBotProvider())
+
+  // Clean up supplement buffers when an instance is torn down
+  imChannelManager.setOnInstanceStop((instanceId) => {
+    clearSupplementBuffersForInstance(instanceId)
+  })
 
   // Apply IM channel instance configs from config.json
   const config = getConfig()

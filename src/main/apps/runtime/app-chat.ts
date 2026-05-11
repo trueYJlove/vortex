@@ -73,6 +73,7 @@ import { getAppChatConversationId, buildImSessionKey } from '../../../shared/app
 import type { ProgressEvent } from '../../../shared/types/inbound-message'
 import type { ImageAttachment } from '../../services/agent/types'
 import { ProgressEventParser } from './progress-formatter'
+import { flushSupplementBuffer } from './dispatch-inbound'
 export { getAppChatConversationId, buildImSessionKey }
 
 // ============================================
@@ -660,6 +661,17 @@ export async function sendAppChatMessage(
     }
 
     console.log(`[AppChat][${appId}] Active session cleaned up`)
+
+    // Flush buffered IM supplements (deferred so busy lock is released first)
+    if (conversationId !== defaultConvId) {
+      setImmediate(() => {
+        try {
+          flushSupplementBuffer(conversationId)
+        } catch (err) {
+          console.error(`[AppChat][${appId}] flushSupplementBuffer failed:`, err)
+        }
+      })
+    }
   }
 }
 
