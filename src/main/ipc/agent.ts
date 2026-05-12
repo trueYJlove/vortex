@@ -107,6 +107,7 @@ export function registerAgentHandlers(): void {
         return { success: true }
       } catch (error: unknown) {
         const err = error as Error
+        analytics.trackErrorSurface('agent-send', err)
         return { success: false, error: err.message }
       }
     }
@@ -228,6 +229,7 @@ export function registerAgentHandlers(): void {
       return result
     } catch (error: unknown) {
       const err = error as Error
+      analytics.trackErrorSurface('mcp-connect', err)
       return { success: false, servers: [], error: err.message }
     }
   })

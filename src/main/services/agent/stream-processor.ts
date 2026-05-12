@@ -39,9 +39,115 @@ import {
   type SubAgentContext
 } from './subagent-handler'
 import { TRANSPARENT_TOOLS } from './constants'
+import { analytics } from '../analytics/analytics.service'
+import { AnalyticsEvents } from '../analytics/types'
+import { deriveErrorCode } from '../analytics/error-code'
 
 // Unified fallback error suffix - guides user to check logs
 const FALLBACK_ERROR_HINT = 'Check logs in Settings > System > Logs.'
+
+// ============================================
+// Telemetry: tool usage aggregation
+// ============================================
+
+/**
+ * Per-stream tool usage stats. Aggregated inside the stream-processor module so
+ * that one `tool.usage_summary` event is emitted per `processStream` invocation
+ * (one model-driven turn) regardless of which downstream caller (consumer-based
+ * agent flow vs legacy automation flow) ends up firing `agent:complete`.
+ */
+interface ToolStats {
+  toolCounts: Record<string, number>
+  toolErrors: Record<string, number>
+  startedAt: number
+}
+
+/** Keyed by conversationId. Cleared on flush; also guarded against leaks at processStream exit. */
+const toolStatsMap = new Map<string, ToolStats>()
+
+function getOrCreateToolStats(conversationId: string): ToolStats {
+  let stats = toolStatsMap.get(conversationId)
+  if (!stats) {
+    stats = { toolCounts: {}, toolErrors: {}, startedAt: Date.now() }
+    toolStatsMap.set(conversationId, stats)
+  }
+  return stats
+}
+
+function incrementToolCall(conversationId: string, toolName: string): void {
+  if (!toolName) return
+  const stats = getOrCreateToolStats(conversationId)
+  stats.toolCounts[toolName] = (stats.toolCounts[toolName] ?? 0) + 1
+}
+
+function incrementToolError(conversationId: string, toolName: string | undefined): void {
+  if (!toolName) return
+  const stats = toolStatsMap.get(conversationId)
+  if (!stats) return
+  stats.toolErrors[toolName] = (stats.toolErrors[toolName] ?? 0) + 1
+}
+
+/**
+ * Drain accumulated tool stats for a conversation and return them as a
+ * privacy-shaped summary. Returns null when no calls were recorded.
+ *
+ * Defence-in-depth for user-attached MCP tools: tool names of the form
+ * `mcp:<server-name>` are rewritten to `mcp:<redacted>` before leaving this
+ * function. The formal mechanism is the SENSITIVE_KEYS gate on `mcpId`, but
+ * tool names ride inside a nested array (`toolCalls[].name`), so the gate
+ * cannot reach them — explicit redaction here is the belt-and-suspenders.
+ */
+export function flushToolStats(conversationId: string): {
+  toolCalls: Array<{ name: string; count: number; errors: number }>
+  totalCalls: number
+  totalErrors: number
+  durationMs: number
+} | null {
+  const stats = toolStatsMap.get(conversationId)
+  if (!stats) return null
+  toolStatsMap.delete(conversationId)
+
+  const merged: Record<string, { count: number; errors: number }> = {}
+  for (const [name, count] of Object.entries(stats.toolCounts)) {
+    const redacted = name.startsWith('mcp:') ? 'mcp:<redacted>' : name
+    if (!merged[redacted]) merged[redacted] = { count: 0, errors: 0 }
+    merged[redacted].count += count
+  }
+  for (const [name, errors] of Object.entries(stats.toolErrors)) {
+    const redacted = name.startsWith('mcp:') ? 'mcp:<redacted>' : name
+    if (!merged[redacted]) merged[redacted] = { count: 0, errors: 0 }
+    merged[redacted].errors += errors
+  }
+
+  const toolCalls = Object.entries(merged).map(([name, agg]) => ({
+    name,
+    count: agg.count,
+    errors: agg.errors,
+  }))
+  const totalCalls = toolCalls.reduce((sum, t) => sum + t.count, 0)
+  const totalErrors = toolCalls.reduce((sum, t) => sum + t.errors, 0)
+  if (totalCalls === 0 && totalErrors === 0) return null
+
+  return {
+    toolCalls,
+    totalCalls,
+    totalErrors,
+    durationMs: Date.now() - stats.startedAt,
+  }
+}
+
+/**
+ * Derive the telemetry `source` (and optional `appId`) for events emitted
+ * from stream-processor. The agent service routes app-chat / im-reply
+ * traffic through virtual conversationIds prefixed with `app-chat:`. When
+ * the prefix is absent the stream is a normal interactive conversation.
+ */
+function deriveAnalyticsSource(conversationId: string): { source: 'agent' | 'app-chat'; appId?: string } {
+  if (conversationId.startsWith('app-chat:')) {
+    return { source: 'app-chat', appId: conversationId.slice('app-chat:'.length) }
+  }
+  return { source: 'agent' }
+}
 
 // ============================================
 // Types
@@ -202,6 +308,17 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
   // lastSingleUsage: Last API call usage (single call, represents current context size)
   let lastSingleUsage: SingleCallUsage | null = null
   let tokenUsage: TokenUsage | null = null
+
+  // Telemetry: timestamp of the previous llm.invocation emit. Used to derive
+  // PER-CALL durationMs (delta from the previous call's emit, or from t0 for
+  // the first call) so dashboards see per-call latency rather than a
+  // monotonically-increasing "elapsed since send" number.
+  let lastInvocationEmitAt = t0
+  // Telemetry: did we emit at least one `llm.invocation` (status: 'ok')
+  // during this stream? Used to suppress a redundant `status: 'error'`
+  // tail-emit when the turn ultimately aborts/interrupts AFTER one or
+  // more successful invocations.
+  let invocationOkEmitted = false
 
   // Token-level streaming state
   let currentStreamingText = ''  // Accumulates text_delta tokens
@@ -594,6 +711,8 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
               input: toolInput
             }
             emitAgentEvent('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+            // Telemetry: track tool usage; mcp:* names are redacted at flush time.
+            incrementToolCall(conversationId, blockState.toolName || '')
 
             if (is.dev) {
               console.log(`[Agent][${conversationId}] Tool block complete [${blockState.toolName}], input: ${JSON.stringify(toolInput).substring(0, 100)}`)
@@ -645,6 +764,23 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
       const usage = extractSingleUsage(sdkMessage)
       if (usage) {
         lastSingleUsage = usage
+        // Telemetry: emit per-call llm.invocation. modelName is sensitive —
+        // the SENSITIVE_KEYS gate drops it for open-source builds. Token
+        // counts are likewise sensitive. `durationMs` is the per-call delta
+        // (this call's wall-clock cost), not cumulative since send start,
+        // so dashboards can plot per-call latency directly.
+        const now = Date.now()
+        void analytics.track(AnalyticsEvents.LLM_INVOCATION, {
+          ...deriveAnalyticsSource(conversationId),
+          conversationId,
+          modelName: displayModel,
+          durationMs: now - lastInvocationEmitAt,
+          status: 'ok',
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+        })
+        lastInvocationEmitAt = now
+        invocationOkEmitted = true
       }
     }
 
@@ -684,6 +820,11 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
             result: thought.toolOutput || '',
             isError: thought.isError || false
           })
+          // Telemetry: count tool errors by the original tool's name (looked up
+          // via the tool_use thought, since tool_result thoughts don't carry the name).
+          if (thought.isError) {
+            incrementToolError(conversationId, toolUseThought?.toolName)
+          }
 
           console.log(`[Agent][${conversationId}] Tool result merged into thought ${toolUseThoughtId}`)
         } else {
@@ -696,6 +837,10 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
             result: thought.toolOutput || '',
             isError: thought.isError || false
           })
+          // Telemetry: fallback path — name may be on the thought itself.
+          if (thought.isError) {
+            incrementToolError(conversationId, thought.toolName)
+          }
           console.log(`[Agent][${conversationId}] Tool result fallback (no mapping): ${thought.id}`)
         }
       } else {
@@ -737,6 +882,8 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
             input: thought.toolInput || {}
           }
           emitAgentEvent('agent:tool-call', spaceId, conversationId, toolCall as unknown as Record<string, unknown>)
+          // Telemetry: track tool usage (non-stream_event path, e.g. assistant SDK messages).
+          incrementToolCall(conversationId, thought.toolName || '')
         } else if (thought.type === 'error') {
           // SDK reported an error (rate_limit, authentication_failed, etc.)
           // Send error to frontend - user should see the actual error from provider
@@ -999,6 +1146,37 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
     })
   } else if (wasAborted) {
     console.log(`[Agent][${conversationId}] User stopped - no error sent`)
+  }
+
+  // Telemetry: drain tool usage stats for this stream. Emitting here covers
+  // both legacy callers (who get agent:complete via line 963 above) and
+  // consumer-based callers (who emit agent:complete externally after persistence)
+  // — every processStream call results in at most one tool.usage_summary
+  // event, and the stats map can never leak entries.
+  const toolSummary = flushToolStats(conversationId)
+  if (toolSummary) {
+    void analytics.track(AnalyticsEvents.TOOL_USAGE_SUMMARY, {
+      ...deriveAnalyticsSource(conversationId),
+      conversationId,
+      ...toolSummary,
+    })
+  }
+  // Telemetry: on error/interrupt paths where no successful invocation was
+  // ever emitted in this stream (e.g. session crashed before any assistant
+  // message), surface a single failed invocation so the dashboard reflects
+  // the attempt. Suppress when an `ok` was already emitted — an abort that
+  // hits AFTER successful invocations does not retroactively turn those
+  // calls into failures, and double-emitting `ok` + `error` for the same
+  // turn with no turnId would corrupt dashboard aggregates.
+  if (!invocationOkEmitted && (hasErrorThought || isInterrupted || wasAborted)) {
+    void analytics.track(AnalyticsEvents.LLM_INVOCATION, {
+      ...deriveAnalyticsSource(conversationId),
+      conversationId,
+      modelName: displayModel,
+      durationMs: Date.now() - lastInvocationEmitAt,
+      status: 'error',
+      errorCode: deriveErrorCode(errorThought?.content ?? (wasAborted ? 'aborted' : 'interrupted')),
+    })
   }
 
   return result

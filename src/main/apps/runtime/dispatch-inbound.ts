@@ -46,10 +46,10 @@ const MAX_REPLY_LENGTH = 4000
  * Commands that abort the current generation.
  * Slash-prefixed to avoid false triggers from normal conversation.
  */
-const STOP_COMMANDS = new Set(['/halo-stop', '/halo-cancel'])
+const STOP_COMMANDS = new Set(['/halo-stop', '/halo-cancel', '/stop'])
 
 /** Commands that clear the conversation context and start fresh. */
-const CLEAR_COMMANDS = new Set(['/halo-clear', '/halo-reset'])
+const CLEAR_COMMANDS = new Set(['/halo-clear', '/halo-reset', '/clear'])
 
 /** Max characters of a supplement body shown in acks / round-switch prompts. */
 const SUPPLEMENT_PREVIEW_MAX = 20
@@ -599,12 +599,14 @@ export async function dispatchInboundMessage(
     `sender=${msg.from}(${senderName}), isOwner=${isOwner}`
   )
 
-  // Telemetry: count inbound IM messages (no content)
+  // Telemetry: count inbound IM messages (no content). specId is gated by
+  // SENSITIVE_KEYS in the telemetry provider; open-source builds drop it.
   void analytics.track(AnalyticsEvents.MESSAGE_RECEIVED, {
     source: 'im',
     channel: msg.channel,
     chatType: msg.chatType,
     appId: app.id,
+    specId: app.specId,
   })
 
   // Send an immediate acknowledgment so the user sees the <think> block appear
@@ -637,12 +639,14 @@ export async function dispatchInboundMessage(
 
       // Use streaming.finish when available, else fall back to one-shot send
       onReply: (finalContent: string) => {
-        // Telemetry: count outbound replies (no content)
+        // Telemetry: count outbound replies (no content). specId is gated
+        // by SENSITIVE_KEYS at sanitize time.
         void analytics.track(AnalyticsEvents.MESSAGE_SENT, {
           source: 'im-reply',
           channel: msg.channel,
           chatType: msg.chatType,
           appId: app.id,
+          specId: app.specId,
         })
 
         const replyText = finalContent.slice(0, MAX_REPLY_LENGTH)

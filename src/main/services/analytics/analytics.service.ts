@@ -24,8 +24,9 @@ import { createGAProvider } from './providers/ga'
 import { createBaiduProvider } from './providers/baidu'
 import { createTelemetryProvider } from './providers/telemetry'
 import { getConfig, saveConfig } from '../config.service'
-import { getIdentitySource } from '../ai-sources/auth-loader'
+import { getIdentitySource, getTelemetryConfig } from '../ai-sources/auth-loader'
 import { getCurrentSource } from '../../../shared/types'
+import { deriveErrorCode } from './error-code'
 
 /**
  * Build-time injected analytics credentials
@@ -223,6 +224,34 @@ class AnalyticsService {
   }
 
   /**
+   * Track a coarse-grained error surface event.
+   *
+   * Centralized helper for IPC / service catch paths to emit `error.surface`
+   * with a consistent (area, errorCode) shape. The full error message is
+   * never forwarded — only the derived first-token code (capped at 48
+   * chars), and even that only when the build's `allowedSensitiveFields`
+   * permits `errorCode`.
+   *
+   * Internally try/catch'd: a telemetry helper called from an error path
+   * must NEVER re-throw — that would mask the original error and risk
+   * unbounded recursion if a downstream catch also calls back here.
+   */
+  trackErrorSurface(area: string, error: unknown): void {
+    try {
+      const errorCode = deriveErrorCode(error)
+      // Fire-and-forget: track() already swallows provider errors. The void
+      // is explicit so a future linter rule about unawaited promises is happy.
+      void this.track(AnalyticsEvents.ERROR_SURFACE, {
+        area,
+        errorCode,
+      })
+    } catch (err) {
+      // Last-resort guard. Telemetry helper must not re-throw.
+      console.warn('[Analytics] trackErrorSurface failed:', err)
+    }
+  }
+
+  /**
    * Record a dropped event and emit a throttled warning so a persistent
    * misconfiguration (e.g. `init()` never called) is observable without
    * spamming the console during the normal startup race window.
@@ -407,10 +436,15 @@ class AnalyticsService {
     }
 
     // Self-hosted Telemetry provider (enterprise/internal builds)
+    // SENSITIVE_KEYS allowlist comes from product.json — open-source builds
+    // omit the telemetry block entirely, so this is an empty array there
+    // and the provider drops every sensitive key at sanitize time.
     try {
+      const allowedSensitiveFields = getTelemetryConfig()?.allowedSensitiveFields ?? []
       const telemetryProvider = createTelemetryProvider(
         PROVIDER_CONFIG.telemetry.endpoint,
-        PROVIDER_CONFIG.telemetry.apiKey
+        PROVIDER_CONFIG.telemetry.apiKey,
+        allowedSensitiveFields
       )
       await telemetryProvider.init(userId)
       if (telemetryProvider.initialized) {

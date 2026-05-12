@@ -118,6 +118,7 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:install error:', err.message)
+        analytics.trackErrorSurface('app-install', err)
         return { success: false, error: err.message }
       }
     }
@@ -548,10 +549,14 @@ export function registerAppHandlers(): void {
     'app:chat-send',
     async (_event, request: AppChatRequest) => {
       try {
-        // Telemetry: count user-sent messages to app chat (no content)
+        // Telemetry: count user-sent messages to app chat (no content).
+        // specId is reverse-looked-up so dashboards can label the digital
+        // human; the SENSITIVE_KEYS gate drops it for open-source builds.
+        const specId = getAppManager()?.getApp(request.appId)?.specId
         void analytics.track(AnalyticsEvents.MESSAGE_SENT, {
           source: 'app-chat',
           appId: request.appId,
+          specId,
         })
 
         // Fire-and-forget: streaming events are pushed to renderer via agent:* channels.
@@ -569,6 +574,7 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:chat-send error:', err.message)
+        analytics.trackErrorSurface('app-chat-send', err)
         return { success: false, error: err.message }
       }
     }

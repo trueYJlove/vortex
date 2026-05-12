@@ -110,6 +110,17 @@
         }
       },
       "required": ["mode"]
+    },
+    "telemetry": {
+      "type": "object",
+      "description": "Telemetry configuration (enterprise/custom builds only). Controls which user-authored / user-identifiable fields may be forwarded to the self-hosted telemetry backend. Omit for open-source builds — every sensitive field is dropped by default.",
+      "properties": {
+        "allowedSensitiveFields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Whitelist of SENSITIVE_KEYS property names permitted to be sent. Recognized keys: specId, spaceName, modelName, sourceName, mcpId, skillId, imBotName, inputTokens, outputTokens, errorCode."
+        }
+      }
     }
   },
   "additionalProperties": false

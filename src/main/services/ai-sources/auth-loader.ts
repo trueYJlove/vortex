@@ -212,6 +212,22 @@ export interface ProductConfig {
    * no effect unless the telemetry provider is also configured.
    */
   identitySource?: string
+
+  /**
+   * Telemetry configuration (optional, enterprise/custom builds only).
+   *
+   * Whitelists which property keys in the analytics module's SENSITIVE_KEYS
+   * set may be forwarded to the self-hosted telemetry backend. The
+   * SENSITIVE_KEYS set covers user-authored / user-identifiable fields
+   * (spec.name, space name, model name, MCP/skill/im bot names, token
+   * counts, error codes). Open-source builds MUST omit this entirely —
+   * every SENSITIVE_KEYS property is dropped at sanitize time, in addition
+   * to the empty-endpoint provider-disabled safety net. Enterprise builds
+   * opt-in per field.
+   */
+  telemetry?: {
+    allowedSensitiveFields?: string[]
+  }
 }
 
 /**
@@ -314,6 +330,18 @@ export function getImChannelsPermissionDefaults(): ImChannelsPermissionDefaults 
  */
 export function getIdentitySource(): string | undefined {
   return loadProductConfig().identitySource
+}
+
+/**
+ * Get the telemetry config block from product.json.
+ *
+ * Returns undefined when not configured (open-source builds). When
+ * present, `allowedSensitiveFields` whitelists which SENSITIVE_KEYS may
+ * be forwarded to the telemetry backend — see telemetry provider's
+ * sanitize pass for the enforcement.
+ */
+export function getTelemetryConfig(): ProductConfig['telemetry'] | undefined {
+  return loadProductConfig().telemetry
 }
 
 /**

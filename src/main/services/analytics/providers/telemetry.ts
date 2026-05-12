@@ -25,12 +25,21 @@
  *     already-shipped batch is NOT re-queued — we prefer losing a batch
  *     over duplicating or holding memory indefinitely.
  *
- * Privacy:
- *   - `track()` applies a per-event whitelist of property keys before
- *     enqueueing; any property not on the whitelist is dropped at the
- *     source, so it never leaves the main process even in memory.
- *   - A fallback blocklist guards against accidental additions to event
- *     types that omit an explicit whitelist.
+ * Privacy (three-layer sanitize, applied in order):
+ *   1. `BLOCKED_KEYS` — global hard blocklist of content / token / secret /
+ *      path keys. Always drops, regardless of any other rule. Last line of
+ *      defence against accidental additions.
+ *   2. `EVENT_WHITELIST` — per-event-name allowlist of property keys.
+ *      When a name is present here, only the listed keys survive. When
+ *      absent, every key not in BLOCKED_KEYS is kept.
+ *   3. `SENSITIVE_KEYS` gate — keys that are user-authored or
+ *      user-identifiable (spec.name, space name, model name,
+ *      mcp/skill/im bot names, token counts, error codes). Dropped UNLESS
+ *      the product variant explicitly opted-in via
+ *      `product.json.telemetry.allowedSensitiveFields`. Open-source
+ *      builds omit the product field entirely, so the gate drops every
+ *      sensitive field — in addition to the empty-endpoint
+ *      provider-disabled safety net.
  *
  * Disabled when endpoint or apiKey is empty. When disabled the provider
  * never starts its timer and `track()` is a no-op — safe to use in
@@ -83,6 +92,35 @@ const BLOCKED_KEYS = new Set<string>([
 ])
 
 /**
+ * Property keys that are user-authored or user-identifiable and therefore
+ * SENSITIVE in the privacy sense. These are gated by the product-variant
+ * `allowedSensitiveFields` whitelist:
+ *
+ * - Open-source / public build: product.json omits the telemetry block →
+ *   `allowedSensitiveFields` is empty → every SENSITIVE_KEY is dropped at
+ *   sanitize time (in addition to the empty-endpoint provider-disabled
+ *   safety net).
+ * - Enterprise / internal build: product.json explicitly opts-in per key,
+ *   typically allowing the full set so internal dashboards can show
+ *   readable spec names, model usage, token consumption, etc.
+ *
+ * Distinct from `BLOCKED_KEYS` (which is absolute and applies to leak
+ * vectors like message content or secrets, never permitted anywhere).
+ */
+const SENSITIVE_KEYS = new Set<string>([
+  'specId',        // spec.name — user-authored readable name
+  'spaceName',     // user-authored space name
+  'modelName',     // custom model identifier (may contain provider URL / internal name)
+  'sourceName',    // custom AI source display name
+  'mcpId',         // user-attached MCP server name
+  'skillId',       // user-attached skill name
+  'imBotName',     // user-named IM bot
+  'inputTokens',   // model token consumption (per call)
+  'outputTokens',
+  'errorCode',     // privacy-safe but still leaks workflow shape
+])
+
+/**
  * Per-event-name property whitelist.
  *
  * When a name is present in this map, only the listed keys survive.
@@ -97,11 +135,12 @@ const EVENT_WHITELIST: Record<string, readonly string[]> = {
   'page.view':      ['view', 'from'],
 
   // Chat message counts (identifiers only — never content)
-  'message.sent':     ['source', 'appId', 'specId', 'channel', 'instanceId', 'conversationId', 'spaceId', 'hasImages'],
+  'message.sent':     ['source', 'appId', 'specId', 'channel', 'instanceId', 'conversationId', 'spaceId', 'hasImages',
+                       'modelProvider', 'modelName', 'engine', 'replyDurationMs'],
   'message.received': ['source', 'appId', 'specId', 'channel', 'instanceId', 'conversationId', 'spaceId'],
 
   // Digital human lifecycle
-  'app.installed':      ['appId', 'specId', 'version', 'type'],
+  'app.installed':      ['appId', 'specId', 'version', 'type', 'installSource', 'durationMs'],
   'app.uninstalled':    ['appId', 'specId', 'type'],
   'app.run.started':    ['appId', 'specId', 'runId', 'trigger'],
   'app.run.completed':  ['appId', 'specId', 'runId', 'trigger', 'status', 'durationMs'],
@@ -110,11 +149,24 @@ const EVENT_WHITELIST: Record<string, readonly string[]> = {
 
   // Startup snapshot
   'installed_apps.snapshot': ['apps', 'count'],
+
+  // Model + tool observability
+  'llm.invocation':       ['source', 'appId', 'conversationId', 'engine', 'modelProvider', 'modelName',
+                           'durationMs', 'status', 'errorCode', 'inputTokens', 'outputTokens'],
+  'tool.usage_summary':   ['source', 'appId', 'runId', 'conversationId', 'toolCalls',
+                           'totalCalls', 'totalErrors', 'durationMs'],
+  'error.surface':        ['area', 'errorCode'],
 }
 
 export interface TelemetryProviderConfig extends BaseProviderOptions {
   endpoint: string
   apiKey: string
+  /**
+   * Subset of SENSITIVE_KEYS that the current build is permitted to forward.
+   * Sourced from `product.json.telemetry.allowedSensitiveFields`. Empty
+   * (or unset) → every SENSITIVE_KEY is dropped at sanitize time.
+   */
+  allowedSensitiveFields?: readonly string[]
 }
 
 interface QueuedEvent extends AnalyticsEvent {
@@ -137,12 +189,15 @@ export class TelemetryProvider extends BaseProvider {
   private flushTimer: NodeJS.Timeout | null = null
   /** Captured per track() call; used when a scheduled flush fires without a fresh track. */
   private lastContext: UserContext | null = null
+  /** Per-build SENSITIVE_KEYS allowlist. Empty Set = drop every sensitive key. */
+  private allowedSensitiveFields: Set<string>
 
   constructor(config: TelemetryProviderConfig) {
     super(config)
     // Normalize trailing slashes so `${endpoint}/v1/events` is always well-formed.
     this.endpoint = (config.endpoint || '').replace(/\/+$/, '')
     this.apiKey = config.apiKey || ''
+    this.allowedSensitiveFields = new Set(config.allowedSensitiveFields ?? [])
   }
 
   async init(userId: string): Promise<void> {
@@ -275,13 +330,14 @@ export class TelemetryProvider extends BaseProvider {
   }
 
   /**
-   * Apply the whitelist + blocklist to caller-provided properties.
+   * Three-layer sanitize. Order matters:
+   *   1. BLOCKED_KEYS always wins (absolute leak vectors: content, secrets, paths).
+   *   2. Per-event whitelist filters to the known structural keys.
+   *   3. SENSITIVE_KEYS gate drops user-authored / user-identifiable keys
+   *      unless the product variant opted in.
    *
-   * - If an event whitelist exists for this event name, only whitelisted
-   *   keys are kept.
-   * - Otherwise, every key not in BLOCKED_KEYS is kept.
-   * - Keys in BLOCKED_KEYS are always dropped, even if whitelisted — the
-   *   blocklist wins in case of accidental overlap.
+   * Result is undefined when every key was dropped, so the queued event
+   * doesn't waste bytes on an empty object.
    */
   private sanitizeProperties(
     eventName: string,
@@ -293,9 +349,13 @@ export class TelemetryProvider extends BaseProvider {
     const out: Record<string, unknown> = {}
 
     for (const [key, value] of Object.entries(props)) {
-      if (BLOCKED_KEYS.has(key)) continue
-      if (whitelist && !whitelist.includes(key)) continue
       if (value === undefined) continue
+      // 1. Absolute blocklist — always drops.
+      if (BLOCKED_KEYS.has(key)) continue
+      // 2. Per-event whitelist — when present, only listed keys survive.
+      if (whitelist && !whitelist.includes(key)) continue
+      // 3. SENSITIVE_KEYS gate — drop unless the build opted in.
+      if (SENSITIVE_KEYS.has(key) && !this.allowedSensitiveFields.has(key)) continue
       out[key] = value
     }
 
@@ -313,11 +373,20 @@ export class TelemetryProvider extends BaseProvider {
  * `initialized` will flip to false inside `init()` when credentials are
  * empty — callers can use either `provider.initialized` after init or just
  * let `track()` be a no-op.
+ *
+ * `allowedSensitiveFields` is sourced from
+ * `product.json.telemetry.allowedSensitiveFields`; omit (or pass empty)
+ * for open-source builds where every SENSITIVE_KEY must be dropped.
  */
-export function createTelemetryProvider(endpoint: string, apiKey: string): TelemetryProvider {
+export function createTelemetryProvider(
+  endpoint: string,
+  apiKey: string,
+  allowedSensitiveFields: readonly string[] = []
+): TelemetryProvider {
   return new TelemetryProvider({
     endpoint,
     apiKey,
+    allowedSensitiveFields,
     debug: process.env.NODE_ENV === 'development',
   })
 }
