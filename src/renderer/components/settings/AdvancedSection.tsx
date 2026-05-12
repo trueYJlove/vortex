@@ -111,7 +111,6 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
     }
     return flags
   })
-  const [annotationsEnabled, setAnnotationsEnabled] = useState(config?.annotations?.enabled ?? true)
   const [developerMode, setDeveloperModeState] = useState(config?.agent?.developerMode ?? false)
   const [capsPanelOpen, setCapsPanelOpen] = useState(false)
 
@@ -215,15 +214,6 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
     }
   }
 
-  const handleAnnotationsToggle = async (enabled: boolean) => {
-    setAnnotationsEnabled(enabled)
-    try {
-      await api.patchConfig({ annotations: { enabled } })
-    } catch (error) {
-      console.error("[AdvancedSection] Failed to update annotations:", error)
-      setAnnotationsEnabled(config?.annotations?.enabled ?? true)
-    }
-  }
   const handleDeveloperModeChange = async (enabled: boolean) => {
     setDeveloperModeState(enabled)
     try {
@@ -424,28 +414,6 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
           />
         </div>
 
-        {/* Annotation Settings */}
-        <div className="flex items-center justify-between pt-4 border-t border-border">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="font-medium">{t('Annotations')}</p>
-              <span
-                className="inline-flex items-center justify-center w-4 h-4 text-xs rounded-full bg-muted text-muted-foreground cursor-help"
-                title={t('Show or hide annotation content on chat messages')}
-              >
-                ?
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {t('Show or hide annotation content on chat messages')}
-            </p>
-          </div>
-          <Switch
-            checked={annotationsEnabled}
-            onCheckedChange={handleAnnotationsToggle}
-            size="sm"
-          />
-        </div>
         {/* Developer Mode */}
         <div className="flex items-start justify-between pt-4 border-t border-border">
           <div className="flex-1 min-w-0">

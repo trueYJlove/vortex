@@ -14,15 +14,17 @@ provider credentials are injected.
 
 ```
 src/main/services/analytics/
-├── analytics.service.ts     # Singleton service: init, track, destroy, watermark
+├── analytics.service.ts     # Singleton service: init, track, destroy, watermark,
+│                            # trackErrorSurface
 ├── types.ts                 # AnalyticsEvent*, UserContext, AnalyticsConfig, AnalyticsProvider
+├── error-code.ts            # Shared deriveErrorCode helper (privacy-safe first token)
 ├── index.ts                 # Public re-exports
 ├── snapshot.ts              # Startup snapshot + run replay (one-shot per launch)
 ├── providers/
 │   ├── base.ts              # BaseProvider: timeout / retry / safeTrack / logging
 │   ├── ga.ts                # Google Analytics 4 (Measurement Protocol)
 │   ├── baidu.ts             # Baidu Tongji
-│   └── telemetry.ts         # Self-hosted batched provider
+│   └── telemetry.ts         # Self-hosted batched provider (three-layer sanitize)
 └── subscribers/
     └── apps.subscriber.ts   # AppManager + Runtime lifecycle → analytics events
 ```
@@ -66,14 +68,32 @@ failure in one cannot starve the others.
 | GA4       | Measurement API | none     | immediate                  | upstream only  |
 | Telemetry | POST /v1/events | in-memory queue | debounce 5s + size 100 + destroy() | **double pass** |
 
-The Telemetry provider applies two privacy passes:
+The Telemetry provider applies a three-layer sanitize pass (order matters):
 
-1. **Per-event whitelist** (`EVENT_WHITELIST` in `telemetry.ts`) — only
-   listed keys survive for known event names.
-2. **Global blocklist** (`BLOCKED_KEYS`) — drops every
-   content/token/secret/path key regardless of whitelist.
+1. **Global blocklist** (`BLOCKED_KEYS`) — absolute. Drops every
+   content / token / secret / path key regardless of any other rule.
+   Last line of defence against accidental additions.
+2. **Per-event whitelist** (`EVENT_WHITELIST`) — keep only listed keys
+   for known event names. When the name is absent, every key not in
+   BLOCKED_KEYS is kept (used for the `action.*` family).
+3. **SENSITIVE_KEYS gate** — user-authored / user-identifiable keys
+   (`specId`, `spaceName`, `modelName`, `sourceName`, `mcpId`, `skillId`,
+   `imBotName`, `inputTokens`, `outputTokens`, `errorCode`) are dropped
+   unless the product variant explicitly opted-in via
+   `product.json.telemetry.allowedSensitiveFields`.
 
-The blocklist always wins on conflict.
+Open-source builds omit the product `telemetry` block entirely, so
+`allowedSensitiveFields` is empty and every SENSITIVE_KEY is dropped at
+sanitize time — in addition to the empty-endpoint provider-disabled
+safety net. Enterprise / internal builds typically allow the full
+SENSITIVE_KEYS set so internal dashboards can show readable spec names,
+model usage, token consumption, etc.
+
+The `mcp:*` tool name redaction in `tool.usage_summary` is a separate
+defence-in-depth measure: tool names ride inside a nested array
+(`toolCalls[].name`) that the property-level gate cannot reach, so the
+flush helper explicitly rewrites `mcp:<name>` → `mcp:<redacted>` before
+emission.
 
 ### Subscribers
 
@@ -88,10 +108,54 @@ to the analytics pipeline:
 | `Runtime.onRunFinished` (ok) | `app.run.completed`     |
 | `Runtime.onRunFinished` (err)| `app.run.failed`        |
 
+Every emitted run event carries both `appId` (UUID — the dashboard
+aggregation key) and `specId` (human-readable spec.name — display tag,
+gated by the SENSITIVE_KEYS framework). `specId` is reverse-looked-up
+from `appManager.getApp(evt.appId)` because the runtime events do not
+carry it directly.
+
 All subscribers are `void analytics.track(...)` — never awaited, never
 throw into the business path. Error details are reduced to a short
-`errorCode` (first colon/space-delimited token, capped at 48 chars); the
-full error message never leaves the main process.
+`errorCode` via the shared `deriveErrorCode()` helper in
+`error-code.ts` (first colon / whitespace-delimited token, capped at 48
+chars); the full error message never leaves the main process and even
+the short code is gated by SENSITIVE_KEYS.
+
+### Model + tool observability
+
+Beyond run-level events, the stream-processor in
+`src/main/services/agent/stream-processor.ts` emits two additional
+telemetry signals so dashboards can correlate model usage and tool
+behaviour with run outcomes:
+
+| Source point                      | Emitted analytics event   | Rate          |
+|-----------------------------------|---------------------------|---------------|
+| Each assistant SDK message        | `llm.invocation` (status:'ok')   | Per model call |
+| Stream exit when no usage captured| `llm.invocation` (status:'error')| Once per turn  |
+| processStream end                 | `tool.usage_summary`       | Once per turn  |
+
+`llm.invocation` includes `modelName` and token counts — all sensitive
+and gated. `tool.usage_summary` aggregates `agent:tool-call` and
+`agent:tool-result` events keyed by conversationId, then drains via
+`flushToolStats(conversationId)` at the end of every processStream
+invocation. The flush also fires on the `agent:error` path in
+`send-message.ts` so the in-memory stats map can never leak entries
+when a turn aborts before processStream returns.
+
+### Error surface
+
+`analytics.trackErrorSurface(area, error)` is the centralized way for
+IPC handlers and service catch paths to record a coarse error map.
+It is internally try/caught (telemetry must never re-throw into an
+error path) and emits `error.surface` with two fields:
+
+| Field        | Source                                       |
+|--------------|----------------------------------------------|
+| `area`       | Stable short string (e.g. `'agent-send'`, `'app-install'`, `'mcp-connect'`) |
+| `errorCode`  | `deriveErrorCode(error)` — gated by SENSITIVE_KEYS |
+
+Use `area` as a stable bucket for dashboards. `errorCode` is sensitive
+and dropped for open-source builds.
 
 ### Startup snapshot (`snapshot.ts`)
 

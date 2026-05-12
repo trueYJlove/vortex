@@ -118,6 +118,7 @@ export class CodexAppServerSession {
       sessionId,
       model: options.model,
       mcpServers: options.mcpServers,
+      includePartialMessages: options.includePartialMessages,
     })
 
     const isReady = (): boolean =>

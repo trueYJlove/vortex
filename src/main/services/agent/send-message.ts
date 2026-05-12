@@ -42,6 +42,9 @@ import {
   buildMessageContent,
 } from './message-utils'
 import { resolveCredentialsForSdk, buildBaseSdkOptions } from './sdk-config'
+import { flushToolStats } from './stream-processor'
+import { analytics } from '../analytics/analytics.service'
+import { AnalyticsEvents } from '../analytics/types'
 
 // ============================================
 // Send Message
@@ -230,6 +233,26 @@ export async function sendMessage(
       const genericErrorMatch = stderrBuffer.match(/Error: [\s\S]*?(?=\n\s*at |$)/m)
       if (mcpErrorMatch) errorMessage = mcpErrorMatch[0].trim()
       else if (genericErrorMatch) errorMessage = genericErrorMatch[0].trim()
+    }
+
+    // Telemetry: surface this error to the global error map and drain any
+    // tool stats that processStream couldn't (e.g. crash during sendMessage
+    // before the stream even started). Both calls are fire-and-forget and
+    // internally try/caught — they never re-throw into this path.
+    //
+    // Idempotency note: when processStream DID run to completion, it already
+    // flushed the toolStatsMap entry for this conversationId, so flushToolStats
+    // here returns null and the inner emit is skipped. This is intentional
+    // belt-and-suspenders: the only path where this branch fires non-null is
+    // a crash BEFORE processStream took over the stats map.
+    analytics.trackErrorSurface('agent-send', err)
+    const toolSummary = flushToolStats(conversationId)
+    if (toolSummary) {
+      void analytics.track(AnalyticsEvents.TOOL_USAGE_SUMMARY, {
+        source: 'agent',
+        conversationId,
+        ...toolSummary,
+      })
     }
 
     emitAgentEvent('agent:error', spaceId, conversationId, {
