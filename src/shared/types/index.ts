@@ -25,7 +25,9 @@ export type {
   OAuthCompleteResult,
   AISourceType,
   AISourceUserInfo,
-  LocalizedText
+  LocalizedText,
+  PresetApiConfig,
+  AuthProviderConfig
 } from './ai-sources'
 
 // AI Sources - export constants and functions

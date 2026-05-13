@@ -54,7 +54,7 @@
     },
     "authProviders": {
       "type": "array",
-      "description": "Authentication provider configurations",
+      "description": "Authentication provider configurations. An entry can be one of three forms: (1) builtin=true for in-tree providers (e.g. custom), (2) path=... for dynamic OAuth provider modules, (3) preset=... for a fixed-baseUrl API-key form (mutually exclusive with `path`). The `type` field is a free-form identifier; the special value 'preset-api' is recommended for preset entries but the renderer routes purely on the presence of `preset`.",
       "items": {
         "type": "object",
         "required": ["type", "enabled"],
@@ -81,6 +81,49 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "preset": {
+            "type": "object",
+            "description": "Preset API configuration. When present, this provider renders as an API-key form with a fixed baseUrl. Mutually exclusive with `path` (dynamic OAuth providers).",
+            "required": ["baseUrl", "apiType"],
+            "properties": {
+              "baseUrl": {
+                "type": "string",
+                "description": "Fixed base URL of the gateway (no path suffix). e.g. 'http://example.com/public'"
+              },
+              "apiType": {
+                "type": "string",
+                "enum": ["chat_completions", "responses", "anthropic_passthrough", "kiro"],
+                "description": "Persisted to AISource.apiType. Determines dispatch path for Anthropic/Halo SDK engines. Codex engine ignores this and uses OpenAI protocol."
+              },
+              "modelsPath": {
+                "type": "string",
+                "description": "Path appended to baseUrl for GET model list. Default: '/v1/models'. The endpoint must return OpenAI-compatible { data: [{ id }] }."
+              },
+              "fallbackModels": {
+                "type": "array",
+                "description": "Used when GET models fails or returns empty.",
+                "items": {
+                  "type": "object",
+                  "required": ["id"],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" }
+                  }
+                }
+              },
+              "docs": {
+                "type": "object",
+                "description": "Optional documentation link shown in the form.",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string" },
+                  "label": {
+                    "description": "Localized text. Defaults to 'Learn more' / '了解更多' if absent."
+                  }
+                }
+              }
+            }
           }
         }
       }

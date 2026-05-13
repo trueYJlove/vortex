@@ -1867,6 +1867,13 @@ export const api = {
     return httpRequest('POST', `/api/apps/${appId}/chat/clear`, { spaceId })
   },
 
+  appChatRestart: async (appId: string): Promise<ApiResponse<{ sessionsClosed: number }>> => {
+    if (isElectron()) {
+      return window.halo.appChatRestart(appId)
+    }
+    return httpRequest('POST', `/api/apps/${appId}/chat/restart`)
+  },
+
   appImChatMessages: async (appId: string, spaceId: string, channel: string, chatType: 'direct' | 'group', chatId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.halo.appImChatMessages({ appId, spaceId, channel, chatType, chatId })

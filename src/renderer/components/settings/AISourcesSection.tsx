@@ -30,25 +30,7 @@ import { getBuiltinProvider, isOAuthProvider as isOAuthProviderFn } from '../../
 import { useTranslation, getCurrentLanguage } from '../../i18n'
 import { api } from '../../api'
 import { ProviderSelector } from './ProviderSelector'
-import { resolveLocalizedText, type LocalizedText } from '../../../shared/types'
-
-// ============================================================================
-// Types for dynamic OAuth providers (from product.json)
-// ============================================================================
-
-/**
- * Provider configuration from backend (product.json)
- */
-interface AuthProviderConfig {
-  type: string
-  displayName: LocalizedText
-  description: LocalizedText
-  icon: string
-  iconBgColor: string
-  recommended: boolean
-  enabled: boolean
-  builtin?: boolean
-}
+import { resolveLocalizedText, type LocalizedText, type AuthProviderConfig } from '../../../shared/types'
 
 // ============================================================================
 // Helper functions for dynamic providers
@@ -138,6 +120,11 @@ export function AISourcesSection({ config, setConfig }: AISourcesSectionProps) {
 
   // State
   const [showAddForm, setShowAddForm] = useState(false)
+  // Preset-API provider entry currently being added (from the bottom list in
+  // settings). When set, the section renders a preset-add form via
+  // `ProviderSelector` with `presetProvider`. Mutually exclusive with
+  // `showAddForm` (generic add) and `editingSourceId` (edit).
+  const [addingPresetProvider, setAddingPresetProvider] = useState<AuthProviderConfig | null>(null)
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null)
   const [deletingSourceId, setDeletingSourceId] = useState<string | null>(null)
   const [expandedSourceId, setExpandedSourceId] = useState<string | null>(null)
@@ -230,6 +217,7 @@ export function AISourcesSection({ config, setConfig }: AISourcesSectionProps) {
 
     setShowAddForm(false)
     setEditingSourceId(null)
+    setAddingPresetProvider(null)
   }
 
   // Handle delete source
@@ -547,20 +535,25 @@ export function AISourcesSection({ config, setConfig }: AISourcesSectionProps) {
   }
 
   // Show add/edit form
-  if (showAddForm || editingSourceId) {
+  if (showAddForm || editingSourceId || addingPresetProvider) {
+    const title = editingSourceId
+      ? t('Edit Provider')
+      : addingPresetProvider
+        ? resolveLocalizedText(addingPresetProvider.displayName, getCurrentLanguage())
+        : t('Add AI Provider')
     return (
       <div className="space-y-4">
-        <h3 className="font-medium text-text-primary">
-          {editingSourceId ? t('Edit Provider') : t('Add AI Provider')}
-        </h3>
+        <h3 className="font-medium text-text-primary">{title}</h3>
         <ProviderSelector
           aiSources={aiSources}
           onSave={handleSaveSource}
           onCancel={() => {
             setShowAddForm(false)
             setEditingSourceId(null)
+            setAddingPresetProvider(null)
           }}
           editingSourceId={editingSourceId}
+          presetProvider={addingPresetProvider ?? undefined}
         />
       </div>
     )
@@ -791,48 +784,89 @@ export function AISourcesSection({ config, setConfig }: AISourcesSectionProps) {
         {t('Add AI Provider')}
       </button>
 
-      {/* Dynamic OAuth Providers (from product.json) */}
+      {/* Dynamic auth providers from product.json — split into two groups:
+          OAuth entries (interactive login) and Preset-API entries (API key
+          form). Preset entries used to be lumped into the OAuth group and
+          silently failed on click because they have no provider module. */}
       {(() => {
-        // Filter out providers that are already logged in
-        const availableOAuthProviders = oauthProviders.filter(
-          provider => !aiSources.sources.some(s => s.provider === provider.type)
-        )
+        // Preset entries: filter out those already added. Preset sources are
+        // persisted with `provider: 'custom'` (no dedicated ProviderId), so we
+        // identify them by the explicit `isPreset` flag combined with a
+        // baseUrl match — `apiUrl` is the stable identity of a preset entry.
+        const availablePresetProviders = oauthProviders.filter(provider => {
+          if (!provider.preset) return false
+          return !aiSources.sources.some(
+            s => s.isPreset === true && s.apiUrl === provider.preset!.baseUrl
+          )
+        })
 
-        if (availableOAuthProviders.length === 0) return null
+        // OAuth entries: anything without a preset block. The legacy
+        // `s.provider === provider.type` filter still works for OAuth sources.
+        const availableOAuthProviders = oauthProviders.filter(provider => {
+          if (provider.preset) return false
+          return !aiSources.sources.some(s => s.provider === provider.type)
+        })
+
+        if (availablePresetProviders.length === 0 && availableOAuthProviders.length === 0) {
+          return null
+        }
+
+        const renderProviderButton = (
+          provider: AuthProviderConfig,
+          onClick: () => void
+        ) => {
+          const IconComponent = getIconComponent(provider.icon)
+          return (
+            <button
+              key={provider.type}
+              onClick={onClick}
+              className="flex items-center gap-3 w-full p-3 bg-surface-secondary hover:bg-surface-tertiary
+                       border border-border-primary rounded-lg transition-colors"
+            >
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: provider.iconBgColor }}
+              >
+                <IconComponent size={20} className="text-white" />
+              </div>
+              <div className="flex-1 text-left">
+                <div className="font-medium text-text-primary">
+                  {getLocalizedText(provider.displayName)}
+                </div>
+                <div className="text-xs text-text-secondary">
+                  {getLocalizedText(provider.description)}
+                </div>
+              </div>
+            </button>
+          )
+        }
 
         return (
-          <div className="pt-4 border-t border-border-secondary">
-            <h4 className="text-sm font-medium text-text-secondary mb-3">
-              {t('OAuth Login')}
-            </h4>
-            <div className="space-y-2">
-              {availableOAuthProviders.map(provider => {
-                const IconComponent = getIconComponent(provider.icon)
-                return (
-                  <button
-                    key={provider.type}
-                    onClick={() => handleOAuthLogin(provider.type as ProviderId)}
-                    className="flex items-center gap-3 w-full p-3 bg-surface-secondary hover:bg-surface-tertiary
-                             border border-border-primary rounded-lg transition-colors"
-                  >
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: provider.iconBgColor }}
-                    >
-                      <IconComponent size={20} className="text-white" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="font-medium text-text-primary">
-                        {getLocalizedText(provider.displayName)}
-                      </div>
-                      <div className="text-xs text-text-secondary">
-                        {getLocalizedText(provider.description)}
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+          <div className="pt-4 border-t border-border-secondary space-y-4">
+            {availablePresetProviders.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-text-secondary mb-3">
+                  {t('Preset API')}
+                </h4>
+                <div className="space-y-2">
+                  {availablePresetProviders.map(provider =>
+                    renderProviderButton(provider, () => setAddingPresetProvider(provider))
+                  )}
+                </div>
+              </div>
+            )}
+            {availableOAuthProviders.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-text-secondary mb-3">
+                  {t('OAuth Login')}
+                </h4>
+                <div className="space-y-2">
+                  {availableOAuthProviders.map(provider =>
+                    renderProviderButton(provider, () => handleOAuthLogin(provider.type as ProviderId))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )
       })()}

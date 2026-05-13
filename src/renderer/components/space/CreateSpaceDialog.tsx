@@ -23,7 +23,6 @@ export function CreateSpaceDialog({ onClose, onCreated }: CreateSpaceDialogProps
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
-      onMouseDown={onClose}
     >
       <div
         className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in"

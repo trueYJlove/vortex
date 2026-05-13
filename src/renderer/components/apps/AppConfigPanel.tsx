@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle } from 'lucide-react'
+import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle, RefreshCw, X } from 'lucide-react'
 import { stringify as stringifyYaml, parse as parseYaml } from 'yaml'
 import { useAppsStore } from '../../stores/apps.store'
 import { useAppStore } from '../../stores/app.store'
@@ -205,9 +205,15 @@ interface SettingsTabProps {
   appId: string
   spaceName?: string
   t: (s: string, opts?: Record<string, unknown>) => string
+  /**
+   * Invoked when a save changes a field that requires the running agent
+   * to be restarted to take effect (system_prompt, user config values).
+   * Parent owns the hint visibility so the banner persists across tab switches.
+   */
+  onRequireRestart: () => void
 }
 
-function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
+function SettingsTab({ app, appId, spaceName, t, onRequireRestart }: SettingsTabProps) {
   const { updateAppConfig, updateAppSpec, updateAppOverrides, grantPermission, revokePermission } = useAppsStore()
   const { setView } = useAppStore()
 
@@ -303,7 +309,8 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
     const patch: Record<string, unknown> = {}
     if (specName !== app.spec.name) patch.name = specName.trim()
     if (specDescription !== app.spec.description) patch.description = specDescription.trim()
-    if (specSystemPrompt !== specSystemPromptValue) {
+    const promptChanged = specSystemPrompt !== specSystemPromptValue
+    if (promptChanged) {
       patch.system_prompt = specSystemPrompt.trim() || null
     }
 
@@ -312,6 +319,9 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
     if (ok) {
       setSpecSaveSuccess(true)
       setTimeout(() => setSpecSaveSuccess(false), 2000)
+      // system_prompt is loaded at session creation; flag restart so users
+      // see the inline hint instead of silently getting stale behavior.
+      if (promptChanged) onRequireRestart()
     } else {
       setSpecError(t('Failed to save spec changes'))
     }
@@ -332,6 +342,9 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
     if (ok) {
       setConfigSaveSuccess(true)
       setTimeout(() => setConfigSaveSuccess(false), 2000)
+      // config values are baked into the system prompt at session creation,
+      // so changes only take effect for a fresh session.
+      onRequireRestart()
     }
   }
 
@@ -846,9 +859,11 @@ interface YamlTabProps {
   app: InstalledApp
   appId: string
   t: (s: string, opts?: Record<string, unknown>) => string
+  /** See SettingsTabProps.onRequireRestart */
+  onRequireRestart: () => void
 }
 
-function YamlTab({ app, appId, t }: YamlTabProps) {
+function YamlTab({ app, appId, t, onRequireRestart }: YamlTabProps) {
   const { updateAppSpec, exportApp } = useAppsStore()
 
   const [yamlContent, setYamlContent] = useState(() => specToYaml(app.spec))
@@ -894,6 +909,13 @@ function YamlTab({ app, appId, t }: YamlTabProps) {
 
     setSaving(true)
 
+    // Detect whether the saved YAML changed any field that requires an
+    // agent restart to take effect. We diff before sending so the hint is
+    // not raised for cosmetic edits (e.g. comment/whitespace-only changes).
+    const promptChanged = parsed.system_prompt !== app.spec.system_prompt
+    const configChanged = JSON.stringify(parsed.config_schema ?? null)
+      !== JSON.stringify(app.spec.config_schema ?? null)
+
     // Send the full parsed spec as the patch.
     // The backend applies JSON Merge Patch and re-validates with Zod.
     const ok = await updateAppSpec(appId, parsed)
@@ -902,6 +924,7 @@ function YamlTab({ app, appId, t }: YamlTabProps) {
     if (ok) {
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 2000)
+      if (promptChanged || configChanged) onRequireRestart()
     } else {
       setError(t('Failed to save. The server rejected the spec — check for validation errors.'))
     }
@@ -998,13 +1021,51 @@ interface AppConfigPanelProps {
 
 export function AppConfigPanel({ appId, spaceName }: AppConfigPanelProps) {
   const { t } = useTranslation()
-  const { apps, uninstallApp } = useAppsStore()
+  const { apps, uninstallApp, restartAppAgent } = useAppsStore()
   const app = apps.find(a => a.id === appId)
 
   const [activeTab, setActiveTab] = useState<ConfigTab>('settings')
   const [showUninstallConfirm, setShowUninstallConfirm] = useState(false)
   const [showClearMemoryConfirm, setShowClearMemoryConfirm] = useState(false)
   const [clearingMemory, setClearingMemory] = useState(false)
+
+  // Restart-required hint: raised by a save that changes a field loaded only
+  // at session creation (system_prompt, config_schema, userConfig). Cleared
+  // by a successful restart or explicit dismissal.
+  const [restartHinted, setRestartHinted] = useState(false)
+  const [restarting, setRestarting] = useState(false)
+  // Brief inline success indicator next to the Restart button. Auto-clears
+  // after a few seconds so the user gets explicit confirmation that the
+  // click did something — without it, a fast restart looks like a no-op.
+  const [restartedAt, setRestartedAt] = useState<number | null>(null)
+
+  // Reset hint + ephemeral indicators when switching apps so nothing bleeds
+  // across panels.
+  useEffect(() => {
+    setRestartHinted(false)
+    setRestarting(false)
+    setRestartedAt(null)
+  }, [appId])
+
+  const handleRestartAgent = useCallback(async () => {
+    setRestarting(true)
+    try {
+      const ok = await restartAppAgent(appId)
+      if (ok) {
+        setRestartHinted(false)
+        setRestartedAt(Date.now())
+      }
+    } finally {
+      setRestarting(false)
+    }
+  }, [appId, restartAppAgent])
+
+  // Auto-clear the inline success indicator after ~2.5s.
+  useEffect(() => {
+    if (restartedAt === null) return
+    const timer = setTimeout(() => setRestartedAt(null), 2500)
+    return () => clearTimeout(timer)
+  }, [restartedAt])
 
   if (!app) return null
 
@@ -1050,13 +1111,94 @@ export function AppConfigPanel({ appId, spaceName }: AppConfigPanelProps) {
         </button>
       </div>
 
+      {/* Restart-required hint banner: appears after a save that changes a
+          field loaded only at session creation. Persists across tab switches
+          and dismissals so users don't lose track of stuck state. */}
+      {restartHinted && (
+        <div
+          role="status"
+          className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 p-3 rounded-lg border border-amber-400/30 bg-amber-400/5"
+        >
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="text-sm text-foreground">
+                {t('Changes require an {{name}} restart to take effect.', { name: 'Agent' })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t('Conversation history is preserved.')}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 sm:flex-shrink-0 self-end sm:self-auto">
+            <button
+              onClick={handleRestartAgent}
+              disabled={restarting}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+            >
+              {restarting
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <RefreshCw className="w-3 h-3" />}
+              {t('Restart Now')}
+            </button>
+            <button
+              onClick={() => setRestartHinted(false)}
+              disabled={restarting}
+              className="p-1 text-muted-foreground hover:text-foreground rounded-md transition-colors disabled:opacity-50"
+              aria-label={t('Dismiss')}
+              title={t('Dismiss')}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tab content */}
       {activeTab === 'settings' && (
-        <SettingsTab app={app} appId={appId} spaceName={spaceName} t={t} />
+        <SettingsTab
+          app={app}
+          appId={appId}
+          spaceName={spaceName}
+          t={t}
+          onRequireRestart={() => setRestartHinted(true)}
+        />
       )}
       {activeTab === 'yaml' && (
-        <YamlTab app={app} appId={appId} t={t} />
+        <YamlTab
+          app={app}
+          appId={appId}
+          t={t}
+          onRequireRestart={() => setRestartHinted(true)}
+        />
       )}
+
+      {/* Runtime Control: always-visible escape hatch for restarting the
+          agent. Sits outside Danger Zone because restart is non-destructive
+          (no data loss); grouping it with Uninstall would mis-signal risk. */}
+      <div className="space-y-2 pt-2 border-t border-border">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {t('Runtime Control')}
+        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleRestartAgent}
+            disabled={restarting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-foreground hover:text-primary border border-border hover:border-primary/60 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {restarting
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <RefreshCw className="w-3.5 h-3.5" />}
+            {t('Restart {{name}}', { name: 'Agent' })}
+          </button>
+          {restartedAt !== null && (
+            <span className="text-xs text-green-500">{t('Restarted')}</span>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground/60">
+          {t('Reloads the prompt and configuration for this digital human across all chat channels. Conversation history is preserved.')}
+        </p>
+      </div>
 
       {/* Danger Zone (always visible) */}
       <div className="space-y-2 pt-2 border-t border-border">
