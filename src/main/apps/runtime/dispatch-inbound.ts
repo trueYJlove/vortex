@@ -434,9 +434,10 @@ export async function dispatchInboundMessage(
   }
 
   // ── Streaming disable check ───────────────────────────────────
-  // When streaming is disabled, strip the streaming handle so the runtime
-  // sends only the final reply — no thinking process or tool calls leak.
-  if (instanceCfg?.streaming === false && reply.streaming) {
+  // Streaming is opt-in (default off — pipeline currently unstable). Strip the
+  // streaming handle unless the instance has explicitly enabled streaming, so the
+  // runtime sends only the final reply.
+  if (instanceCfg?.streaming !== true && reply.streaming) {
     reply = { ...reply, streaming: undefined }
   }
 

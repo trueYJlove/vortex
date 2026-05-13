@@ -16,6 +16,7 @@ Always design with high maintainability and modularity, aligned with long-term a
 - Any code changes（edit/delete/move） require human confirmation and consent.
 - You must read the halo-dev specifications before writing code.
 - Follow Long-term principle
+- code comments should be concise and to the point, focusing on why rather than what.
   
 **tips.**
 This project is 100% AI-generated, so humans may not necessarily know more than you do. You need to proactively review documentation, manage documents, and examine code to confirm details and direction (for matters involving architecture and direction, actively discuss with users).

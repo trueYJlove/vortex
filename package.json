@@ -1,14 +1,16 @@
 {
   "name": "halo",
-  "version": "2.1.9-dev.0-rc.16",
+  "version": "2.1.9-dev.0-rc.20",
   "description": "AI that gets things done",
   "type": "module",
   "main": "./out/main/index.mjs",
   "author": "Halo Team",
   "license": "MIT",
   "scripts": {
-    "dev": "cross-env HALO_DATA_DIR=~/.halo-dev electron-vite dev",
+    "dev": "npm run bundle:builtin && cross-env HALO_DATA_DIR=~/.halo-dev electron-vite dev",
     "build": "electron-vite build",
+    "prebuild": "node scripts/sync-builtin-apps.mjs",
+    "bundle:builtin": "node scripts/sync-builtin-apps.mjs",
     "start": "electron-vite preview",
     "postinstall": "node scripts/postinstall.mjs",
     "bump-rc": "node scripts/bump-rc-version.mjs",

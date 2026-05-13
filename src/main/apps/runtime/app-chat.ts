@@ -324,7 +324,7 @@ export async function sendAppChatMessage(
   const memoryInstructions = memory.getPromptInstructions()
   const usesAIBrowser = resolvePermission(app, 'ai-browser')
   const usesEmail = resolvePermission(app, 'email', false) // default false — higher trust
-  const usesImPush = resolvePermission(app, 'im-push', false) // default false — AI-driven IM push
+  const usesImPush = resolvePermission(app, 'im-push') // default true — AI-driven IM push
 
   // ── Merge config_schema defaults into userConfig ────
   const mergedConfig = mergeConfigWithDefaults(app.userConfig, app.spec.config_schema)

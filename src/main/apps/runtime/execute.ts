@@ -252,7 +252,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     const memoryInstructions = memory.getPromptInstructions()
     const usesAIBrowser = resolvePermission(app, 'ai-browser')
     const usesEmail = resolvePermission(app, 'email', false) // default false — higher trust
-    const usesImPush = resolvePermission(app, 'im-push', false) // default false — AI-driven IM push
+    const usesImPush = resolvePermission(app, 'im-push') // default true — AI-driven IM push
 
     // ── Merge config_schema defaults into userConfig ─────
     //    Ensures defaults are available even if the user never opened the config panel.

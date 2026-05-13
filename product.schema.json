@@ -121,6 +121,42 @@
           "description": "Whitelist of SENSITIVE_KEYS property names permitted to be sent. Recognized keys: specId, spaceName, modelName, sourceName, mcpId, skillId, imBotName, inputTokens, outputTokens, errorCode."
         }
       }
+    },
+    "builtinApps": {
+      "type": "object",
+      "description": "Built-in digital humans bundled with the build (VSCode-style built-in extensions). Each entry is materialized into resources/builtin-apps/<specId>/ at build time by scripts/sync-builtin-apps.mjs and auto-installed on first launch by the App Manager. Open-source builds typically omit this field; enterprise builds (e.g. product.<variant>.json) declare their own list pointing to a private SSOT repository.",
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "description": "Path to the external SSOT directory containing each built-in app folder. Resolved relative to product.json's directory (i.e. project root). Each entry's specId must match a subdirectory containing spec.yaml and an optional skills/ directory. May be overridden at build time via the HALO_BUILTIN_APPS_SOURCE environment variable."
+        },
+        "apps": {
+          "type": "array",
+          "description": "List of built-in apps to bundle. The order has no functional meaning.",
+          "items": {
+            "type": "object",
+            "required": ["specId"],
+            "properties": {
+              "specId": {
+                "type": "string",
+                "description": "Subdirectory name inside sourcePath. Becomes the canonical spec identifier."
+              },
+              "spaceId": {
+                "type": ["string", "null"],
+                "description": "Target space for installation. Use 'halo-temp' for the default temp space, or null for global scope. Defaults to 'halo-temp'."
+              },
+              "defaultStatus": {
+                "type": "string",
+                "enum": ["active", "paused"],
+                "description": "Initial status when first installed. Use 'paused' for apps that require user configuration or browser login before they can run safely. Defaults to 'paused'."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["sourcePath", "apps"],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

@@ -525,7 +525,7 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
             </p>
           </div>
           <Switch
-            checked={hasImInstances && resolvePermission(app, 'im-push', false)}
+            checked={hasImInstances && resolvePermission(app, 'im-push')}
             onCheckedChange={async (checked) => {
               if (!hasImInstances) return
               if (checked) {
@@ -555,7 +555,7 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
           </button>
         )}
         {/* Warn when user disabled a permission the spec declares */}
-        {hasImInstances && !resolvePermission(app, 'im-push', false) && app.spec.permissions?.includes('im-push') && (
+        {hasImInstances && !resolvePermission(app, 'im-push') && app.spec.permissions?.includes('im-push') && (
           <p className="text-xs text-amber-500 flex items-center gap-1 -mt-2">
             <AlertTriangle className="w-3 h-3 flex-shrink-0" />
             {t('This app may require IM Push to work properly')}
@@ -641,7 +641,7 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
           <AppNotifyChannelsSection
             appId={appId}
             appName={app.spec.name}
-            imPushEnabled={resolvePermission(app, 'im-push', false)}
+            imPushEnabled={resolvePermission(app, 'im-push')}
           />
         </div>
       )}

@@ -98,8 +98,10 @@ export interface ImChannelInstanceConfig {
   config: Record<string, unknown>
   /**
    * Whether to enable streaming (thinking process + tool calls) for this instance.
-   * When false, only the final reply is sent — no intermediate progress events.
-   * Default: true (streaming enabled).
+   * When enabled, intermediate progress events are pushed; otherwise only the final
+   * reply is sent.
+   * Default: false (streaming disabled — current streaming pipeline is unstable;
+   * users can opt in per-instance via the UI toggle).
    */
   streaming?: boolean
   /**
@@ -142,6 +144,28 @@ export interface ImChannelInstanceConfig {
    * When undefined, guests have no tool or path access (deny-all default).
    */
   guestPolicy?: GuestPolicy
+
+  /**
+   * One-shot owner auto-claim marker.
+   *
+   * Scoped to the WeCom Intelligent Bot scan-auth (QR-code) onboarding flow,
+   * which is anomalous in that its protocol returns only bot credentials
+   * (botid/secret) and never the scanner's user identity. Without this flag
+   * the user would have to manually look up and paste their own WeCom userid
+   * into `owners` — a UX dead-end for non-technical users.
+   *
+   * Semantics:
+   *   - Set to `true` only by the scan-auth completion path with
+   *     `permissionEnabled: true` and `owners` left empty.
+   *   - The wecom-bot provider intercepts the next inbound message, writes
+   *     its `from` into `owners`, and clears this flag (one-shot).
+   *   - Other providers MUST NOT read this field. OAuth-based IM platforms
+   *     return user identity at authorization time and have no need for it.
+   *
+   * Lives at the top level (not inside `config`) so it is auto-excluded from
+   * `ImChannelManager.configEqual`, avoiding a WS reconnect on claim write.
+   */
+  pendingOwnerClaim?: boolean
 }
 
 // ============================================
