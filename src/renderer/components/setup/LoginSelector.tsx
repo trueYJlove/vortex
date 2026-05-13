@@ -4,23 +4,14 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Globe, ChevronDown, ChevronRight, MessageSquare, Wrench, Key, Cloud, Server, Shield, Lock, Zap, LogIn, User, Github, Brain, type LucideIcon } from 'lucide-react'
+import { Globe, ChevronDown, ChevronRight, MessageSquare, Wrench, Key, KeyRound, Cloud, Server, Shield, Lock, Zap, LogIn, User, Github, Brain, type LucideIcon } from 'lucide-react'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
-import { resolveLocalizedText, type LocalizedText } from '../../../shared/types'
+import { resolveLocalizedText, type LocalizedText, type AuthProviderConfig } from '../../../shared/types'
 
-/**
- * Provider configuration from backend
- */
-interface AuthProviderConfig {
-  type: string
-  displayName: LocalizedText
-  description: LocalizedText
-  icon: string
-  iconBgColor: string  // Hex color like #24292e
-  recommended: boolean
-  enabled: boolean
-}
+// Re-export so existing renderer imports (`from './LoginSelector'`) continue
+// to work without churn. The canonical definition lives in shared/types.
+export type { AuthProviderConfig }
 
 function getLocalizedText(value: LocalizedText): string {
   return resolveLocalizedText(value, getCurrentLanguage())
@@ -29,6 +20,8 @@ function getLocalizedText(value: LocalizedText): string {
 interface LoginSelectorProps {
   onSelectProvider: (providerType: string) => void
   onSelectCustom: () => void
+  /** Invoked when the user selects a preset-API provider entry */
+  onSelectPreset: (provider: AuthProviderConfig) => void
 }
 
 /**
@@ -40,6 +33,7 @@ const iconMap: Record<string, LucideIcon> = {
   'user': User,
   'globe': Globe,
   'key': Key,
+  'key-round': KeyRound,
   'cloud': Cloud,
   'server': Server,
   'shield': Shield,
@@ -60,7 +54,7 @@ function hexToRgba(hex: string, alpha: number = 0.15): string {
   return `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})`
 }
 
-export function LoginSelector({ onSelectProvider, onSelectCustom }: LoginSelectorProps) {
+export function LoginSelector({ onSelectProvider, onSelectCustom, onSelectPreset }: LoginSelectorProps) {
   const { t } = useTranslation()
 
   // Language selector state
@@ -122,12 +116,20 @@ export function LoginSelector({ onSelectProvider, onSelectCustom }: LoginSelecto
   }
 
   // Handle provider selection
+  // Routing priority: preset > custom > OAuth provider module.
+  // Preset takes precedence over both `path` (mutually exclusive per schema)
+  // and the legacy 'custom' shortcut so existing product.json entries keep
+  // working unchanged.
   const handleProviderSelect = (provider: AuthProviderConfig) => {
+    if (provider.preset) {
+      onSelectPreset(provider)
+      return
+    }
     if (provider.type === 'custom') {
       onSelectCustom()
-    } else {
-      onSelectProvider(provider.type)
+      return
     }
+    onSelectProvider(provider.type)
   }
 
   // Get icon component for a provider

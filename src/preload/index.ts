@@ -417,6 +417,7 @@ export interface HaloAPI {
   appChatMessages: (input: { appId: string; spaceId: string }) => Promise<IpcResponse>
   appChatSessionState: (appId: string) => Promise<IpcResponse>
   appChatClear: (input: { appId: string; spaceId: string }) => Promise<IpcResponse>
+  appChatRestart: (appId: string) => Promise<IpcResponse<{ sessionsClosed: number }>>
   appImChatMessages: (input: { appId: string; spaceId: string; channel: string; chatType: 'direct' | 'group'; chatId: string }) => Promise<IpcResponse>
   appImChatClear: (input: { appId: string; spaceId: string; channel: string; chatType: 'direct' | 'group'; chatId: string }) => Promise<IpcResponse>
 
@@ -808,6 +809,7 @@ const api: HaloAPI = {
   appChatMessages: (input) => ipcRenderer.invoke('app:chat-messages', input),
   appChatSessionState: (appId) => ipcRenderer.invoke('app:chat-session-state', appId),
   appChatClear: (input) => ipcRenderer.invoke('app:chat-clear', input),
+  appChatRestart: (appId) => ipcRenderer.invoke('app:chat-restart', appId),
   appImChatMessages: (input) => ipcRenderer.invoke('app:im-chat-messages', input),
   appImChatClear: (input) => ipcRenderer.invoke('app:im-chat-clear', input),
 

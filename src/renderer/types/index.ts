@@ -29,6 +29,8 @@ export type {
   OAuthLoginState,
   OAuthStartResult,
   OAuthCompleteResult,
+  PresetApiConfig,
+  AuthProviderConfig,
   // Legacy types for backward compatibility
   LegacyAISourcesConfig,
   OAuthSourceConfig,

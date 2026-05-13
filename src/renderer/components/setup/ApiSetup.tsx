@@ -10,27 +10,52 @@ import { v4 as uuidv4 } from 'uuid'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import { Lightbulb, CheckCircle2, XCircle } from '../icons/ToolIcons'
-import { Globe, ChevronDown, ArrowLeft, Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react'
-import { AVAILABLE_MODELS, DEFAULT_MODEL, type AISourcesConfig, type AISource } from '../../types'
+import { Globe, ChevronDown, ArrowLeft, Eye, EyeOff, Loader2, RefreshCw, ExternalLink } from 'lucide-react'
+import { AVAILABLE_MODELS, DEFAULT_MODEL, type AISourcesConfig, type AISource, type ModelOption } from '../../types'
 import { getBuiltinProvider } from '../../types'
+import { resolveLocalizedText, type LocalizedText } from '../../../shared/types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
+import type { AuthProviderConfig } from './LoginSelector'
+import { usePresetModels } from '../../hooks/usePresetModels'
 
 interface ApiSetupProps {
   /** Called when user clicks back button */
   onBack?: () => void
   /** Whether to show the back button */
   showBack?: boolean
+  /**
+   * Preset-API provider entry. When set, the form switches to "API Key only"
+   * mode: the provider toggle and apiUrl input are hidden, models are fetched
+   * from `preset.baseUrl + (preset.modelsPath ?? '/v1/models')`, and the
+   * persisted AISource records the configured `apiType`.
+   */
+  preset?: AuthProviderConfig
 }
 
-export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
+export function ApiSetup({ onBack, showBack = false, preset }: ApiSetupProps) {
   const { t } = useTranslation()
   const { config, setConfig, setView } = useAppStore()
 
   // Form state
-  const [provider, setProvider] = useState(config?.api.provider || 'anthropic')
-  const [apiKey, setApiKey] = useState(config?.api.apiKey || '')
-  const [apiUrl, setApiUrl] = useState(config?.api.apiUrl || 'https://api.anthropic.com')
-  const [model, setModel] = useState(config?.api.model || DEFAULT_MODEL)
+  // In preset mode, the provider toggle is hidden and the baseUrl is fixed —
+  // we still seed `provider` to a deterministic value ('openai') so that any
+  // shared rendering paths (e.g. the model select block) keep behaving
+  // consistently with the non-Anthropic branch.
+  const [provider, setProvider] = useState(
+    preset ? 'openai' : (config?.api.provider || 'anthropic')
+  )
+  const [apiKey, setApiKey] = useState(preset ? '' : (config?.api.apiKey || ''))
+  const [apiUrl, setApiUrl] = useState(
+    preset ? preset.preset!.baseUrl : (config?.api.apiUrl || 'https://api.anthropic.com')
+  )
+  // Initial model: prefer preset's first fallbackModel if available, else generic placeholder
+  const [model, setModel] = useState(() => {
+    if (preset) {
+      const fallback = preset.preset!.fallbackModels
+      return fallback && fallback.length > 0 ? fallback[0].id : ''
+    }
+    return config?.api.model || DEFAULT_MODEL
+  })
   const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Validation result state
@@ -38,17 +63,36 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
     valid: boolean
     message?: string
   } | null>(null)
-  // Custom model toggle
+  // Custom model toggle (irrelevant in preset mode — preset always uses fetched/fallback list)
   const [useCustomModel, setUseCustomModel] = useState(() => {
+    if (preset) return false
     const currentModel = config?.api.model || DEFAULT_MODEL
     return !AVAILABLE_MODELS.some(m => m.id === currentModel)
   })
 
-  // Model fetching state
+  // Model fetching state. In preset mode the list lives as `ModelOption[]` so
+  // we can preserve display names from `fallbackModels`. Non-preset mode keeps
+  // the legacy `string[]` (model IDs only) to avoid touching that codepath.
   const [fetchedModels, setFetchedModels] = useState<string[]>(
-    (config?.api.availableModels as string[]) || []
+    preset ? [] : ((config?.api.availableModels as string[]) || [])
   )
   const [isFetchingModels, setIsFetchingModels] = useState(false)
+
+  // Preset mode delegates model fetching + race protection to the shared hook
+  // (also used by ProviderSelector in settings). The hook is inert when
+  // `enabled` is false, so non-preset flows pay no cost.
+  const presetModelsHook = usePresetModels({
+    baseUrl: preset?.preset?.baseUrl,
+    modelsPath: preset?.preset?.modelsPath,
+    fallbackModels: preset?.preset?.fallbackModels,
+    apiKey,
+    model,
+    setModel,
+    enabled: Boolean(preset)
+  })
+  const presetModels = presetModelsHook.models
+  const isFetchingPresetModels = presetModelsHook.isFetching
+  const presetWarning = presetModelsHook.warning
 
   // Language selector state
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false)
@@ -81,7 +125,7 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
     }
   }
 
-  // Fetch models from custom API
+  // Fetch models from custom API (non-preset mode)
   const fetchModels = async () => {
     if (!apiUrl) {
       setError(t('Please enter API URL first'))
@@ -150,36 +194,86 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
     }
   }
 
+  // Preset model fetching, race protection, fallback handling, and unmount
+  // cleanup all live in the `usePresetModels` hook above. The hook returns a
+  // `fetchModels()` function that we wire to the Fetch button.
+
   // Handle save and enter - save directly without mandatory validation
   const handleSaveAndEnter = async () => {
     if (!apiKey.trim()) {
       setError(t('Please enter API Key'))
       return
     }
+    if (preset && !model) {
+      setError(t('Please select a model'))
+      return
+    }
 
     setError(null)
 
     try {
-      const effectiveApiUrl = apiUrl || 'https://api.anthropic.com'
       const now = new Date().toISOString()
 
-      // Build v2 AISource
-      const providerType = provider as 'anthropic' | 'openai'
-      const builtin = getBuiltinProvider(providerType)
+      let newSource: AISource
+      // legacy `config.api` mirror (kept for backward compatibility)
+      let legacyProvider: 'anthropic' | 'openai'
+      let legacyAvailableModels: string[]
 
-      const newSource: AISource = {
-        id: uuidv4(),
-        name: builtin?.name || (providerType === 'anthropic' ? 'Claude API' : 'Custom API'),
-        provider: providerType,
-        authType: 'api-key',
-        apiUrl: effectiveApiUrl,
-        apiKey,
-        model,
-        availableModels: fetchedModels.length > 0
-          ? fetchedModels.map(id => ({ id, name: id }))
-          : builtin?.models || [{ id: model, name: model }],
-        createdAt: now,
-        updatedAt: now
+      if (preset) {
+        // ── Preset API source ─────────────────────────────────────────────
+        const cfg = preset.preset!
+        const availableModels: ModelOption[] = presetModels.length > 0
+          ? presetModels
+          : [{ id: model, name: model }]
+        // Legacy 'provider' flag is best-effort: anthropic_passthrough maps to
+        // 'anthropic' so the legacy code paths that read it (e.g. AdvancedSection)
+        // still classify the source sensibly.
+        legacyProvider = cfg.apiType === 'anthropic_passthrough' ? 'anthropic' : 'openai'
+        legacyAvailableModels = availableModels.map(m => m.id)
+
+        newSource = {
+          id: uuidv4(),
+          name: resolveLocalizedText(preset.displayName, getCurrentLanguage()),
+          // Reuse the existing 'custom' provider bucket so the settings UI
+          // (ProviderSelector / AISourcesSection) handles this source via the
+          // standard API-key code paths without needing a new provider kind.
+          provider: 'custom',
+          authType: 'api-key',
+          apiUrl: cfg.baseUrl,
+          apiType: cfg.apiType,
+          apiKey,
+          model,
+          availableModels,
+          createdAt: now,
+          updatedAt: now,
+          // Explicit origin marker so the settings editor (ProviderSelector)
+          // can render the preset-edit form for this source. Without this flag
+          // the editor would fall back to the generic builtin-provider path,
+          // which has no entry for `provider: 'custom'` and breaks the UI.
+          isPreset: true
+        }
+      } else {
+        // ── Custom API source (existing behavior, untouched) ──────────────
+        const effectiveApiUrl = apiUrl || 'https://api.anthropic.com'
+        const providerType = provider as 'anthropic' | 'openai'
+        const builtin = getBuiltinProvider(providerType)
+        legacyProvider = providerType
+        legacyAvailableModels = fetchedModels
+
+        newSource = {
+          id: uuidv4(),
+          name: builtin?.name || (providerType === 'anthropic' ? 'Claude API' : 'Custom API'),
+          provider: providerType,
+          authType: 'api-key',
+          apiUrl: effectiveApiUrl,
+          apiKey,
+          model,
+          availableModels: fetchedModels.length > 0
+            ? fetchedModels.map(id => ({ id, name: id }))
+            : builtin?.models || [{ id: model, name: model }],
+          createdAt: now,
+          updatedAt: now
+        }
       }
 
       // Build v2 aiSources config
@@ -193,11 +287,11 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
         ...config,
         // Legacy api field for backward compatibility
         api: {
-          provider: providerType,
+          provider: legacyProvider,
           apiKey,
-          apiUrl: effectiveApiUrl,
+          apiUrl: newSource.apiUrl,
           model,
-          availableModels: fetchedModels
+          availableModels: legacyAvailableModels
         },
         // v2 aiSources structure
         aiSources: newAiSources,
@@ -314,49 +408,62 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
             </button>
           )}
           <h2 className="text-center text-lg">
-            {showBack ? t('Configure Custom API') : t('Before you start, configure your AI')}
+            {preset
+              ? resolveLocalizedText(preset.displayName, getCurrentLanguage())
+              : (showBack ? t('Configure Custom API') : t('Before you start, configure your AI'))}
           </h2>
         </div>
 
         <div className="bg-card rounded-xl p-6 border border-border">
-          {/* Provider */}
-          <div className="mb-4 flex items-center justify-between gap-3 p-3 bg-secondary/50 rounded-lg">
-            <div className="w-8 h-8 rounded-lg bg-[#da7756]/20 flex items-center justify-center">
-              <svg className="w-5 h-5 text-[#da7756]" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M4.709 15.955l4.72-2.647.08-.08 2.726-1.529.08-.08 6.206-3.48a.25.25 0 00.125-.216V6.177a.25.25 0 00-.375-.217l-6.206 3.48-.08.08-2.726 1.53-.08.079-4.72 2.647a.25.25 0 00-.125.217v1.746c0 .18.193.294.354.216h.001zm13.937-3.584l-4.72 2.647-.08.08-2.726 1.529-.08.08-6.206 3.48a.25.25 0 00-.125.216v1.746a.25.25 0 00.375.217l6.206-3.48.08-.08 2.726-1.53.08-.079 4.72-2.647a.25.25 0 00.125-.217v-1.746a.25.25 0 00-.375-.216z" />
-              </svg>
+          {/* Provider — hidden in preset mode (baseUrl + apiType are fixed) */}
+          {!preset && (
+            <div className="mb-4 flex items-center justify-between gap-3 p-3 bg-secondary/50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-[#da7756]/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#da7756]" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4.709 15.955l4.72-2.647.08-.08 2.726-1.529.08-.08 6.206-3.48a.25.25 0 00.125-.216V6.177a.25.25 0 00-.375-.217l-6.206 3.48-.08.08-2.726 1.53-.08.079-4.72 2.647a.25.25 0 00-.125.217v1.746c0 .18.193.294.354.216h.001zm13.937-3.584l-4.72 2.647-.08.08-2.726 1.529-.08.08-6.206 3.48a.25.25 0 00-.125.216v1.746a.25.25 0 00.375.217l6.206-3.48.08-.08 2.726-1.53.08-.079 4.72-2.647a.25.25 0 00.125-.217v-1.746a.25.25 0 00-.375-.216z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-sm">
+                  {provider === 'anthropic'
+                    ? t('Claude (Anthropic) API')
+                    : t('OpenAI API')}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {provider === 'openai'
+                    ? t('Official and all compatible providers')
+                    : t('Official and compatible proxies')}
+                </p>
+              </div>
+              <select
+                value={provider}
+                onChange={(e) => handleProviderChange(e.target.value)}
+                className="px-3 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors text-sm"
+              >
+                <option value="anthropic">{t('Claude (Anthropic) API')}</option>
+                <option value="openai">{t('OpenAI API')}</option>
+              </select>
             </div>
-            <div>
-              <p className="font-medium text-sm">
-                {provider === 'anthropic'
-                  ? t('Claude (Anthropic) API')
-                  : t('OpenAI API')}
-              </p>
+          )}
+
+          {/* Preset description (replaces provider toggle) */}
+          {preset && (
+            <div className="mb-4 p-3 bg-secondary/50 rounded-lg">
               <p className="text-xs text-muted-foreground">
-                {provider === 'openai'
-                  ? t('Official and all compatible providers')
-                  : t('Official and compatible proxies')}
+                {resolveLocalizedText(preset.description, getCurrentLanguage())}
               </p>
             </div>
-            <select
-              value={provider}
-              onChange={(e) => handleProviderChange(e.target.value)}
-              className="px-3 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors text-sm"
-            >
-              <option value="anthropic">{t('Claude (Anthropic) API')}</option>
-              <option value="openai">{t('OpenAI API')}</option>
-            </select>
-          </div>
+          )}
 
           {/* API Key input */}
-          <div className="mb-4">
+          <div className={preset ? 'mb-2' : 'mb-4'}>
             <label className="block text-sm text-muted-foreground mb-2">API Key</label>
             <div className="relative">
               <input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={provider === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx'}
+                placeholder={preset ? '••••••••••••' : (provider === 'openai' ? 'sk-xxxxxxxxxxxxx' : 'sk-ant-xxxxxxxxxxxxx')}
                 className="w-full px-4 py-2 pr-12 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
               />
               <button
@@ -369,27 +476,97 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
             </div>
           </div>
 
-          {/* API URL input */}
-          <div className="mb-6">
-            <label className="block text-sm text-muted-foreground mb-2">{t('API URL (optional)')}</label>
-            <input
-              type="text"
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              placeholder={provider === 'openai' ? 'https://api.openai.com or https://xx/v1' : 'https://api.anthropic.com'}
-              className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              {provider === 'openai'
-                ? t('Enter OpenAI compatible service URL (supports /v1/chat/completions)')
-                : t('Default official URL, modify for custom proxy')}
-            </p>
-          </div>
+          {/* Docs link (preset mode only) */}
+          {preset?.preset?.docs && (
+            <div className="mb-4">
+              <button
+                type="button"
+                onClick={() => { void api.openExternal(preset.preset!.docs!.url) }}
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <ExternalLink className="w-3 h-3" />
+                {preset.preset.docs.label
+                  ? resolveLocalizedText(preset.preset.docs.label as LocalizedText, getCurrentLanguage())
+                  : t('Learn more')}
+              </button>
+            </div>
+          )}
+
+          {/* API URL input — hidden in preset mode */}
+          {!preset && (
+            <div className="mb-6">
+              <label className="block text-sm text-muted-foreground mb-2">{t('API URL (optional)')}</label>
+              <input
+                type="text"
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
+                placeholder={provider === 'openai' ? 'https://api.openai.com or https://xx/v1' : 'https://api.anthropic.com'}
+                className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {provider === 'openai'
+                  ? t('Enter OpenAI compatible service URL (supports /v1/chat/completions)')
+                  : t('Default official URL, modify for custom proxy')}
+              </p>
+            </div>
+          )}
 
           {/* Model */}
           <div className="mb-2">
             <label className="block text-sm text-muted-foreground mb-2">{t('Model')}</label>
-            {provider === 'anthropic' ? (
+            {preset ? (
+              <>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    {presetModels.length > 0 ? (
+                      <select
+                        value={model}
+                        onChange={(e) => setModel(e.target.value)}
+                        className="w-full px-4 py-2 bg-input rounded-lg border border-border focus:border-primary focus:outline-none transition-colors appearance-none"
+                      >
+                        {!presetModels.some(m => m.id === model) && model && (
+                          <option value={model}>{model}</option>
+                        )}
+                        {presetModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name || m.id}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="w-full px-4 py-2 bg-input rounded-lg border border-border text-sm text-muted-foreground">
+                        {t('Enter API Key, then fetch models')}
+                      </div>
+                    )}
+                    {presetModels.length > 0 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                        <ChevronDown className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { void presetModelsHook.fetchModels() }}
+                    disabled={isFetchingPresetModels || !apiKey.trim()}
+                    className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded-lg border border-border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={t('Fetch available models')}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isFetchingPresetModels ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+                {presetWarning && (
+                  <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-500">
+                    {presetWarning}
+                  </p>
+                )}
+                {!presetWarning && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t('Models will be fetched from the gateway after you enter an API Key')}
+                  </p>
+                )}
+              </>
+            ) : provider === 'anthropic' ? (
               <>
                 {useCustomModel ? (
                   <input
@@ -489,18 +666,20 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
           </div>
         </div>
 
-        {/* Help link */}
-        <p className="text-center mt-4 text-sm text-muted-foreground">
-          <a
-            href="https://console.anthropic.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary cursor-pointer hover:underline inline-flex items-center gap-1"
-          >
-            <Lightbulb className="w-4 h-4 text-yellow-500" />
-            {t("Don't know how to get it? View tutorial")}
-          </a>
-        </p>
+        {/* Help link — hidden in preset mode (preset.docs link lives inside the card) */}
+        {!preset && (
+          <p className="text-center mt-4 text-sm text-muted-foreground">
+            <a
+              href="https://console.anthropic.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary cursor-pointer hover:underline inline-flex items-center gap-1"
+            >
+              <Lightbulb className="w-4 h-4 text-yellow-500" />
+              {t("Don't know how to get it? View tutorial")}
+            </a>
+          </p>
+        )}
 
         {/* Error message */}
         {error && (
@@ -518,15 +697,18 @@ export function ApiSetup({ onBack, showBack = false }: ApiSetupProps) {
         )}
 
         {/* Buttons */}
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={handleTestConnection}
-            disabled={isValidating}
-            className="px-4 py-3 bg-secondary text-foreground rounded-lg border border-border hover:bg-secondary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
-          >
-            {isValidating && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isValidating ? t('Testing...') : t('Test connection')}
-          </button>
+        <div className="mt-6 flex flex-col sm:flex-row gap-3">
+          {/* Test connection is custom-API only — preset mode validates via the model fetch */}
+          {!preset && (
+            <button
+              onClick={handleTestConnection}
+              disabled={isValidating}
+              className="px-4 py-3 bg-secondary text-foreground rounded-lg border border-border hover:bg-secondary/80 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+            >
+              {isValidating && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isValidating ? t('Testing...') : t('Test connection')}
+            </button>
+          )}
           <button
             onClick={handleSaveAndEnter}
             disabled={isValidating}

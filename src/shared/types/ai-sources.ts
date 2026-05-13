@@ -225,6 +225,20 @@ export interface AISource {
    *   { "llama3": { "contextWindow": 8192 } }
    */
   modelOverrides?: Record<string, ModelCapabilityOverride>
+
+  // ===== Origin Marker (Optional) =====
+  /**
+   * Set to `true` when the source was created via a preset-API auth provider
+   * entry (`product.json authProviders[].preset`). The renderer settings editor
+   * uses this to switch into a stripped-down "rotate key + pick model" form
+   * (apiUrl is fixed, provider switching is hidden) instead of the generic
+   * builtin-provider editor — which cannot represent preset sources because
+   * `provider: 'custom'` has no `BuiltinProvider` entry.
+   *
+   * Persisted on disk; older sources without this flag remain editable via the
+   * legacy code paths (backward compatible).
+   */
+  isPreset?: boolean
 }
 
 /**
@@ -521,3 +535,82 @@ export function getAvailableModels(source: AISource): ModelOption[] {
  */
 export type AISourceType = string
 export type AISourceUserInfo = AISourceUser
+
+// ============================================================================
+// Auth Provider Configuration (shared between main loader and renderer UI)
+// ============================================================================
+
+/**
+ * Authentication provider entry as declared in product.json `authProviders[]`.
+ *
+ * Used as the single source of truth across the main process loader
+ * (`src/main/services/ai-sources/auth-loader.ts`) and the renderer setup UI
+ * (`LoginSelector.tsx`, `SetupPage.tsx`, `ApiSetup.tsx`). Keeping the type here
+ * prevents the two layers from drifting as fields are added (e.g. `preset`).
+ *
+ * Three mutually-exclusive shapes are supported by the loader:
+ *   1. `builtin: true`              — provider code is bundled in-tree.
+ *   2. `path: '...'`                — external OAuth provider module loaded via dynamic import.
+ *   3. `preset: { ... }`            — fixed-baseUrl API-key form, no provider module loaded.
+ */
+export interface AuthProviderConfig {
+  /** Provider type identifier (e.g., 'oauth', 'custom', 'preset-api') */
+  type: AISourceType
+  /** Display name for UI (supports i18n: string or { "en": "...", "zh-CN": "..." }) */
+  displayName: LocalizedText
+  /** Description text for UI (supports i18n: string or { "en": "...", "zh-CN": "..." }) */
+  description: LocalizedText
+  /** Lucide icon name */
+  icon: string
+  /** Icon background color (hex color like '#24292e') */
+  iconBgColor: string
+  /** Whether this is the recommended option */
+  recommended: boolean
+  /** Whether this provider is enabled */
+  enabled: boolean
+  /** Path to an external provider module, resolved relative to product.json */
+  path?: string
+  /** Whether this is a built-in provider (loaded by manager, no path required) */
+  builtin?: boolean
+  /**
+   * Preset API configuration. When present, the renderer routes this entry to
+   * an API-key form with a fixed baseUrl (no provider module is loaded).
+   * Mutually exclusive with `path`.
+   */
+  preset?: PresetApiConfig
+}
+
+// ============================================================================
+// Preset API Configuration (for preset-api login entries in product.json)
+// ============================================================================
+
+/**
+ * Preset API configuration declared in product.json `authProviders[].preset`.
+ *
+ * When an auth provider entry carries this object, the renderer presents an
+ * "API Key only" login form with a fixed baseUrl — the user does not see (or
+ * configure) the gateway URL. The persisted AISource records `apiType` so the
+ * chat dispatcher routes the right protocol upstream.
+ *
+ * Mutually exclusive with `path` (dynamic OAuth provider modules).
+ */
+export interface PresetApiConfig {
+  /** Fixed base URL of the gateway (no /v1 or path suffix is required) */
+  baseUrl: string
+  /**
+   * Persisted to AISource.apiType. Determines dispatch path for the in-process
+   * router used by the Anthropic / Halo SDK engines. The Codex engine ignores
+   * this field and uses the OpenAI protocol directly against the same baseUrl.
+   */
+  apiType: 'chat_completions' | 'responses' | 'anthropic_passthrough' | 'kiro'
+  /** Path appended to baseUrl for GET model list. Defaults to '/v1/models'. */
+  modelsPath?: string
+  /** Used when the live /models call fails or returns an empty list */
+  fallbackModels?: ModelOption[]
+  /** Optional documentation link rendered next to the API Key input */
+  docs?: {
+    url: string
+    /** Localized link label. Defaults to a generic "Learn more" string. */
+    label?: LocalizedText
+  }
+}

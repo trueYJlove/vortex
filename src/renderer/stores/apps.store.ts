@@ -65,6 +65,14 @@ interface AppsState {
   // ── Continue ─────────────────────────────
   continueApp: (appId: string, runId: string) => Promise<boolean>
 
+  // ── Agent Restart ────────────────────────
+  /**
+   * Restart an app's chat agent: closes its CC subprocesses so the next
+   * message loads the latest system prompt and config. Conversation history
+   * is preserved. Returns true on success.
+   */
+  restartAppAgent: (appId: string) => Promise<boolean>
+
   // ── Config Updates ────────────────────────
   updateAppConfig: (appId: string, config: Record<string, unknown>) => Promise<boolean>
   updateAppFrequency: (appId: string, subscriptionId: string, frequency: string) => Promise<boolean>
@@ -374,6 +382,25 @@ export const useAppsStore = create<AppsState>((set, get) => ({
       return !!res.success
     } catch (err) {
       console.error('[AppsStore] continueApp error:', err)
+      return false
+    }
+  },
+
+  // ── Agent Restart ────────────────────────
+
+  restartAppAgent: async (appId) => {
+    try {
+      const res = await api.appChatRestart(appId)
+      if (!res.success && res.error) {
+        useNotificationStore.getState().show({
+          title: res.error,
+          variant: 'warning',
+          duration: 4000,
+        })
+      }
+      return !!res.success
+    } catch (err) {
+      console.error('[AppsStore] restartAppAgent error:', err)
       return false
     }
   },

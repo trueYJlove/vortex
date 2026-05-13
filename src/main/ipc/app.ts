@@ -26,6 +26,7 @@
  *   app:chat-status        Get app chat status (generating + conversationId)
  *   app:chat-messages      Load persisted chat messages for an app
  *   app:chat-session-state Get session state for recovery after refresh
+ *   app:chat-restart       Restart an app's chat agent (reload prompt/config)
  *   app:export-spec        Export an app's spec as a YAML string
  *   app:import-spec        Install an app from a YAML spec string
  *   app:open-skill-folder  Reveal a skill's on-disk directory in the OS file manager
@@ -48,6 +49,7 @@ import {
   getAppChatConversationId,
   clearAppChat,
   clearImSession,
+  restartAppChat,
 } from '../apps/runtime'
 import type { AppSpec } from '../apps/spec'
 import type { AppListFilter, UninstallOptions, UpgradeStrategy } from '../apps/manager'
@@ -694,6 +696,25 @@ export function registerAppHandlers(): void {
     }
   )
 
+  // ── app:chat-restart ─────────────────────────────────────────────────
+  // Closes all Claude Code subprocesses for an app's chat sessions (native
+  // + every IM channel session) so the next message loads the latest system
+  // prompt and config. Conversation history is preserved via saved sessionId.
+  ipcMain.handle(
+    'app:chat-restart',
+    async (_event, appId: string) => {
+      try {
+        const result = await restartAppChat(appId)
+        console.log(`[AppIPC] app:chat-restart: appId=${appId}, closed=${result.sessionsClosed}`)
+        return { success: true, data: result }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[AppIPC] app:chat-restart error:', err.message)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
   // ── app:im-chat-messages ────────────────────────────────────────────
   ipcMain.handle(
     'app:im-chat-messages',
@@ -930,5 +951,5 @@ export function registerAppHandlers(): void {
     }
   )
 
-  console.log('[AppIPC] App management handlers registered (28 channels)')
+  console.log('[AppIPC] App management handlers registered (29 channels)')
 }
