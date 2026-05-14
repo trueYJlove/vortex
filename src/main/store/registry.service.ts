@@ -29,6 +29,9 @@ import type {
   StoreQueryParams,
   StoreQueryResponse,
   UpdateInfo,
+  UpdateSeverity,
+  UpgradeAvailableEvent,
+  UpgradeStrategy,
 } from '../../shared/store/store-types'
 import type { RegistryServiceConfig } from './registry.types'
 import type { DatabaseManager } from '../platform/store/types'
@@ -128,6 +131,22 @@ let queryService: QueryService | null = null
 
 /** Listener for sync status changes (set by IPC layer) */
 let syncStatusListener: ((event: { registryId: string; status: string; appCount: number; error?: string }) => void) | null = null
+
+/** Listener for upgrade-available events (set by IPC layer) */
+let upgradeAvailableListener: ((event: UpgradeAvailableEvent) => void) | null = null
+
+/**
+ * Register a listener for upgrade-available events.
+ * Called by the IPC layer to push events to the renderer.
+ */
+export function onUpgradeAvailable(listener: typeof upgradeAvailableListener): void {
+  upgradeAvailableListener = listener
+}
+
+/** Internal emitter used by upgrade.service.ts and applyUpgrade dispatch logic. */
+export function emitUpgradeAvailable(event: UpgradeAvailableEvent): void {
+  upgradeAvailableListener?.(event)
+}
 
 // ============================================
 // Initialization / Shutdown
@@ -621,6 +640,7 @@ function buildPreviewSpec(entry: RegistryEntry, registryId: string): AppSpec {
 export async function checkUpdates(
   installedApps: Array<{
     id: string
+    upgradeStrategy?: UpgradeStrategy
     spec: { name: string; version: string; store?: { slug?: string; registry_id?: string } }
   }>
 ): Promise<UpdateInfo[]> {
@@ -645,11 +665,101 @@ export async function checkUpdates(
         currentVersion: app.spec.version,
         latestVersion: entry.version,
         entry,
+        strategy: app.upgradeStrategy ?? 'auto',
+        severity: computeSeverity(app.spec.version, entry.version),
       })
     }
   }
 
   return updates
+}
+
+/**
+ * Compare two semver versions to classify the diff as patch / minor / major.
+ *
+ * Falls back to 'major' if either version is unparseable — safer to surface
+ * an alert than to silently auto-upgrade through an unknown change.
+ */
+function computeSeverity(current: string, latest: string): UpdateSeverity {
+  const c = parseSemver(current)
+  const l = parseSemver(latest)
+  if (!c || !l) return 'major'
+  if (l[0] > c[0]) return 'major'
+  if (l[1] > c[1]) return 'minor'
+  if (l[2] > c[2]) return 'patch'
+  return 'patch'
+}
+
+/**
+ * Apply an upgrade to an installed App.
+ *
+ * Fetches the latest spec from the registry, validates it against the
+ * mode-permitted severity, then delegates to AppManager.updateSpec()
+ * which preserves userConfig/userOverrides/permissions.
+ *
+ * Modes:
+ *   - 'patch_minor': only allowed when severity is patch or minor
+ *   - 'major':       allowed for any severity (used after user confirms a major)
+ *   - 'force':       allowed for any severity, skips strategy checks
+ */
+export async function applyUpgrade(
+  appId: string,
+  mode: 'patch_minor' | 'major' | 'force' = 'force',
+): Promise<{ appId: string; from: string; to: string; severity: UpdateSeverity }> {
+  ensureInitialized()
+
+  if (!queryService) {
+    throw new Error('QueryService not available (db not provided)')
+  }
+
+  const manager = getAppManager()
+  if (!manager) {
+    throw new Error('App Manager is not yet initialized')
+  }
+
+  const app = manager.getApp(appId)
+  if (!app) throw new Error(`Installed app not found: ${appId}`)
+
+  const slug = app.spec.store?.slug
+  if (!slug) throw new Error(`App ${appId} has no store.slug — cannot upgrade`)
+
+  const found = queryService.findEntry(slug)
+  if (!found) throw new Error(`App ${slug} not found in any registry (cannot upgrade)`)
+
+  const fromVersion = app.spec.version
+  const toVersion = found.entry.version
+  if (!isNewerVersion(toVersion, fromVersion)) {
+    throw new Error(`App ${slug} is already at the latest version (${fromVersion})`)
+  }
+
+  const severity = computeSeverity(fromVersion, toVersion)
+  if (mode === 'patch_minor' && severity === 'major') {
+    throw new Error(`Cannot auto-apply major upgrade for ${slug} (use mode='major' after user confirm)`)
+  }
+
+  // Fetch the full latest spec from the source registry
+  const registry = config.registries.find(r => r.id === found.registryId)
+  if (!registry) throw new Error(`Registry not found: ${found.registryId}`)
+
+  const adapter = getAdapter(registry)
+  const newSpec = await adapter.fetchSpec(registry, found.entry)
+  const newSpecWithStore = withInstallStoreMetadata(newSpec, found.entry.slug, found.registryId)
+
+  // updateSpec preserves userConfig / userOverrides / permissions automatically
+  manager.updateSpec(appId, newSpecWithStore as unknown as Record<string, unknown>)
+
+  console.log(
+    `[RegistryService] applyUpgrade: ${slug} ${fromVersion} -> ${toVersion} ` +
+    `(severity=${severity}, mode=${mode})`
+  )
+
+  // Refresh runtime activation for automation apps so subscriptions reflect any spec changes
+  const runtime = getAppRuntime()
+  if (runtime && newSpecWithStore.type === 'automation') {
+    runtime.syncAppSubscriptions(appId)
+  }
+
+  return { appId, from: fromVersion, to: toVersion, severity }
 }
 
 // ============================================

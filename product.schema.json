@@ -85,6 +85,39 @@
         }
       }
     },
+    "registryOverrides": {
+      "type": "object",
+      "description": "Per-registry overrides for built-in registry sources. Enterprise/custom builds use this to redirect the official registry or disable public sources.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "name": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "publish": {
+            "type": "object",
+            "description": "Publish target. Determines where the App detail 'Publish' button routes the spec.",
+            "required": ["target"],
+            "properties": {
+              "target": {
+                "type": "string",
+                "enum": ["github-pr", "http-registry", "local-dhpkg"]
+              },
+              "github": {
+                "type": "object",
+                "properties": {
+                  "owner": { "type": "string" },
+                  "repo": { "type": "string" },
+                  "clientId": { "type": "string" }
+                },
+                "required": ["owner", "repo"]
+              },
+              "token": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "browserPolicy": {
       "type": "object",
       "description": "Browser network access policy. Controls which domains the embedded browser can navigate to. Omit for unrestricted access (default).",

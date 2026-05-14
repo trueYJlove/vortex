@@ -1730,6 +1730,16 @@ export const api = {
     return httpRequest('POST', `/api/apps/${appId}/permissions/revoke`, { permission })
   },
 
+  appSetUpgradeStrategy: async (
+    appId: string,
+    strategy: 'auto' | 'notify' | 'manual',
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.appSetUpgradeStrategy({ appId, strategy })
+    }
+    return httpRequest('POST', `/api/apps/${appId}/upgrade-strategy`, { strategy })
+  },
+
   // App Import / Export
   appExportSpec: async (appId: string): Promise<ApiResponse<{ yaml: string; filename: string }>> => {
     if (isElectron()) {
@@ -1961,6 +1971,51 @@ export const api = {
       return window.halo.onStoreSyncStatusChanged(callback)
     }
     return onEvent('store:sync-status-changed', callback)
+  },
+
+  storeCheckUpdatesNow: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.storeCheckUpdatesNow()
+    }
+    return httpRequest('POST', '/api/store/check-updates-now')
+  },
+
+  storeApplyUpgrade: async (
+    appId: string,
+    mode?: 'patch_minor' | 'major' | 'force',
+  ): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.storeApplyUpgrade({ appId, mode })
+    }
+    return httpRequest('POST', `/api/store/apps/${appId}/upgrade`, { mode })
+  },
+
+  storePublish: async (appId: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.storePublish({ appId })
+    }
+    return httpRequest('POST', `/api/store/apps/${appId}/publish`)
+  },
+
+  storeExportDhpkg: async (appId: string): Promise<ApiResponse<{ path: string }>> => {
+    if (isElectron()) {
+      return window.halo.storeExportDhpkg({ appId })
+    }
+    return { success: false, error: 'Dhpkg export is desktop-only' }
+  },
+
+  storeImportDhpkg: async (input?: { filePath?: string; spaceId?: string | null }): Promise<ApiResponse<{ appId: string }>> => {
+    if (isElectron()) {
+      return window.halo.storeImportDhpkg(input)
+    }
+    return { success: false, error: 'Dhpkg import is desktop-only' }
+  },
+
+  onStoreUpgradeAvailable: (callback: (data: { appId: string; currentVersion: string; latestVersion: string; strategy: 'auto' | 'notify' | 'manual'; severity: 'patch' | 'minor' | 'major' }) => void) => {
+    if (isElectron()) {
+      return window.halo.onStoreUpgradeAvailable(callback)
+    }
+    return onEvent('store:upgrade-available', callback)
   },
 
   // ===== Model Capabilities =====

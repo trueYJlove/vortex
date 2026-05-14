@@ -60,6 +60,7 @@ import { registerCliConfigHandlers } from '../ipc/cli-config'
 import { registerModelCapabilitiesHandlers } from '../ipc/model-capabilities'
 import { registerWeixinIlinkHandlers } from '../ipc/weixin-ilink'
 import { initRegistryService, shutdownRegistryService } from '../store'
+import { startUpgradeScheduler, stopUpgradeScheduler } from '../store/upgrade.service'
 import { cleanupImChannelTempFiles } from '../apps/runtime/im-channels'
 import { registerIdleTask, startIdleDrain } from './idle-queue'
 import { seedDefaultAppIfNeeded } from '../apps/manager/seed'
@@ -132,6 +133,11 @@ async function initPlatformAndApps(): Promise<void> {
 
   // ── Phase 4: Registry Service (App Store) ─────────────────────────────
   initRegistryService({ db })
+
+  // ── Phase 4.5: Upgrade Scheduler ──────────────────────────────────────
+  // 6h periodic check + auto-apply for patch/minor on 'auto' strategy.
+  // Surfaces 'store:upgrade-available' events for major/notify/manual.
+  startUpgradeScheduler()
 
   // ── Start timer loops AFTER all wiring is complete ──────────────────────
   // This ensures no events fire before subscriptions are registered.
@@ -289,6 +295,9 @@ export function initializeExtendedServices(): void {
 export async function cleanupExtendedServices(): Promise<void> {
   // Space: Flush any throttled activity timestamps to disk before teardown
   flushSpaceActivity()
+
+  // Store: Stop upgrade scheduler before tearing down registry / app manager
+  stopUpgradeScheduler()
 
   // Store: Shutdown registry service (before app manager)
   shutdownRegistryService()

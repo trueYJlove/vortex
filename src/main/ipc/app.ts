@@ -50,7 +50,7 @@ import {
   clearImSession,
 } from '../apps/runtime'
 import type { AppSpec } from '../apps/spec'
-import type { AppListFilter, UninstallOptions } from '../apps/manager'
+import type { AppListFilter, UninstallOptions, UpgradeStrategy } from '../apps/manager'
 import type { ActivityQueryOptions, EscalationResponse, AppChatRequest } from '../apps/runtime'
 import { readSessionMessages } from '../apps/runtime/session-store'
 import { getSpace } from '../services/space.service'
@@ -488,6 +488,24 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:grant-permission error:', err.message)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
+  // ── app:set-upgrade-strategy ────────────────────────────────────────────
+  ipcMain.handle(
+    'app:set-upgrade-strategy',
+    async (_event, input: { appId: string; strategy: UpgradeStrategy }) => {
+      try {
+        const r = requireManager()
+        if (!r.success) return r
+        r.manager.setUpgradeStrategy(input.appId, input.strategy)
+        console.log(`[AppIPC] app:set-upgrade-strategy: appId=${input.appId}, strategy=${input.strategy}`)
+        return { success: true }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[AppIPC] app:set-upgrade-strategy error:', err.message)
         return { success: false, error: err.message }
       }
     }

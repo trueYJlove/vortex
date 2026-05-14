@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle } from 'lucide-react'
+import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle, Upload, RefreshCw, Share2 } from 'lucide-react'
 import { stringify as stringifyYaml, parse as parseYaml } from 'yaml'
 import { useAppsStore } from '../../stores/apps.store'
 import { useAppStore } from '../../stores/app.store'
@@ -193,6 +193,175 @@ function InfoTip({ text }: { text: string }) {
         </span>
       )}
     </span>
+  )
+}
+
+// ============================================
+// Distribution Section
+//
+// Surfaces three user actions on the App detail page:
+//   1. Upgrade strategy dropdown — 'auto' | 'notify' | 'manual'
+//   2. "Publish" button — routes through product.json publish target
+//   3. "Export as .dhpkg" — local offline export
+//
+// Kept as a self-contained sub-component so the SettingsTab body stays readable.
+// ============================================
+
+interface DistributionSectionProps {
+  app: InstalledApp
+  appId: string
+  t: (s: string, opts?: Record<string, unknown>) => string
+}
+
+function DistributionSection({ app, appId, t }: DistributionSectionProps) {
+  type Strategy = 'auto' | 'notify' | 'manual'
+  const currentStrategy = (app.upgradeStrategy ?? 'auto') as Strategy
+  const [strategy, setStrategy] = useState<Strategy>(currentStrategy)
+  const [savingStrategy, setSavingStrategy] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [exportingDhpkg, setExportingDhpkg] = useState(false)
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    setStrategy(currentStrategy)
+  }, [currentStrategy])
+
+  async function handleStrategyChange(next: Strategy) {
+    setStrategy(next)
+    setSavingStrategy(true)
+    try {
+      const res = await api.appSetUpgradeStrategy(appId, next)
+      if (!res.success) {
+        setFeedback({ kind: 'error', text: t('Failed to update upgrade strategy: {{error}}', { error: res.error ?? '' }) })
+      } else {
+        // Refresh the app in the store so the new strategy is visible
+        await useAppsStore.getState().loadApps()
+      }
+    } catch (err) {
+      setFeedback({ kind: 'error', text: t('Failed to update upgrade strategy: {{error}}', { error: (err as Error).message }) })
+    } finally {
+      setSavingStrategy(false)
+    }
+  }
+
+  async function handlePublish() {
+    setPublishing(true)
+    setFeedback(null)
+    try {
+      const res = await api.storePublish(appId)
+      if (res.success) {
+        const details = (res.data as { details?: string } | undefined)?.details ?? t('Published successfully.')
+        setFeedback({ kind: 'success', text: details })
+      } else {
+        setFeedback({ kind: 'error', text: res.error ?? t('Publish failed.') })
+      }
+    } catch (err) {
+      setFeedback({ kind: 'error', text: (err as Error).message })
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  async function handleExportDhpkg() {
+    setExportingDhpkg(true)
+    setFeedback(null)
+    try {
+      const res = await api.storeExportDhpkg(appId)
+      if (res.success && res.data?.path) {
+        setFeedback({ kind: 'success', text: t('Saved .dhpkg to {{path}}', { path: res.data.path }) })
+      } else if (res.error && res.error !== 'User cancelled') {
+        setFeedback({ kind: 'error', text: res.error })
+      }
+    } catch (err) {
+      setFeedback({ kind: 'error', text: (err as Error).message })
+    } finally {
+      setExportingDhpkg(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+        <Share2 className="w-3.5 h-3.5" />
+        {t('Distribution')}
+      </h3>
+      <div className="bg-secondary rounded-lg p-3 space-y-3">
+        {/* Upgrade Strategy */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <label htmlFor="upgrade-strategy" className="text-sm text-foreground sm:w-40 flex-shrink-0">
+            {t('Upgrade strategy')}
+          </label>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              id="upgrade-strategy"
+              value={strategy}
+              disabled={savingStrategy}
+              onChange={(e) => handleStrategyChange(e.target.value as Strategy)}
+              className="w-full sm:w-auto px-2 py-1.5 text-sm bg-background text-foreground border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="auto">{t('Auto (silent patch/minor)')}</option>
+              <option value="notify">{t('Notify only')}</option>
+              <option value="manual">{t('Manual')}</option>
+            </select>
+            {savingStrategy && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {strategy === 'auto'
+            ? t('Patch and minor versions install automatically. Major upgrades will ask first.')
+            : strategy === 'notify'
+              ? t('You will be notified for every available upgrade — nothing installs silently.')
+              : t('No automatic upgrade checks. Use Check for upgrades to update on demand.')}
+        </p>
+
+        {/* Actions row */}
+        <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-border">
+          <button
+            type="button"
+            onClick={handlePublish}
+            disabled={publishing}
+            className="flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40"
+            title={t('Submit this App to the registry')}
+          >
+            {publishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+            {t('Publish')}
+          </button>
+          <button
+            type="button"
+            onClick={handleExportDhpkg}
+            disabled={exportingDhpkg}
+            className="flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors disabled:opacity-40"
+            title={t('Save a .dhpkg file you can share by hand')}
+          >
+            {exportingDhpkg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {t('Export as .dhpkg')}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              setFeedback(null)
+              const res = await api.storeCheckUpdatesNow()
+              if (res.success) {
+                setFeedback({ kind: 'success', text: t('Upgrade check complete.') })
+              } else {
+                setFeedback({ kind: 'error', text: res.error ?? t('Check failed.') })
+              }
+            }}
+            className="flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
+            title={t('Run an immediate upgrade check')}
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            {t('Check for upgrades')}
+          </button>
+        </div>
+
+        {feedback && (
+          <p className={`text-xs ${feedback.kind === 'success' ? 'text-green-500' : 'text-red-400'}`}>
+            {feedback.text}
+          </p>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -767,6 +936,8 @@ function SettingsTab({ app, appId, spaceName, t }: SettingsTabProps) {
         </div>
 
         {/* ── Spec Info (read-only summary + data directory) ── */}
+        <DistributionSection app={app} appId={appId} t={t} />
+
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
             <FileCode className="w-3.5 h-3.5" />

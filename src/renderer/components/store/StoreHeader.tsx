@@ -5,11 +5,14 @@
  * Provides real-time filtering as user types or selects categories.
  */
 
-import { useCallback, useEffect, useRef } from 'react'
-import { Search, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Search, RefreshCw, Upload } from 'lucide-react'
 import { useAppsPageStore } from '../../stores/apps-page.store'
+import { useAppsStore } from '../../stores/apps.store'
+import { useSpaceStore } from '../../stores/space.store'
 import { STORE_CATEGORY_META } from '../../../shared/store/store-types'
 import { useTranslation } from '../../i18n'
+import { api } from '../../api'
 import type { AppType } from '../../../shared/apps/spec-types'
 
 const TYPE_FILTERS: Array<{ id: AppType | null; labelKey: string }> = [
@@ -18,6 +21,42 @@ const TYPE_FILTERS: Array<{ id: AppType | null; labelKey: string }> = [
   { id: 'skill', labelKey: 'Skill' },
   { id: 'mcp', labelKey: 'MCP' },
 ]
+
+/** Pick a `.dhpkg` file from disk and install it locally. */
+function ImportDhpkgButton() {
+  const { t } = useTranslation()
+  const [busy, setBusy] = useState(false)
+
+  async function handleImport() {
+    setBusy(true)
+    try {
+      // Default to the currently-active space so the user gets a sensible scope.
+      const activeSpaceId = useSpaceStore.getState().currentSpace?.id ?? null
+      const res = await api.storeImportDhpkg({ spaceId: activeSpaceId })
+      if (res.success && res.data?.appId) {
+        await useAppsStore.getState().loadApps()
+      } else if (res.error && res.error !== 'User cancelled') {
+        console.error('[StoreHeader] Import .dhpkg failed:', res.error)
+      }
+    } catch (err) {
+      console.error('[StoreHeader] Import .dhpkg error:', err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleImport}
+      disabled={busy}
+      className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors disabled:opacity-50"
+      title={t('Import a .dhpkg file from disk')}
+      aria-label={t('Import a .dhpkg file from disk')}
+    >
+      <Upload className="w-4 h-4" />
+    </button>
+  )
+}
 
 export function StoreHeader() {
   const { t } = useTranslation()
@@ -99,6 +138,7 @@ export function StoreHeader() {
         >
           <RefreshCw className={`w-4 h-4 ${storeLoading ? 'animate-spin' : ''}`} />
         </button>
+        <ImportDhpkgButton />
       </div>
 
       {/* Type filter tabs */}

@@ -393,6 +393,7 @@ export interface HaloAPI {
   appUpdateSpec: (input: { appId: string; specPatch: Record<string, unknown> }) => Promise<IpcResponse>
   appGrantPermission: (input: { appId: string; permission: string }) => Promise<IpcResponse>
   appRevokePermission: (input: { appId: string; permission: string }) => Promise<IpcResponse>
+  appSetUpgradeStrategy: (input: { appId: string; strategy: 'auto' | 'notify' | 'manual' }) => Promise<IpcResponse>
 
   // App Import / Export
   appExportSpec: (appId: string) => Promise<IpcResponse<{ yaml: string; filename: string }>>
@@ -438,7 +439,13 @@ export interface HaloAPI {
   storeRemoveRegistry: (registryId: string) => Promise<IpcResponse>
   storeToggleRegistry: (input: { registryId: string; enabled: boolean }) => Promise<IpcResponse>
   storeUpdateRegistryAdapterConfig: (input: { registryId: string; adapterConfig: Record<string, unknown> }) => Promise<IpcResponse>
+  storeCheckUpdatesNow: () => Promise<IpcResponse>
+  storeApplyUpgrade: (input: { appId: string; mode?: 'patch_minor' | 'major' | 'force' }) => Promise<IpcResponse>
+  storePublish: (input: { appId: string }) => Promise<IpcResponse>
+  storeExportDhpkg: (input: { appId: string }) => Promise<IpcResponse<{ path: string }>>
+  storeImportDhpkg: (input?: { filePath?: string; spaceId?: string | null }) => Promise<IpcResponse<{ appId: string }>>
   onStoreSyncStatusChanged: (callback: (data: { registryId: string; status: string; appCount: number; error?: string }) => void) => () => void
+  onStoreUpgradeAvailable: (callback: (data: { appId: string; currentVersion: string; latestVersion: string; strategy: 'auto' | 'notify' | 'manual'; severity: 'patch' | 'minor' | 'major' }) => void) => () => void
 
   // Model Capabilities
   /** Resolve the final capability for a model (preset merged with user overrides) */
@@ -770,6 +777,7 @@ const api: HaloAPI = {
   appUpdateSpec: (input) => ipcRenderer.invoke('app:update-spec', input),
   appGrantPermission: (input) => ipcRenderer.invoke('app:grant-permission', input),
   appRevokePermission: (input) => ipcRenderer.invoke('app:revoke-permission', input),
+  appSetUpgradeStrategy: (input) => ipcRenderer.invoke('app:set-upgrade-strategy', input),
 
   // App Import / Export
   appExportSpec: (appId) => ipcRenderer.invoke('app:export-spec', appId),
@@ -824,7 +832,13 @@ const api: HaloAPI = {
   storeRemoveRegistry: (registryId) => ipcRenderer.invoke('store:remove-registry', registryId),
   storeToggleRegistry: (input) => ipcRenderer.invoke('store:toggle-registry', input),
   storeUpdateRegistryAdapterConfig: (input) => ipcRenderer.invoke('store:update-registry-adapter-config', input),
+  storeCheckUpdatesNow: () => ipcRenderer.invoke('store:check-updates-now'),
+  storeApplyUpgrade: (input) => ipcRenderer.invoke('store:apply-upgrade', input),
+  storePublish: (input) => ipcRenderer.invoke('store:publish', input),
+  storeExportDhpkg: (input) => ipcRenderer.invoke('store:export-dhpkg', input),
+  storeImportDhpkg: (input) => ipcRenderer.invoke('store:import-dhpkg', input ?? {}),
   onStoreSyncStatusChanged: (callback) => createEventListener('store:sync-status-changed', callback),
+  onStoreUpgradeAvailable: (callback) => createEventListener('store:upgrade-available', callback),
 
   // Notification (in-app toast)
   onNotificationToast: (callback) => createEventListener('notification:toast', callback),

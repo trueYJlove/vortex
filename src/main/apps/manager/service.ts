@@ -28,6 +28,7 @@ import type {
   AppUninstalledHandler,
   Unsubscribe,
   UninstallOptions,
+  UpgradeStrategy,
 } from './types'
 import { AppManagerStore } from './store'
 import {
@@ -332,6 +333,7 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
           denied: [],
         },
         installedAt: Date.now(),
+        upgradeStrategy: 'auto',
       }
 
       // Persist to SQLite first (atomic: if this fails, no filesystem side effects).
@@ -627,6 +629,15 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
         }
       }
       store.updateOverrides(appId, merged as InstalledApp['userOverrides'])
+    },
+
+    setUpgradeStrategy(appId: string, strategy: UpgradeStrategy): void {
+      requireApp(appId) // Throws if not found
+      if (strategy !== 'auto' && strategy !== 'notify' && strategy !== 'manual') {
+        throw new Error(`Invalid upgrade strategy: ${strategy}`)
+      }
+      store.updateUpgradeStrategy(appId, strategy)
+      console.log(`[AppManager] App ${appId}: upgradeStrategy -> ${strategy}`)
     },
 
     updateSpec(appId: string, specPatch: Record<string, unknown>): void {

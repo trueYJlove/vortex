@@ -44,6 +44,7 @@ export type {
   StatusChangeHandler,
   Unsubscribe,
   UninstallOptions,
+  UpgradeStrategy,
 } from './types'
 
 // Re-export error types

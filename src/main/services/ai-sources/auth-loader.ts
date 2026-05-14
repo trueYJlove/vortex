@@ -95,6 +95,21 @@ export interface RegistryOverride {
   url?: string
   name?: string
   enabled?: boolean
+  /**
+   * Publish target for the App detail page's "Publish" button.
+   * The user never picks the target — it is determined by product.json.
+   *
+   *   - 'github-pr':     open a draft PR against an OSS DHP repo (requires `github.owner/repo`)
+   *   - 'http-registry': POST a multipart .dhpkg to a private registry with a Bearer token
+   *   - 'local-dhpkg':   write a .dhpkg via the system save dialog (no network)
+   */
+  publish?: {
+    target: 'github-pr' | 'http-registry' | 'local-dhpkg'
+    /** Required when target === 'github-pr' */
+    github?: { owner: string; repo: string; clientId?: string }
+    /** Required when target === 'http-registry'; must be replaced at deploy time. */
+    token?: string
+  }
 }
 
 /**

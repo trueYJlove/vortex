@@ -22,8 +22,21 @@ const FETCH_TIMEOUT_MS = 300_000 // 5 min — large indexes (e.g. claude-skills 
 
 const APP_TYPE_VALUES = ['automation', 'skill', 'mcp', 'extension'] as const
 
+/**
+ * Slug format accepts either:
+ *   - Flat:   ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$           e.g. "xhs-search"
+ *   - Scoped: ^[a-z0-9-]+\/[a-z0-9-]+$                    e.g. "openkursar/xhs-search"
+ *
+ * The scoped form is used for community-authored skills.
+ */
+const SLUG_FLAT_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
+const SLUG_SCOPED_RE = /^[a-z0-9-]+\/[a-z0-9-]+$/
+
 const RegistryEntrySchema = z.object({
-  slug: z.string().regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/),
+  slug: z.string().refine(
+    (value) => SLUG_FLAT_RE.test(value) || SLUG_SCOPED_RE.test(value),
+    { message: 'slug must be either a flat id (e.g. "xhs-search") or scoped "<author>/<id>"' }
+  ),
   name: z.string().trim().min(1),
   version: z.string().trim().min(1),
   author: z.string().trim().min(1),
@@ -63,8 +76,83 @@ export class HaloAdapter implements RegistryAdapter {
   readonly strategy = 'mirror' as const
 
   async fetchIndex(source: RegistrySource): Promise<RegistryIndex> {
-    const url = `${source.url.replace(/\/+$/, '')}/index.json`
+    const baseUrl = source.url.replace(/\/+$/, '')
     const t0 = performance.now()
+
+    // Prefer the split layout (digital-humans.json + skills.json + mcps.json);
+    // fall back to the legacy single `index.json` if any split file is missing.
+    const splitFiles = ['digital-humans.json', 'skills.json', 'mcps.json'] as const
+
+    const splitResults = await Promise.allSettled(
+      splitFiles.map(async (file) => {
+        const url = `${baseUrl}/${file}`
+        const res = await fetchWithTimeout(url, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-Store/1.0' },
+        })
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} for ${file}`)
+        }
+        return await res.json() as unknown
+      })
+    )
+
+    const allSplitOk = splitResults.every(r => r.status === 'fulfilled')
+    if (allSplitOk) {
+      const parts: RegistryIndex[] = []
+      for (let i = 0; i < splitResults.length; i++) {
+        const result = splitResults[i]
+        if (result.status !== 'fulfilled') continue
+        const parsed = RegistryIndexSchema.safeParse(result.value)
+        if (!parsed.success) {
+          // If any split file has invalid schema, fall back to legacy below
+          console.warn(
+            `[HaloAdapter] Split index "${splitFiles[i]}" failed validation, falling back to index.json: ` +
+              parsed.error.issues.map(issue => issue.path.join('.')).join(', ')
+          )
+          return this.fetchLegacyIndex(baseUrl, t0)
+        }
+        parts.push(parsed.data as RegistryIndex)
+      }
+
+      // Merge: take version/source from the first part, latest generated_at, concat apps
+      const merged: RegistryIndex = {
+        version: parts[0]?.version ?? 1,
+        source: parts[0]?.source ?? baseUrl,
+        generated_at: parts
+          .map(p => p.generated_at)
+          .filter((s): s is string => typeof s === 'string')
+          .sort()
+          .pop() ?? new Date().toISOString(),
+        apps: parts.flatMap(p => p.apps),
+      }
+
+      const dt = performance.now() - t0
+      console.log(
+        `[HaloAdapter] Loaded split index (digital-humans + skills + mcps): ` +
+        `${merged.apps.length} apps total (${dt.toFixed(0)}ms)`
+      )
+
+      const duplicates = findDuplicateSlugs(merged.apps)
+      if (duplicates.length > 0) {
+        throw new Error(`Invalid index: duplicate slug(s): ${duplicates.join(', ')}`)
+      }
+      return merged
+    }
+
+    // Fallback: any split file missing → use legacy index.json
+    console.log(
+      `[HaloAdapter] Split index unavailable (` +
+      splitResults
+        .map((r, i) => r.status === 'rejected' ? `${splitFiles[i]}=miss` : `${splitFiles[i]}=ok`)
+        .join(', ') +
+      `), falling back to index.json`
+    )
+    return this.fetchLegacyIndex(baseUrl, t0)
+  }
+
+  /** Legacy single-file `index.json` loader, retained for unmigrated registries. */
+  private async fetchLegacyIndex(baseUrl: string, t0: number): Promise<RegistryIndex> {
+    const url = `${baseUrl}/index.json`
     const response = await fetchWithTimeout(url, {
       headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-Store/1.0' },
     })
@@ -84,7 +172,7 @@ export class HaloAdapter implements RegistryAdapter {
     const index = parsed.data as RegistryIndex
 
     const dt = performance.now() - t0
-    console.log(`[HaloAdapter] Completed: ${index.apps.length} apps (${dt.toFixed(0)}ms)`)
+    console.log(`[HaloAdapter] Loaded legacy index.json: ${index.apps.length} apps (${dt.toFixed(0)}ms)`)
 
     const duplicates = findDuplicateSlugs(index.apps)
     if (duplicates.length > 0) {
