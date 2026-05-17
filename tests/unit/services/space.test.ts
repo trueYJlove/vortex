@@ -14,6 +14,7 @@ import {
   listSpaces,
   createSpace,
   getSpace,
+  getSpaceDir,
   deleteSpace,
   getAllSpacePaths,
   touchSpaceActivity,
@@ -335,6 +336,47 @@ describe('Space Service', () => {
 
     it('should be safe to call with no pending activity', () => {
       expect(() => flushSpaceActivity()).not.toThrow()
+    })
+  })
+
+  describe('getSpaceDir', () => {
+    // Pins the boundary semantics that FileExportGate depends on:
+    // "the space's working directory" must equal the agent's cwd, not the
+    // internal storage path. Regressions here historically broke outbound
+    // file sends for every user with a custom workingDir.
+
+    it('returns the artifacts subdir for halo-temp', () => {
+      const dir = getSpaceDir('halo-temp')
+      const expected = path.join(getTempSpacePath(), 'artifacts')
+      expect(dir).toBe(expected)
+    })
+
+    it('returns workingDir when set on a custom space', async () => {
+      const projectDir = path.join(getHaloDir(), 'fixtures', 'd-drive-project')
+      fs.mkdirSync(projectDir, { recursive: true })
+
+      const space = await createSpace({
+        name: 'Custom Working Dir',
+        icon: 'folder',
+        customPath: projectDir
+      })
+
+      expect(getSpaceDir(space.id)).toBe(projectDir)
+      // Must NOT silently fall back to space.path (the internal storage location)
+      expect(getSpaceDir(space.id)).not.toBe(space.path)
+    })
+
+    it('falls back to space.path when workingDir is not set', async () => {
+      const space = await createSpace({
+        name: 'No Custom Dir',
+        icon: 'folder'
+      })
+
+      expect(getSpaceDir(space.id)).toBe(space.path)
+    })
+
+    it('returns empty string for unknown spaceIds', () => {
+      expect(getSpaceDir('does-not-exist')).toBe('')
     })
   })
 })

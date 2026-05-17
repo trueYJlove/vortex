@@ -64,7 +64,7 @@ import { getImSessionRegistry } from './im-session-registry'
 import { createHaloAppsMcpServer } from '../conversation-mcp'
 import { createWebSearchMcpServer } from '../../services/web-search'
 import { createEmailMcpServer } from '../../services/email-mcp'
-import { getSpace } from '../../services/space.service'
+import { getSpace, getSpaceDir } from '../../services/space.service'
 import { openSessionWriter, readSessionMessages, saveChatSessionId, loadChatSessionId, deleteChatSessionId } from './session-store'
 import { getAppMemoryService, getActivityStore } from './index'
 import { createMemoryStatusMcpServer } from '../../platform/memory/snapshot'
@@ -362,9 +362,11 @@ export async function sendAppChatMessage(
     }
   }
 
-  // Notify tool: allows AI to send notifications to channels and IM contacts
-  // FileExportGate restricts outbound file sends to space directory + tmpdir
-  const exportGate = new FileExportGate([memoryScope.spacePath, osTmpdir()])
+  // Notify tool: allows AI to send notifications to channels and IM contacts.
+  // FileExportGate roots = the space's working directory (matches the AI's
+  // cwd) + tmpdir. Not the same as memoryScope.spacePath, which targets
+  // space.path (internal storage) — see getSpaceDir().
+  const exportGate = new FileExportGate([getSpaceDir(app.spaceId!), osTmpdir()])
   const imSessions = usesImPush
     ? (getImSessionRegistry()?.getAllSessions(app.id) ?? [])
     : []

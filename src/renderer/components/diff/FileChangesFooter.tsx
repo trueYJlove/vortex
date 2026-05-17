@@ -60,7 +60,8 @@ export function FileChangesFooter({ fileChangesSummary, thoughts, onLoadThoughts
   }, [thoughts])
 
   // Display data: lightweight summary for stats bar and file list
-  // Pure computation — no side effects
+  // Pure computation — no side effects.
+  // Note: fileChangesSummary is expected to be pre-normalized by the caller.
   const displayChanges = useMemo(() => {
     if (Array.isArray(thoughts) && thoughts.length > 0) {
       const extracted = extractFileChanges(thoughts)
