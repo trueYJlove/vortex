@@ -31,7 +31,7 @@ import { setImPermissionContext, clearImPermissionContext } from './im-permissio
 import { analytics } from '../../services/analytics/analytics.service'
 import { AnalyticsEvents } from '../../services/analytics/types'
 import { FileExportGate } from './file-export-gate'
-import { getSpace } from '../../services/space.service'
+import { getSpaceDir } from '../../services/space.service'
 
 // ============================================
 // Constants
@@ -583,9 +583,10 @@ export async function dispatchInboundMessage(
     messageText += `\n\n[Attached files — use the Read tool to access their content]\n${fileLines}`
   }
 
-  // Build FileExportGate scoped to this app's space + tmpdir
-  const spacePath = getSpace(app.spaceId!)?.path ?? ''
-  const exportGate = new FileExportGate([spacePath, tmpdir()])
+  // FileExportGate roots = the space's working directory (matches the AI's
+  // cwd, where attachments and AI-produced files actually live) + tmpdir.
+  // See getSpaceDir() for why this is not the same as space.path.
+  const exportGate = new FileExportGate([getSpaceDir(app.spaceId!), tmpdir()])
 
   // Resolve file-send capability for this instance (absent for text-only channels)
   const chatTypeNorm: 'direct' | 'group' = msg.chatType

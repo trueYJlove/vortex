@@ -26,6 +26,7 @@ import { getToolIcon } from '../icons/ToolIcons'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileChangesFooter } from '../diff'
+import { normalizeFileChangesSummary } from '../../../shared/file-changes'
 import { MessageImages } from './ImageAttachmentPreview'
 import { TokenUsageIndicator } from './TokenUsageIndicator'
 import { truncateText, getToolFriendlyFormat } from './thought-utils'
@@ -250,6 +251,14 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
   const hasThoughts = Array.isArray(message.thoughts) && message.thoughts.length > 0
   const hasSeparatedThoughts = message.thoughts === null && !!message.thoughtsSummary
 
+  // Normalize persisted fileChanges at the boundary. Older builds / partial
+  // writes can produce shapes missing required arrays, which previously
+  // crashed the entire chat view via FileChangesFooter's useMemo.
+  const fileChangesSummary = useMemo(
+    () => normalizeFileChangesSummary(message.metadata?.fileChanges),
+    [message.metadata?.fileChanges]
+  )
+
   // Handle copying message content to clipboard
   const handleCopyMessage = useCallback(async () => {
     if (!message.content) return
@@ -378,9 +387,9 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
 
       {/* File changes footer - shows immediately from metadata, or from loaded thoughts */}
       {/* Diff content is lazy-loaded from thoughts when user clicks a file */}
-      {!isUser && (message.metadata?.fileChanges || hasThoughts) && (
+      {!isUser && (fileChangesSummary || hasThoughts) && (
         <FileChangesFooter
-          fileChangesSummary={message.metadata?.fileChanges}
+          fileChangesSummary={fileChangesSummary}
           thoughts={message.thoughts}
           onLoadThoughts={
             hasSeparatedThoughts && currentSpaceId && currentConversationId

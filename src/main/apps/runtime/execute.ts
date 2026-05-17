@@ -42,7 +42,7 @@ import { createAIBrowserMcpServer, createScopedBrowserContext } from '../../serv
 import { createWebSearchMcpServer } from '../../services/web-search'
 import { createEmailMcpServer } from '../../services/email-mcp'
 import { getConfig, resolveClaudeConfigDir } from '../../services/config.service'
-import { getSpace } from '../../services/space.service'
+import { getSpace, getSpaceDir } from '../../services/space.service'
 import { openSessionWriter, type SessionWriter } from './session-store'
 
 // ============================================
@@ -353,9 +353,12 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
       emitEntry
     )
 
-    // Create halo-notify MCP server for AI-driven notifications
-    // FileExportGate restricts outbound file sends to space directory + tmpdir
-    const exportGate = new FileExportGate([memoryScope.spacePath, tmpdir()])
+    // Create halo-notify MCP server for AI-driven notifications.
+    // FileExportGate roots = the space's working directory (matches the AI's
+    // cwd) + tmpdir. memoryScope.spacePath is intentionally NOT reused here:
+    // memory lives under space.path (internal storage), while exportable
+    // files live under workingDir||path — see getSpaceDir().
+    const exportGate = new FileExportGate([getSpaceDir(app.spaceId!), tmpdir()])
     const imSessions = usesImPush
       ? (getImSessionRegistry()?.getAllSessions(app.id) ?? [])
       : []

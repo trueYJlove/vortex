@@ -326,6 +326,33 @@ export function getSpace(spaceId: string): Space | null {
 }
 
 /**
+ * Canonical working directory of a space — the boundary that defines
+ * "what belongs to this space" for the AI agent (cwd), the Artifact panel,
+ * the file explorer, and outbound file gates.
+ *
+ * Why a dedicated helper: `space.path` is Halo's internal record-keeping
+ * location (memory, session JSONL, app data). The user's actual workspace
+ * — and the AI's cwd — is `workingDir` when set. Treating these as the same
+ * is a category error that has caused real bugs (e.g. file-export gates
+ * rejecting files the AI legitimately produced in its own cwd).
+ *
+ * Read-only: never creates directories. Callers that need the directory
+ * to exist (agent spawn, artifact mkdir) must handle that themselves.
+ *
+ * @returns Absolute path, or '' for unknown spaceIds. Callers passing the
+ *          result to `FileExportGate` can rely on the gate filtering empty
+ *          roots; other callers must handle '' explicitly.
+ */
+export function getSpaceDir(spaceId: string): string {
+  if (spaceId === 'halo-temp') {
+    return join(getTempSpacePath(), 'artifacts')
+  }
+  const space = getSpace(spaceId)
+  if (!space) return ''
+  return space.workingDir || space.path
+}
+
+/**
  * Get a specific space with preferences loaded from meta.json (single disk read).
  * Use this only when preferences are needed (IPC/UI layer).
  */
