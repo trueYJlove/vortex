@@ -18,6 +18,7 @@ import {
 import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
+import { ErrorContent } from './ErrorContent'
 import {
   truncateText,
   getThoughtIcon,
@@ -240,22 +241,26 @@ const ThoughtItem = memo(function ThoughtItem({ thought, isLast, allThoughts, is
         <div className="flex items-end gap-3">
           {/* Content - takes available space */}
           <div className="flex-1 min-w-0">
-            {displayContent && (
-              <div
-                className={`text-sm ${
-                  thought.type === 'thinking' ? 'text-muted-foreground/70 italic' : 'text-foreground/80'
-                } whitespace-pre-wrap break-words`}
-              >
-                {isContentExpanded || !needsTruncate ? displayContent : truncatedContent + '...'}
-                {(thought.type === 'thinking' || thought.type === 'text') && needsTruncate && (
-                  <button
-                    onClick={() => setIsContentExpanded(!isContentExpanded)}
-                    className="ml-1 text-primary/60 hover:text-primary not-italic"
-                  >
-                    {isContentExpanded ? t('Collapse') : t('Expand')}
-                  </button>
-                )}
-              </div>
+            {thought.type === 'error' ? (
+              thought.content && <ErrorContent content={thought.content} />
+            ) : (
+              displayContent && (
+                <div
+                  className={`text-sm ${
+                    thought.type === 'thinking' ? 'text-muted-foreground/70 italic' : 'text-foreground/80'
+                  } whitespace-pre-wrap break-words`}
+                >
+                  {isContentExpanded || !needsTruncate ? displayContent : truncatedContent + '...'}
+                  {(thought.type === 'thinking' || thought.type === 'text') && needsTruncate && (
+                    <button
+                      onClick={() => setIsContentExpanded(!isContentExpanded)}
+                      className="ml-1 text-primary/60 hover:text-primary not-italic"
+                    >
+                      {isContentExpanded ? t('Collapse') : t('Expand')}
+                    </button>
+                  )}
+                </div>
+              )
             )}
           </div>
 

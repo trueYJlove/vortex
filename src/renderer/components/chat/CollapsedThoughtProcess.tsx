@@ -19,6 +19,7 @@ import { TodoCard, parseTodoInput } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { TeamSnapshotPanel } from './TeamPanel'
+import { ErrorContent } from './ErrorContent'
 import {
   getThoughtIcon,
   getThoughtColor,
@@ -84,18 +85,22 @@ function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?:
       <div className="flex items-end gap-3 mt-0.5 ml-[22px]">
         {/* Content - takes available space */}
         <div className="flex-1 min-w-0">
-          {content && (
-            <div className="text-muted-foreground/70 whitespace-pre-wrap break-words">
-              {isContentExpanded || !needsTruncate ? content : content.substring(0, maxLen) + '...'}
-              {(thought.type === 'thinking' || thought.type === 'text') && needsTruncate && (
-                <button
-                  onClick={() => setIsContentExpanded(!isContentExpanded)}
-                  className="ml-1 text-primary/60 hover:text-primary"
-                >
-                  {isContentExpanded ? t('Collapse') : t('Expand')}
-                </button>
-              )}
-            </div>
+          {thought.type === 'error' ? (
+            thought.content && <ErrorContent content={thought.content} compact />
+          ) : (
+            content && (
+              <div className="text-muted-foreground/70 whitespace-pre-wrap break-words">
+                {isContentExpanded || !needsTruncate ? content : content.substring(0, maxLen) + '...'}
+                {(thought.type === 'thinking' || thought.type === 'text') && needsTruncate && (
+                  <button
+                    onClick={() => setIsContentExpanded(!isContentExpanded)}
+                    className="ml-1 text-primary/60 hover:text-primary"
+                  >
+                    {isContentExpanded ? t('Collapse') : t('Expand')}
+                  </button>
+                )}
+              </div>
+            )
           )}
         </div>
 

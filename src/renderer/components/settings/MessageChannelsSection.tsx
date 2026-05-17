@@ -17,6 +17,7 @@ import {
   Mail, MessageSquare, Bell, Webhook, Loader2,
   CheckCircle, XCircle, ChevronDown, RefreshCw, Bot,
   Plus, Trash2, MoreVertical, Smartphone, AlertTriangle,
+  QrCode,
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
@@ -33,6 +34,7 @@ import type {
   GuestPolicy,
 } from '../../../shared/types/im-channel'
 import { WeixinIlinkInstanceCard } from './WeixinIlinkInstanceCard'
+import { WecomScanAuthDialog } from './WecomScanAuthDialog'
 
 /** Product-level permission defaults (from IPC). Mirrors auth-loader.ImChannelsPermissionDefaults. */
 interface PermissionDefaults {
@@ -436,7 +438,8 @@ function InstanceCard({
   const handleStreamingChange = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     setDraft(null)
-    onChange({ ...instance, streaming: instance.streaming === false ? undefined : false })
+    // Streaming defaults to off (undefined). Toggle on → explicit true; toggle off → undefined.
+    onChange({ ...instance, streaming: instance.streaming === true ? undefined : true })
   }
 
   const handleReplyScopeChange = (scope: string) => {
@@ -445,7 +448,7 @@ function InstanceCard({
     onChange({ ...instance, replyScope: scope as ImChannelInstanceConfig['replyScope'] })
   }
 
-  const isStreamingEnabled = instance.streaming !== false
+  const isStreamingEnabled = instance.streaming === true
   const replyScope = instance.replyScope ?? 'all'
 
   return (
@@ -744,6 +747,15 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
   const guestPolicy = instance.guestPolicy
   const guestAccessEnabled = hasOwners && guestPolicy !== undefined
 
+  // Pending owner auto-claim — only meaningful for wecom-bot scan-auth bots.
+  // While true, the WeCom Intelligent Bot provider is waiting for the first
+  // inbound message to bind its sender as the sole owner. We surface this
+  // state in the UI so the empty owners list does not look broken; the
+  // existing "no owners set" warning is suppressed because the bot is in a
+  // deliberate, expected interim state.
+  const pendingOwnerClaim =
+    instance.type === 'wecom-bot' && instance.pendingOwnerClaim === true
+
   // Load installed MCP apps for the user MCP whitelist
   const { apps } = useAppsStore()
   const mcpApps = apps.filter(a => a.spec.type === 'mcp')
@@ -773,6 +785,9 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
     onDebouncedChange({
       ...instance,
       owners: parsed.length > 0 ? parsed : undefined,
+      // Manual edit cancels the wecom-bot auto-claim: the user has taken
+      // explicit control. No-op for instances that never had the flag.
+      ...(pendingOwnerClaim ? { pendingOwnerClaim: false } : {}),
     })
   }
 
@@ -866,8 +881,20 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
             </p>
           </div>
 
-          {/* Warning: no owners set */}
-          {!hasOwners && (
+          {/* Pending owner auto-claim hint (wecom-bot scan-auth only) — shown
+              instead of the empty-owners warning because this is an expected
+              interim state, not a misconfiguration. */}
+          {!hasOwners && pendingOwnerClaim && (
+            <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/30 px-3 py-2">
+              <QrCode className="w-4 h-4 text-primary shrink-0" />
+              <p className="text-xs text-foreground/80">
+                {t('Send any message to this bot in WeCom — your user ID will be registered as the owner automatically. No manual lookup needed.')}
+              </p>
+            </div>
+          )}
+
+          {/* Warning: no owners set (suppressed during pending claim) */}
+          {!hasOwners && !pendingOwnerClaim && (
             <div className="flex items-center gap-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-3 py-2">
               <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0" />
               <p className="text-xs text-yellow-700 dark:text-yellow-300">
@@ -1210,6 +1237,7 @@ export function MessageChannelsSection({ config, setConfig }: MessageChannelsSec
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({})
   const [imStatuses, setImStatuses] = useState<ImChannelInstanceStatus[]>([])
   const [permissionDefaults, setPermissionDefaults] = useState<PermissionDefaults | null>(null)
+  const [scanDialogOpen, setScanDialogOpen] = useState(false)
 
   // Load automation apps for the digital human selector
   const { apps, loadApps } = useAppsStore()
@@ -1241,6 +1269,34 @@ export function MessageChannelsSection({ config, setConfig }: MessageChannelsSec
     const interval = setInterval(fetchStatuses, 10_000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [])
+
+  // Subscribe to main-initiated instance config updates (currently only used
+  // by the wecom-bot scan-auth owner auto-claim flow). When the user sends
+  // their first message in WeCom while this settings panel is open, the
+  // backend writes owners=[userid] + pendingOwnerClaim=false and broadcasts
+  // this event — we patch the local config so the owner ID and pending hint
+  // refresh without requiring a manual reload. configRef avoids re-subscribing
+  // on every config change.
+  const configRef = useRef(config)
+  useEffect(() => { configRef.current = config }, [config])
+  useEffect(() => {
+    const unsub = api.onImChannelInstanceUpdated?.((data: unknown) => {
+      const update = data as { instanceId?: string; instance?: ImChannelInstanceConfig } | null
+      if (!update?.instanceId || !update?.instance) return
+      const current = configRef.current
+      if (!current) return
+      const list: ImChannelInstanceConfig[] = current.imChannels?.instances ?? []
+      const idx = list.findIndex((i: ImChannelInstanceConfig) => i.id === update.instanceId)
+      if (idx === -1) return
+      const patched = list.slice()
+      patched[idx] = update.instance
+      setConfig({
+        ...current,
+        imChannels: { ...current.imChannels, instances: patched },
+      } as HaloConfig)
+    })
+    return () => { unsub?.() }
+  }, [setConfig])
 
   // ── IM Channel instances from config ────────────────────────────
   const instances = config?.imChannels?.instances ?? []
@@ -1308,6 +1364,50 @@ export function MessageChannelsSection({ config, setConfig }: MessageChannelsSec
     const newInstances = instances.filter(i => i.id !== instanceId)
     saveInstances(newInstances)
   }, [instances, saveInstances])
+
+  /**
+   * Wire the freshly-scanned credentials into a new IM channel instance.
+   *
+   * The scan dialog has already installed a dedicated default automation app
+   * via the create-assistant IPC; here we just append the corresponding
+   * ImChannelInstanceConfig and persist. saveInstances() then triggers
+   * imChannelsReload() which starts the WS connection.
+   */
+  const handleScanComplete = useCallback(async (result: {
+    botId: string; secret: string; appId: string; appName: string
+  }) => {
+    // Scan-auth path: force permission control ON and mark the instance as
+    // awaiting one-shot owner auto-claim. The WeCom Intelligent Bot scan
+    // protocol does not return the scanner's userid, so the wecom-bot
+    // provider will bind the first inbound sender as owner — no manual
+    // userid lookup required. This intentionally overrides product-level
+    // permissionDefaults, since scan-auth bots are by protocol only visible
+    // to their creator (single-user personal use). The manual-config path
+    // (handleAddInstance) still honors permissionDefaults — that flow
+    // legitimately covers team / multi-owner scenarios where auto-claim
+    // would bind the wrong user.
+    const newInstance: ImChannelInstanceConfig = {
+      id: generateId(),
+      type: 'wecom-bot',
+      enabled: true,
+      appId: result.appId,
+      config: { botId: result.botId, secret: result.secret, wsUrl: '' },
+      replyScope: 'all',
+      permissionEnabled: true,
+      pendingOwnerClaim: true,
+    }
+    await saveInstances([...instances, newInstance])
+    // Refresh the apps list so the newly-installed assistant appears in the
+    // digital-human selector inside the new instance card.
+    loadApps().catch(() => {})
+    // Ensure the WeCom card is expanded so the user immediately sees the
+    // new instance after the dialog auto-closes.
+    setExpandedChannels(prev => {
+      const next = new Set(prev)
+      next.add('im-wecom-bot')
+      return next
+    })
+  }, [instances, saveInstances, loadApps])
 
   const handleReconnectInstance = useCallback(async (instanceId: string) => {
     try {
@@ -1547,15 +1647,28 @@ export function MessageChannelsSection({ config, setConfig }: MessageChannelsSec
                 />
               ))}
 
-              {/* Add instance button */}
-              <button
-                type="button"
-                onClick={handleAddInstance}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm border border-dashed border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-muted/30 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                {t('Add Bot')}
-              </button>
+              {/* Add instance — scan QR (primary) + manual setup (secondary) */}
+              <div className="flex flex-col sm:flex-row items-stretch gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setScanDialogOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+                >
+                  <QrCode className="w-4 h-4" />
+                  {t('Scan to add')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddInstance}
+                  className="flex items-center justify-center gap-2 px-3 py-2 text-sm border border-border rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {t('Manual setup')}
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center pt-0.5">
+                {t('Recommended: scan to add — auto-creates a default digital human and binds it in one step.')}
+              </p>
             </div>
           )}
         </div>
@@ -1575,6 +1688,13 @@ export function MessageChannelsSection({ config, setConfig }: MessageChannelsSec
           />
         ))}
       </div>
+
+      {/* WeCom scan-to-add dialog (portal-style overlay) */}
+      <WecomScanAuthDialog
+        open={scanDialogOpen}
+        onClose={() => setScanDialogOpen(false)}
+        onComplete={handleScanComplete}
+      />
     </section>
   )
 }

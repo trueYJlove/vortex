@@ -63,6 +63,7 @@ import { initRegistryService, shutdownRegistryService } from '../store'
 import { cleanupImChannelTempFiles } from '../apps/runtime/im-channels'
 import { registerIdleTask, startIdleDrain } from './idle-queue'
 import { seedDefaultAppIfNeeded } from '../apps/manager/seed'
+import { loadBuiltinApps } from '../apps/manager/builtin-loader'
 
 // Module-level reference to db for cleanup
 let platformDb: DatabaseManager | null = null
@@ -140,6 +141,13 @@ async function initPlatformAndApps(): Promise<void> {
   // ── Tier 3: Idle tasks ─────────────────────────────────────────────────
   // Non-critical tasks that run after all essential infrastructure is ready.
   // Failures are logged as warnings and never affect core functionality.
+  //
+  // Order matters here: the built-in loader installs bundled digital humans
+  // declared in product.json's `builtinApps` list. The default-app seed then
+  // checks whether any automation app exists (or any built-in is bundled) to
+  // decide if the "Halo 助手" placeholder should be created. Running the loader
+  // first ensures the seed makes its decision against the post-loader state.
+  registerIdleTask('load-builtin-apps', () => loadBuiltinApps(appManager))
   registerIdleTask('seed-default-app', () => seedDefaultAppIfNeeded(appManager))
   registerIdleTask('startup-snapshot', () => runStartupSnapshot(appManager, runtime))
   startIdleDrain()

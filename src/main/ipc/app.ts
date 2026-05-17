@@ -26,6 +26,7 @@
  *   app:chat-status        Get app chat status (generating + conversationId)
  *   app:chat-messages      Load persisted chat messages for an app
  *   app:chat-session-state Get session state for recovery after refresh
+ *   app:chat-restart       Restart an app's chat agent (reload prompt/config)
  *   app:export-spec        Export an app's spec as a YAML string
  *   app:import-spec        Install an app from a YAML spec string
  *   app:open-skill-folder  Reveal a skill's on-disk directory in the OS file manager
@@ -48,6 +49,7 @@ import {
   getAppChatConversationId,
   clearAppChat,
   clearImSession,
+  restartAppChat,
 } from '../apps/runtime'
 import type { AppSpec } from '../apps/spec'
 import type { AppListFilter, UninstallOptions } from '../apps/manager'
@@ -118,6 +120,7 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:install error:', err.message)
+        analytics.trackErrorSurface('app-install', err)
         return { success: false, error: err.message }
       }
     }
@@ -184,6 +187,10 @@ export function registerAppHandlers(): void {
   )
 
   // ── app:delete ─────────────────────────────────────────────────────────
+  // NOTE: external callers (renderer, HTTP) must NOT be able to bypass the
+  // built-in protection guard. We deliberately do NOT forward any options
+  // from the input — `deleteApp` is invoked with no second argument, so
+  // `BuiltinAppProtectedError` will fire as designed for built-in apps.
   ipcMain.handle(
     'app:delete',
     async (_event, input: { appId: string }) => {
@@ -198,7 +205,13 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:delete error:', err.message)
-        return { success: false, error: err.message }
+        // Preserve `errorName` (e.g. "BuiltinAppProtectedError") so the
+        // renderer can route the error by discriminator instead of parsing
+        // the message string. Lets the UI provide a localized prompt for
+        // protected built-ins ("This app is bundled with Halo and can't be
+        // permanently deleted; uninstall to disable instead.") rather than
+        // surfacing the raw English error text.
+        return { success: false, error: err.message, errorName: err.name }
       }
     }
   )
@@ -548,10 +561,14 @@ export function registerAppHandlers(): void {
     'app:chat-send',
     async (_event, request: AppChatRequest) => {
       try {
-        // Telemetry: count user-sent messages to app chat (no content)
+        // Telemetry: count user-sent messages to app chat (no content).
+        // specId is reverse-looked-up so dashboards can label the digital
+        // human; the SENSITIVE_KEYS gate drops it for open-source builds.
+        const specId = getAppManager()?.getApp(request.appId)?.specId
         void analytics.track(AnalyticsEvents.MESSAGE_SENT, {
           source: 'app-chat',
           appId: request.appId,
+          specId,
         })
 
         // Fire-and-forget: streaming events are pushed to renderer via agent:* channels.
@@ -569,6 +586,7 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:chat-send error:', err.message)
+        analytics.trackErrorSurface('app-chat-send', err)
         return { success: false, error: err.message }
       }
     }
@@ -655,6 +673,25 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:chat-clear error:', err.message)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
+  // ── app:chat-restart ─────────────────────────────────────────────────
+  // Closes all Claude Code subprocesses for an app's chat sessions (native
+  // + every IM channel session) so the next message loads the latest system
+  // prompt and config. Conversation history is preserved via saved sessionId.
+  ipcMain.handle(
+    'app:chat-restart',
+    async (_event, appId: string) => {
+      try {
+        const result = await restartAppChat(appId)
+        console.log(`[AppIPC] app:chat-restart: appId=${appId}, closed=${result.sessionsClosed}`)
+        return { success: true, data: result }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[AppIPC] app:chat-restart error:', err.message)
         return { success: false, error: err.message }
       }
     }
@@ -896,5 +933,5 @@ export function registerAppHandlers(): void {
     }
   )
 
-  console.log('[AppIPC] App management handlers registered (28 channels)')
+  console.log('[AppIPC] App management handlers registered (29 channels)')
 }

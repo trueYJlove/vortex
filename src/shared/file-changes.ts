@@ -130,3 +130,57 @@ export function extractFileChangesSummaryFromThoughts(thoughts: ThoughtLike[]): 
 
   return { edited, created, totalFiles, totalAdded, totalRemoved }
 }
+
+// ============================================
+// Boundary Normalization
+// ============================================
+
+/**
+ * Why: persisted/IPC-delivered FileChangesSummary objects are untrusted —
+ * older builds, partial writes, or hand-edited storage can produce
+ * partial shapes (missing edited/created arrays, non-numeric stats, etc.).
+ * Consumers must call this at the boundary so internal renderer code can
+ * trust the type contract and avoid scattered defensive checks.
+ *
+ * Returns undefined when the input is unusable or contains no entries.
+ */
+export function normalizeFileChangesSummary(input: unknown): FileChangesSummary | undefined {
+  if (!input || typeof input !== 'object') return undefined
+  const raw = input as Partial<FileChangesSummary>
+
+  const toNum = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+
+  const edited: FileChangesSummary['edited'] = Array.isArray(raw.edited)
+    ? raw.edited.flatMap((e) => {
+        if (!e || typeof e !== 'object') return []
+        const item = e as Partial<FileChangesSummary['edited'][number]>
+        if (typeof item.file !== 'string' || !item.file) return []
+        return [{ file: item.file, added: toNum(item.added), removed: toNum(item.removed) }]
+      })
+    : []
+
+  const created: FileChangesSummary['created'] = Array.isArray(raw.created)
+    ? raw.created.flatMap((w) => {
+        if (!w || typeof w !== 'object') return []
+        const item = w as Partial<FileChangesSummary['created'][number]>
+        if (typeof item.file !== 'string' || !item.file) return []
+        return [{ file: item.file, lines: toNum(item.lines) }]
+      })
+    : []
+
+  if (edited.length === 0 && created.length === 0) return undefined
+
+  const totalFiles = typeof raw.totalFiles === 'number' && Number.isFinite(raw.totalFiles)
+    ? raw.totalFiles
+    : edited.length + created.length
+
+  const totalAdded = typeof raw.totalAdded === 'number' && Number.isFinite(raw.totalAdded)
+    ? raw.totalAdded
+    : edited.reduce((s, e) => s + e.added, 0) + created.reduce((s, w) => s + w.lines, 0)
+
+  const totalRemoved = typeof raw.totalRemoved === 'number' && Number.isFinite(raw.totalRemoved)
+    ? raw.totalRemoved
+    : edited.reduce((s, e) => s + e.removed, 0)
+
+  return { edited, created, totalFiles, totalAdded, totalRemoved }
+}

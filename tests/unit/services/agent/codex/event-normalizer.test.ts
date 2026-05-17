@@ -9,11 +9,17 @@ import { describe, expect, it } from 'vitest'
 import { CodexEventNormalizer } from '../../../../../src/main/services/agent/codex/event-normalizer'
 import { ServerNotifications } from '../../../../../src/main/services/agent/codex/types/codex-protocol'
 
-function createNormalizer(): CodexEventNormalizer {
+function createNormalizer(opts: { includePartialMessages?: boolean } = {}): CodexEventNormalizer {
   return new CodexEventNormalizer({
     sessionId: 'session-1',
     model: 'test-model',
     mcpServers: {},
+    // Default the existing-suite path to the "aggregate-only" mode that
+    // matches eeb6f08's original contract — those tests were written when
+    // the normalizer always emitted aggregate text/thinking envelopes.
+    // The live-UI mode (true) is exercised by a dedicated describe block
+    // further down that asserts aggregate text/thinking are suppressed.
+    includePartialMessages: opts.includePartialMessages ?? false,
   })
 }
 
@@ -443,6 +449,75 @@ describe('CodexEventNormalizer (app-server protocol)', () => {
       item: { id: 'msg-empty', type: 'agentMessage', text: '' },
     })
     expect(itemDone.find((m) => m?.type === 'assistant')).toBeUndefined()
+  })
+
+  // ──────────────────────────────────────────────────────────────────────
+  // includePartialMessages = true (live-UI mode)
+  // ──────────────────────────────────────────────────────────────────────
+  //
+  // Production regression (chat showed "你好" + "你好" stacked): in the
+  // default app-chat / interactive chat path Halo passes
+  // `includePartialMessages: true` to the SDK adapter. With Codex this
+  // previously meant stream-processor's `lastTextContent` was written TWICE
+  // — once from the stream_event content_block_stop, then again from the
+  // aggregate `type:'assistant'` text thought — producing a doubled
+  // bubble. Claude SDK avoids this by emitting text in EITHER stream_event
+  // OR aggregate, never both. These tests lock the same二选一 in Codex.
+
+  it('suppresses aggregate text content when includePartialMessages=true (stream_event is the live source)', () => {
+    const n = createNormalizer({ includePartialMessages: true })
+    n.handle(ServerNotifications.TurnStarted, { threadId: 't', turnId: 'r1' })
+    n.handle(ServerNotifications.ItemStarted, {
+      threadId: 't', turnId: 'r1', itemId: 'msg-1',
+      item: { id: 'msg-1', type: 'agentMessage' },
+    })
+    n.handle(ServerNotifications.AgentMessageDelta, { threadId: 't', turnId: 'r1', itemId: 'msg-1', delta: '你好！有什么我可以帮你的吗？😊' })
+    const itemDone = n.handle(ServerNotifications.ItemCompleted, {
+      threadId: 't', turnId: 'r1', itemId: 'msg-1',
+      item: { id: 'msg-1', type: 'agentMessage', text: '你好！有什么我可以帮你的吗？😊' },
+    })
+    // stream_event content_block_stop still fires (drives live UI)…
+    const streamStop = streamEvents(itemDone).find((e) => e.type === 'content_block_stop')
+    expect(streamStop).toBeDefined()
+    // …but NO aggregate `type:'assistant'` text envelope is emitted, so
+    // stream-processor.ts:711-726 has nothing to append on top of the
+    // already-streamed lastTextContent — no doubled bubble.
+    expect(itemDone.find((m) => m?.type === 'assistant')).toBeUndefined()
+  })
+
+  it('suppresses aggregate thinking content when includePartialMessages=true', () => {
+    const n = createNormalizer({ includePartialMessages: true })
+    n.handle(ServerNotifications.TurnStarted, { threadId: 't', turnId: 'r1' })
+    n.handle(ServerNotifications.ItemStarted, {
+      threadId: 't', turnId: 'r1', itemId: 'r-1',
+      item: { id: 'r-1', type: 'reasoning' },
+    })
+    n.handle(ServerNotifications.ReasoningTextDelta, { threadId: 't', turnId: 'r1', itemId: 'r-1', delta: 'Pondering' })
+    const itemDone = n.handle(ServerNotifications.ItemCompleted, {
+      threadId: 't', turnId: 'r1', itemId: 'r-1',
+      item: { id: 'r-1', type: 'reasoning', content: ['Pondering'] },
+    })
+    expect(itemDone.find((m) => m?.type === 'assistant')).toBeUndefined()
+  })
+
+  it('still emits aggregate tool_use envelope when includePartialMessages=true (ordering for JSONL linking is mandatory)', () => {
+    // tool_use aggregate is independent of the text/thinking split because
+    // session-store.convertEventsToMessages links tool_use ↔ tool_result by
+    // id during JSONL replay, and the user.tool_result envelope MUST be
+    // preceded by its tool_use `assistant` aggregate.
+    const n = createNormalizer({ includePartialMessages: true })
+    n.handle(ServerNotifications.TurnStarted, { threadId: 't', turnId: 'r1' })
+    n.handle(ServerNotifications.ItemStarted, {
+      threadId: 't', turnId: 'r1', itemId: 'cmd',
+      item: { id: 'cmd', type: 'commandExecution', command: 'ls' },
+    })
+    const itemDone = n.handle(ServerNotifications.ItemCompleted, {
+      threadId: 't', turnId: 'r1', itemId: 'cmd',
+      item: { id: 'cmd', type: 'commandExecution', command: 'ls', aggregatedOutput: 'a\nb\n', status: 'completed' },
+    })
+    const aggregate = itemDone.find((m) => m?.type === 'assistant')
+    expect(aggregate).toBeDefined()
+    expect(aggregate.message.content[0]).toMatchObject({ type: 'tool_use', id: 'cmd', name: 'Bash' })
   })
 
   it('REGRESSION: handle() emits zero messages until a turn-scoped notification arrives', () => {

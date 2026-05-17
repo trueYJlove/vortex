@@ -1,38 +1,61 @@
 /**
- * apps/runtime/im-channels -- WeCom Bot Provider
+ * apps/runtime/im-channels -- WeCom Bot Provider (SDK-backed)
  *
  * ImChannelProvider implementation for WeCom Intelligent Bot (企业微信智能机器人).
  *
- * Protocol (aligned with @wecom/aibot-node-sdk):
- * - WebSocket long connection (JSON, no XML/AES)
- * - `aibot_subscribe` for authentication (bot_id + secret)
- * - `aibot_msg_callback` for receiving messages
- * - `aibot_respond_msg` for replying (same req_id)
- * - `aibot_send_msg` for proactive push
- * - Application-level heartbeat: `{ cmd: "ping" }` every 30 seconds
- * - Only ONE WebSocket connection per bot allowed
- * - req_id expires after 5 minutes (WeCom protocol limit)
+ * This is a thin adapter on top of `@wecom/aibot-node-sdk`. The SDK owns:
+ *   - WebSocket lifecycle (connect / heartbeat / reconnect / auth)
+ *   - Reply queueing per req_id with ack-waiting
+ *   - Non-blocking back-pressure for stream frames
+ *   - Chunked media upload (init → chunk → finish)
+ *   - Encrypted file download with AES-256-CBC decrypt
  *
- * File capabilities (WeCom single-chat only):
- * - Receive: image / file / video — URL+aeskey, AES-256-CBC decrypted to local temp file
- * - Send: chunked WebSocket upload (init → chunks → complete → media_id) then send msg
- * - Images are also passed as base64 for Claude multimodal vision
+ * This file owns:
+ *   - InboundMessage construction (translates SDK events to the normalized
+ *     contract consumed by dispatch-inbound)
+ *   - 24h reply-window tracking (caches the inbound WsFrame per chatId so
+ *     we can call replyMedia / replyStream long after the original event)
+ *   - Pending-push queue across brief WS bounces
+ *   - StreamingTransport implementation backing WecomStreamSession
+ *   - Provider/Instance lifecycle that plugs into ImChannelManager
+ *
+ * Long-task support is delegated to WecomStreamSession: when a stream is
+ * about to hit the WeCom 10-minute single-stream cutoff, it proactively
+ * finishes and switches to discrete proactive pushes via the queue.
+ *
+ * Protocol time limits (per official docs):
+ *   - Reply window: 24 hours after inbound callback
+ *   - Stream message: 10 minutes from first packet to finish=true
+ *   - Media URL: 5 minutes (download window for image/file/video)
+ *
+ * Logging conventions: every event is emitted via the same key=value
+ * `event=<name> field=value ...` shape historically used by this module.
+ * SDK-internal logs are routed through the SDK's `logger` option and tagged
+ * with `event=sdk` so they remain grep-distinguishable from our own events.
  */
 
-import WebSocket from 'ws'
-import { createDecipheriv, createHash } from 'crypto'
+import AiBot, {
+  type WsFrame,
+  type WsFrameHeaders,
+  type BaseMessage,
+  type TextMessage,
+  type ImageMessage,
+  type FileMessage,
+  type VideoMessage,
+  type MixedMessage,
+  type Logger as SdkLogger,
+  type WeComMediaType,
+} from '@wecom/aibot-node-sdk'
 import { readdirSync, statSync, unlinkSync } from 'fs'
 import { readFile, writeFile, mkdir } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join, basename, extname } from 'path'
-import https from 'https'
 import type {
   ImChannelProvider,
   ImChannelInstance,
   ImFileCapability,
   ImChannelConfigFieldDef,
   ImChannelType,
-  SanctionedFile,
 } from '../../../../shared/types/im-channel'
 import type {
   InboundMessage,
@@ -42,39 +65,85 @@ import type {
   ProgressEvent,
 } from '../../../../shared/types/inbound-message'
 import type { ImageAttachment, ImageMediaType } from '../../../services/agent/types'
+import {
+  WecomStreamSession,
+  type StreamingTransport,
+  type StreamLogger,
+  type StreamLogLevel,
+} from './wecom-stream-session'
+import { ensureUtf8 } from './wecom-content-utf8'
+import { maybeClaimOwner } from './wecom-bot-owner-claim'
 
 // ============================================
 // Constants
 // ============================================
 
 const DEFAULT_WS_URL = 'wss://openws.work.weixin.qq.com'
-const HEARTBEAT_INTERVAL_MS = 30_000    // 30 seconds
-const RECONNECT_BASE_DELAY_MS = 2_000   // 2 seconds
-const RECONNECT_MAX_DELAY_MS = 30_000   // 30 seconds cap
-const MAX_RECONNECT_ATTEMPTS = 100
-const REQ_ID_TTL_MS = 5 * 60 * 1000    // 5 minutes (WeCom protocol limit)
-const REQ_ID_CLEANUP_INTERVAL_MS = 60_000 // 1 minute
-
-/** Max chunk size before base64 encoding (WeCom limit: 512 KB raw) */
-const UPLOAD_CHUNK_SIZE = 512 * 1024
-
-/** Max allowed chunks per upload session (WeCom limit) */
-const UPLOAD_MAX_CHUNKS = 100
-
-/** Timeout for a single WeCom WebSocket request-response pair */
-const WS_REQUEST_TIMEOUT_MS = 30_000
-
-/** Local temp directory for downloaded WeCom media */
+/** 24h reply window per official docs ("收到消息回调后，24小时内可以往该会话回复消息"). */
+const REPLY_WINDOW_MS = 24 * 60 * 60 * 1000
+/** Max wait for WS re-auth before dropping a queued push. */
+const PUSH_QUEUE_WAIT_MS = 2 * 60 * 1000
+/** Interval for periodic health-snapshot log lines. */
+const HEALTH_SNAPSHOT_INTERVAL_MS = 5 * 60_000
+/** Cleanup cadence for the inbound-frame cache (24h-expired entries). */
+const REQ_ID_CLEANUP_INTERVAL_MS = 5 * 60_000
+/** Local temp directory for downloaded WeCom media. */
 const TEMP_DIR = join(tmpdir(), 'halo-wecom')
+/** Image file extensions that map to WeCom 'image' media type. */
+const IMAGE_EXTENSIONS = new Set([
+  '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
+])
 
-/** Max download size (100 MB). Defense-in-depth against unbounded memory allocation. */
-const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
+// ============================================
+// Structured Logging
+// ============================================
+
+type LogLevel = 'info' | 'warn' | 'error'
+type LogFields = Record<string, string | number | boolean | null | undefined>
+
+function formatVal(v: unknown): string {
+  if (v === null || v === undefined) return 'null'
+  if (typeof v === 'string') {
+    if (/[\s=]/.test(v)) return `"${v.replace(/"/g, '\\"')}"`
+    return v
+  }
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v)
+  return String(v)
+}
+
+function logEvent(
+  instanceId: string,
+  level: LogLevel,
+  event: string,
+  fields: LogFields = {},
+): void {
+  const parts: string[] = [`[WecomBot:${instanceId}]`, `event=${event}`]
+  for (const key of Object.keys(fields)) {
+    const val = fields[key]
+    if (val === undefined) continue
+    parts.push(`${key}=${formatVal(val)}`)
+  }
+  const line = parts.join(' ')
+  // eslint-disable-next-line no-console -- structured logger by design
+  if (level === 'error') console.error(line)
+  else if (level === 'warn') console.warn(line)
+  else console.log(line)
+}
+
+let traceIdCounter = 0
+function generateTraceId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${(++traceIdCounter).toString(36)}`
+}
+
+// ============================================
+// Public temp-file cleanup
+// ============================================
 
 /**
  * Remove stale WeCom media temp files older than 24 hours.
  *
- * Called once at startup by the im-channels layer. Files are only needed for
- * the duration of a single agent execution, so anything older than 24 hours
+ * Called once at startup by the im-channels layer. Files are only needed
+ * for the duration of a single agent execution, so anything older than 24h
  * is safe to remove.
  */
 export function cleanupWecomTempFiles(): void {
@@ -85,245 +154,27 @@ export function cleanupWecomTempFiles(): void {
     for (const f of files) {
       const fp = join(TEMP_DIR, f)
       try {
-        if (statSync(fp).mtimeMs < cutoff) { unlinkSync(fp); cleaned++ }
-      } catch { /* file may be in use or already gone */ }
+        if (statSync(fp).mtimeMs < cutoff) {
+          unlinkSync(fp)
+          cleaned++
+        }
+      } catch {
+        /* file may be in use or already gone */
+      }
     }
     if (cleaned > 0) {
-      console.log(`[WecomBot] Removed ${cleaned} stale temp file(s) from ${TEMP_DIR}`)
-    }
-  } catch { /* directory may not exist on first run */ }
-}
-
-/** Image file extensions that map to WeCom 'image' media type */
-const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'])
-
-// ============================================
-// Helpers
-// ============================================
-
-let reqIdCounter = 0
-
-function generateReqId(prefix: string): string {
-  return `${prefix}_${Date.now()}_${++reqIdCounter}`
-}
-
-// ============================================
-// Media: Download & Decrypt
-// ============================================
-
-/**
- * Download an encrypted media file from WeCom and decrypt it locally.
- *
- * MUST be called within 5 minutes of receiving the message (URL expiry).
- * Algorithm: AES-256-CBC, key = aeskey bytes, IV = first 16 bytes of key.
- * Padding: PKCS#7 to 32-byte multiples (WeCom-specific; handled manually).
- *
- * @param url - WeCom media URL (valid for 5 minutes)
- * @param aeskeyBase64 - Base64-encoded AES key
- * @param filename - Display filename (used to name the temp file)
- * @param instanceId - For logging context
- * @returns Absolute path to the decrypted temp file
- */
-async function downloadAndDecrypt(
-  url: string,
-  aeskeyBase64: string,
-  filename: string,
-  instanceId: string
-): Promise<string> {
-  // Ensure temp directory exists
-  await mkdir(TEMP_DIR, { recursive: true })
-
-  console.log(`[WecomBot:${instanceId}] Downloading media: ${filename} (url length=${url.length})`)
-  const t0 = Date.now()
-
-  // Download encrypted content
-  const encryptedBuf = await httpGetBuffer(url)
-
-  // Guard against empty responses (e.g., expired URL returning empty 200)
-  if (encryptedBuf.length === 0) {
-    throw new Error(`[WecomBot] Empty response downloading media: ${filename}`)
-  }
-
-  // Decrypt: AES-256-CBC, IV = first 16 bytes of key.
-  // WeCom pads plaintext to 32-byte multiples (not standard 16-byte AES block size),
-  // so padding values 17–32 are valid but rejected by Node's built-in PKCS#7 check.
-  // Solution: disable auto-padding and strip manually.
-  const aeskey = Buffer.from(aeskeyBase64, 'base64')
-  const iv = aeskey.subarray(0, 16)
-  const decipher = createDecipheriv('aes-256-cbc', aeskey, iv)
-  decipher.setAutoPadding(false)
-  const raw = Buffer.concat([decipher.update(encryptedBuf), decipher.final()])
-  // Strip WeCom PKCS#7 padding (pad value ∈ [1, 32])
-  const padLen = raw[raw.length - 1]
-  if (padLen < 1 || padLen > 32) {
-    throw new Error(`[WecomBot] Invalid padding byte: ${padLen} (expected 1–32)`)
-  }
-  const decrypted = raw.subarray(0, raw.length - padLen)
-
-  // Write to temp file with a collision-safe name
-  const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${filename}`
-  const outPath = join(TEMP_DIR, safeName)
-  await writeFile(outPath, decrypted)
-
-  console.log(
-    `[WecomBot:${instanceId}] Downloaded & decrypted: ${filename} → ${outPath} ` +
-    `(${decrypted.length} bytes, ${Date.now() - t0}ms)`
-  )
-  return outPath
-}
-
-/**
- * Simple HTTPS GET → Buffer.
- * Follows redirects once (WeCom CDN may redirect).
- * Rejects on non-200 status or timeout (30 s).
- */
-function httpGetBuffer(url: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doGet = (targetUrl: string, redirectsLeft: number) => {
-      const req = https.get(targetUrl, (res) => {
-        // Handle redirects
-        if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && redirectsLeft > 0) {
-          res.resume()
-          console.log(`[WecomBot] HTTP redirect ${res.statusCode} → ${res.headers.location}`)
-          doGet(res.headers.location, redirectsLeft - 1)
-          return
-        }
-        if (res.statusCode !== 200) {
-          res.resume()
-          reject(new Error(`HTTP ${res.statusCode} downloading WeCom media from ${targetUrl}`))
-          return
-        }
-        const chunks: Buffer[] = []
-        let totalBytes = 0
-        res.on('data', (chunk: Buffer) => {
-          totalBytes += chunk.length
-          if (totalBytes > MAX_DOWNLOAD_BYTES) {
-            req.destroy()
-            reject(new Error(`WeCom media download exceeds ${MAX_DOWNLOAD_BYTES} bytes limit`))
-            return
-          }
-          chunks.push(chunk)
-        })
-        res.on('end', () => resolve(Buffer.concat(chunks)))
-        res.on('error', reject)
-      })
-      req.on('error', reject)
-      req.setTimeout(30_000, () => {
-        req.destroy()
-        reject(new Error('WeCom media download timeout (30s)'))
+      logEvent('_startup', 'info', 'temp_files_cleaned', {
+        cleaned,
+        dir: TEMP_DIR,
       })
     }
-    doGet(url, 3)
-  })
-}
-
-// ============================================
-// Media: Image Download Helper
-// ============================================
-
-/**
- * Download, decrypt, and prepare an image for both file attachment and
- * multimodal AI input.
- *
- * Returns null on failure (logged, not thrown) so callers can continue
- * processing remaining attachments without losing earlier successes.
- */
-async function downloadAndPrepareImage(
-  url: string,
-  aeskey: string,
-  instanceId: string
-): Promise<{ attachment: InboundAttachment; image: ImageAttachment } | null> {
-  try {
-    const filename = `image_${Date.now()}.jpg`
-    const localPath = await downloadAndDecrypt(url, aeskey, filename, instanceId)
-    const imgBuf = await readFile(localPath)
-    const imgExt = url.split('?')[0].split('.').pop()?.toLowerCase()
-    const mimeMap: Record<string, ImageMediaType> = { png: 'image/png', gif: 'image/gif' }
-    const mediaType: ImageMediaType = mimeMap[imgExt ?? ''] ?? 'image/jpeg'
-    return {
-      attachment: { type: 'image', filename, localPath, mimeType: 'image/jpeg' },
-      image: {
-        id: `wecom_img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        type: 'image',
-        mediaType,
-        data: imgBuf.toString('base64'),
-        name: filename,
-      },
-    }
-  } catch (err) {
-    console.error(`[WecomBot:${instanceId}] Image download failed:`, err)
-    return null
+  } catch {
+    /* directory may not exist on first run */
   }
 }
 
 // ============================================
-// Streaming: Tool Icons & Formatting
-// ============================================
-
-/**
- * Built-in SDK tool icons (exact name match).
- * Keep this list to tools that have a meaningfully distinct icon.
- */
-const BUILTIN_TOOL_ICONS: Record<string, string> = {
-  Read: '📖',
-  Edit: '✏️',
-  Write: '📝',
-  Bash: '⚙️',
-  Glob: '🔍',
-  Grep: '🔍',
-  Agent: '🤖',
-  Task: '🤖',
-  WebFetch: '🌐',
-  WebSearch: '🔎',
-  TodoWrite: '📋',
-  TodoRead: '📋',
-  NotebookEdit: '📓',
-  ExitPlanMode: '✅',
-}
-
-/**
- * Resolve the display icon for a tool.
- *
- * Priority:
- *   1. Exact match in BUILTIN_TOOL_ICONS (SDK built-ins)
- *   2. mcp__ai-browser__ prefix → all browser tools share one icon
- *   3. mcp__web-search__ prefix → search icon
- *   4. mcp__halo-* prefix → Halo internal tools
- *   5. Any other mcp__ prefix → generic tool icon
- *   6. Unknown → default gear
- */
-function getToolIcon(toolName: string): string {
-  if (BUILTIN_TOOL_ICONS[toolName]) return BUILTIN_TOOL_ICONS[toolName]
-  if (toolName.startsWith('mcp__ai-browser__')) return '🌐'
-  if (toolName.startsWith('mcp__web-search__')) return '🔎'
-  if (toolName.startsWith('mcp__halo-')) return '🔧'
-  if (toolName.startsWith('mcp__')) return '🔧'
-  return '⚙️'
-}
-
-/** Format a ProgressEvent as a single line for display in the WeCom <think> block. */
-function formatProgressLine(event: ProgressEvent): string {
-  switch (event.type) {
-    case 'tool_call': {
-      const icon = getToolIcon(event.tool)
-      const label = event.summary || event.tool
-      return `${icon} ${label}`
-    }
-    case 'tool_result': {
-      const icon = event.success ? '✅' : '❌'
-      return `${icon} ${event.summary || (event.success ? 'Done' : 'Error')}`
-    }
-    case 'thinking':
-      return `💭 ${event.text}`
-    case 'status':
-      return `ℹ️ ${event.text}`
-    default:
-      return ''
-  }
-}
-
-// ============================================
-// WeCom Bot Config (provider-specific)
+// Provider
 // ============================================
 
 interface WecomBotProviderConfig {
@@ -331,194 +182,6 @@ interface WecomBotProviderConfig {
   secret: string
   wsUrl?: string
 }
-
-// ============================================
-// WecomStreamSession
-// ============================================
-
-/**
- * Manages a single streaming reply session for one user message.
- *
- * Accumulates progress events into a <think> block, then sends the combined
- * content (think block + answer text) as WeCom stream packets via WebSocket.
- *
- * Protocol: WeCom requires `stream.content` to be FULL accumulated content each
- * time (not a delta). Content is replaced on each packet update.
- *
- * Throttling: sends at most one packet per THROTTLE_MS to avoid client jank.
- * Content limit: enforces MAX_CONTENT_BYTES by evicting oldest progress lines.
- */
-class WecomStreamSession implements StreamingHandle {
-  private readonly streamId: string
-  private readonly ws: WebSocket
-  private readonly reqId: string
-  private readonly instanceId: string
-
-  private progressLines: string[] = []
-  private answerText = ''
-  private started = false
-  private finished = false
-
-  // Throttle state
-  private throttleTimer: ReturnType<typeof setTimeout> | null = null
-  private pendingFlush = false
-
-  /** Called when this session is finished or disposed, so the instance can untrack it. */
-  onDispose: (() => void) | null = null
-
-  private static readonly THROTTLE_MS = 500
-  // Leave ~480 bytes margin below the WeCom 20480 byte limit
-  private static readonly MAX_CONTENT_BYTES = 20000
-
-  constructor(ws: WebSocket, reqId: string, instanceId: string) {
-    this.streamId = `stream_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    this.ws = ws
-    this.reqId = reqId
-    this.instanceId = instanceId
-  }
-
-  // ── StreamingHandle interface ──────────────────────────────────
-
-  async update(event: ProgressEvent): Promise<void> {
-    if (this.finished) return
-
-    if (event.type === 'text_delta') {
-      this.answerText += event.text
-    } else {
-      const line = formatProgressLine(event)
-      if (line) this.progressLines.push(line)
-    }
-
-    this.scheduleFlush()
-  }
-
-  async finish(finalText: string): Promise<void> {
-    if (this.finished) return
-    this.finished = true
-    this.clearThrottle()
-
-    // Debug: detect content mismatch between streamed text_delta accumulation and final SDK text
-    const streamedText = this.answerText
-    if (streamedText !== finalText) {
-      console.warn(
-        `[WecomStream:${this.instanceId}] ⚠️ Content mismatch on finish!\n` +
-        `  streamed (${streamedText.length} chars): ${streamedText.slice(0, 200)}${streamedText.length > 200 ? '...' : ''}\n` +
-        `  final   (${finalText.length} chars): ${finalText.slice(0, 200)}${finalText.length > 200 ? '...' : ''}`
-      )
-    }
-
-    this.answerText = finalText
-    this.sendPacket(true)
-    this.onDispose?.()
-    console.log(`[WecomStream:${this.instanceId}] Stream finished (streamId=${this.streamId})`)
-  }
-
-  /**
-   * Abort the stream without sending a final packet.
-   * Called when the WebSocket disconnects before finish() — cleans up the
-   * throttle timer to prevent resource leaks.
-   */
-  dispose(): void {
-    if (this.finished) return
-    this.finished = true
-    this.clearThrottle()
-    this.onDispose?.()
-    console.log(`[WecomStream:${this.instanceId}] Stream disposed (streamId=${this.streamId})`)
-  }
-
-  // ── Internal ──────────────────────────────────────────────────
-
-  private scheduleFlush(): void {
-    if (this.throttleTimer) {
-      // A timer is already running; flag that we want another flush after it fires
-      this.pendingFlush = true
-      return
-    }
-
-    // Send immediately, then start the cooldown timer
-    this.sendPacket(false)
-    this.throttleTimer = setTimeout(() => {
-      this.throttleTimer = null
-      if (this.pendingFlush) {
-        this.pendingFlush = false
-        if (!this.finished) {
-          this.sendPacket(false)
-        }
-      }
-    }, WecomStreamSession.THROTTLE_MS)
-  }
-
-  private buildContent(): string {
-    const thinkBlock = this.progressLines.length > 0
-      ? `<think>\n${this.progressLines.join('\n')}\n</think>\n\n`
-      : ''
-    return thinkBlock + this.answerText
-  }
-
-  private sendPacket(finish: boolean): void {
-    if (this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(`[WecomStream:${this.instanceId}] WebSocket not open, skipping packet`)
-      return
-    }
-
-    let content = this.buildContent()
-
-    // Enforce byte limit — evict oldest progress lines from the top
-    while (
-      this.progressLines.length > 1 &&
-      Buffer.byteLength(content, 'utf8') > WecomStreamSession.MAX_CONTENT_BYTES
-    ) {
-      this.progressLines.shift()
-      const truncatedThink = `<think>\n...\n${this.progressLines.join('\n')}\n</think>\n\n`
-      content = truncatedThink + this.answerText
-    }
-
-    const packet = {
-      cmd: 'aibot_respond_msg',
-      headers: { req_id: this.reqId },
-      body: {
-        msgtype: 'stream',
-        stream: {
-          id: this.streamId,
-          finish,
-          content,
-        },
-      },
-    }
-
-    if (!this.started) {
-      this.started = true
-      console.log(`[WecomStream:${this.instanceId}] First packet sent (streamId=${this.streamId})`)
-    }
-
-    // Debug: log finish packet content for diagnosing garbled display issues
-    if (finish) {
-      console.log(
-        `[WecomStream:${this.instanceId}] 📤 FINISH packet (streamId=${this.streamId}):\n` +
-        `  bytes=${Buffer.byteLength(content, 'utf8')}, progressLines=${this.progressLines.length}\n` +
-        `  content=${content.slice(0, 500)}${content.length > 500 ? '...' : ''}`
-      )
-    }
-
-    try {
-      this.ws.send(JSON.stringify(packet))
-    } catch (err) {
-      console.error(`[WecomStream:${this.instanceId}] Failed to send stream packet:`, err)
-    }
-  }
-
-  private clearThrottle(): void {
-    if (this.throttleTimer) {
-      clearTimeout(this.throttleTimer)
-      this.throttleTimer = null
-    }
-    this.pendingFlush = false
-  }
-}
-
-// ============================================
-// Provider
-// ============================================
 
 export class WecomBotProvider implements ImChannelProvider {
   readonly type: ImChannelType = 'wecom-bot'
@@ -553,35 +216,22 @@ export class WecomBotProvider implements ImChannelProvider {
 // Instance
 // ============================================
 
-interface ReqIdEntry {
-  reqId: string
+/** Cached inbound frame headers keyed by chatId, with arrival timestamp. */
+interface FrameCacheEntry {
+  /** Stored frame is enough to satisfy the SDK's WsFrameHeaders requirement. */
+  frame: WsFrameHeaders
   ts: number
 }
 
-/** Pending WebSocket request-response resolver */
-interface PendingResponse {
-  resolve: (msg: any) => void
-  reject: (err: Error) => void
-  timer: ReturnType<typeof setTimeout>
-}
-
-/** One message part collected during the debounce window */
-interface BufferPart {
-  body: string
-  attachments: InboundAttachment[]
-  images: ImageAttachment[]
-  reqId: string
-  from: string
-  fromName: string | undefined
+/** A queued push waiting for the WS to re-authenticate. */
+interface PendingPush {
   chatId: string
-  chatType: string
-  msgId: string
-}
-
-/** Active debounce buffer for a single chat conversation */
-interface ChatBuffer {
-  parts: BufferPart[]
-  timer: ReturnType<typeof setTimeout>
+  text: string
+  chatType: 'direct' | 'group'
+  enqueuedAt: number
+  sourceTag: string
+  trace: string | undefined
+  resolve: (sent: boolean) => void
 }
 
 class WecomBotInstance implements ImChannelInstance {
@@ -589,30 +239,33 @@ class WecomBotInstance implements ImChannelInstance {
   readonly providerType: ImChannelType = 'wecom-bot'
 
   private config: WecomBotProviderConfig
-  private ws: WebSocket | null = null
+  private wsClient: InstanceType<typeof AiBot.WSClient> | null = null
   private active = false
-  private reconnectAttempts = 0
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
-  private reqIdCleanupTimer: ReturnType<typeof setInterval> | null = null
-  private inboundHandler: ((msg: InboundMessage, reply: ReplyHandle) => void) | null = null
-  private reqIdMap = new Map<string, ReqIdEntry>()
+  private authenticated = false
+  private inboundHandler:
+    | ((msg: InboundMessage, reply: ReplyHandle) => void)
+    | null = null
 
-  /**
-   * Pending request-response resolvers for WebSocket command pairs.
-   * Used for upload protocol (init / chunk / complete) and future command RPCs.
-   * Keyed by req_id so responses are matched back to their caller Promises.
-   */
-  private pendingResponses = new Map<string, PendingResponse>()
-
-  /** Active stream sessions — disposed on WebSocket close to prevent timer leaks. */
+  /** Cached inbound frames per chat for 24h reply window. */
+  private frameCache = new Map<string, FrameCacheEntry>()
+  /** Stream sessions in flight — for cleanup on WS close. */
   private activeStreamSessions = new Set<WecomStreamSession>()
-
-  /** Debounce window (ms) for coalescing rapid consecutive messages from the same chat. */
-  private static readonly DEBOUNCE_MS = 800
-
-  /** Per-chatId debounce buffers — merges file + text messages sent in quick succession. */
-  private chatBuffers = new Map<string, ChatBuffer>()
+  /** Pushes deferred while WS is unauthenticated; flushed on next auth. */
+  private pendingPushes: PendingPush[] = []
+  /** Timer handles for cleanup on stop(). */
+  private cacheCleanupTimer: ReturnType<typeof setInterval> | null = null
+  private healthSnapshotTimer: ReturnType<typeof setInterval> | null = null
+  /** Counters surfaced in the periodic health snapshot. */
+  private counters = {
+    totalInbound: 0,
+    totalReply: 0,
+    totalPush: 0,
+    totalStreamPackets: 0,
+    totalError: 0,
+    totalDispatched: 0,
+  }
+  /** Timestamp instance was started, for uptime in snapshots. */
+  private startedAt = 0
 
   constructor(instanceId: string, config: WecomBotProviderConfig) {
     this.instanceId = instanceId
@@ -627,795 +280,1074 @@ class WecomBotInstance implements ImChannelInstance {
 
   start(): void {
     this.active = true
+    this.startedAt = Date.now()
     if (!this.config.botId || !this.config.secret) {
-      console.log(`[WecomBot:${this.instanceId}] Missing botId or secret — skipping start`)
+      logEvent(this.instanceId, 'warn', 'start_skip', {
+        reason: 'missing botId or secret',
+      })
       return
     }
-    this.connect()
-    this.reqIdCleanupTimer = setInterval(() => this.cleanupExpiredReqIds(), REQ_ID_CLEANUP_INTERVAL_MS)
-    console.log(`[WecomBot:${this.instanceId}] Started`)
+    this.openClient()
+    this.cacheCleanupTimer = setInterval(
+      () => this.cleanupExpiredFrames(),
+      REQ_ID_CLEANUP_INTERVAL_MS,
+    )
+    this.healthSnapshotTimer = setInterval(
+      () => this.emitHealthSnapshot('periodic'),
+      HEALTH_SNAPSHOT_INTERVAL_MS,
+    )
+    logEvent(this.instanceId, 'info', 'instance_start', {
+      botIdPrefix: this.config.botId.slice(0, 8),
+      wsUrl: this.config.wsUrl || DEFAULT_WS_URL,
+    })
   }
 
   stop(): void {
     this.active = false
-    // Cancel all timers before tearing down the socket so no reconnect or
-    // heartbeat fires during teardown.
-    if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null }
-    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null }
-    if (this.reqIdCleanupTimer) { clearInterval(this.reqIdCleanupTimer); this.reqIdCleanupTimer = null }
-    // Reject all pending upload/command responses immediately on stop
-    this.rejectAllPendingResponses(new Error('WecomBot instance stopped'))
-    // Cancel any pending debounce buffers — drop buffered messages on stop
-    for (const buffer of this.chatBuffers.values()) clearTimeout(buffer.timer)
-    this.chatBuffers.clear()
-    // Destroy socket first, then clear the handler.  Reversing the order would
-    // create a brief window where an in-flight WebSocket message callback could
-    // fire with a null handler and silently drop the message.
-    this.destroySocket()
+    this.authenticated = false
+    this.emitHealthSnapshot('stop')
+    if (this.cacheCleanupTimer) {
+      clearInterval(this.cacheCleanupTimer)
+      this.cacheCleanupTimer = null
+    }
+    if (this.healthSnapshotTimer) {
+      clearInterval(this.healthSnapshotTimer)
+      this.healthSnapshotTimer = null
+    }
+    if (this.pendingPushes.length > 0) {
+      logEvent(this.instanceId, 'warn', 'push_queue_drop_on_stop', {
+        count: this.pendingPushes.length,
+      })
+      const drained = this.pendingPushes.splice(0)
+      for (const entry of drained) entry.resolve(false)
+    }
+    this.activeStreamSessions.forEach((s) => s.dispose())
+    this.activeStreamSessions.clear()
+    try {
+      this.wsClient?.disconnect()
+    } catch (err) {
+      logEvent(this.instanceId, 'warn', 'ws_disconnect_error', {
+        err: err instanceof Error ? err.message : String(err),
+      })
+    }
+    this.wsClient = null
     this.inboundHandler = null
-    this.reqIdMap.clear()
-    this.reconnectAttempts = 0
-    console.log(`[WecomBot:${this.instanceId}] Stopped`)
+    this.frameCache.clear()
+    logEvent(this.instanceId, 'info', 'instance_stop', {})
   }
 
   reconnect(): void {
     if (!this.active) return
-    this.destroySocket()
-    this.stopHeartbeat()
-    this.reconnectAttempts = 0
+    try {
+      this.wsClient?.disconnect()
+    } catch {
+      /* ignore */
+    }
+    this.wsClient = null
+    this.authenticated = false
     if (this.config.botId && this.config.secret) {
-      this.connect()
+      this.openClient()
     }
   }
 
   isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN
-  }
-
-  pushToChat(chatId: string, text: string, chatType: 'direct' | 'group'): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(`[WecomBot:${this.instanceId}] Cannot push: WebSocket not connected`)
-      return false
-    }
-    try {
-      this.ws.send(JSON.stringify({
-        cmd: 'aibot_send_msg',
-        headers: { req_id: generateReqId('aibot_send_msg') },
-        body: {
-          chatid: chatId,
-          chat_type: chatType === 'direct' ? 1 : 2,
-          msgtype: 'markdown',
-          markdown: { content: text },
-        },
-      }))
-      console.log(`[WecomBot:${this.instanceId}] Push sent to chat ${chatId} (${chatType})`)
-      return true
-    } catch (err) {
-      console.error(`[WecomBot:${this.instanceId}] Failed to push message:`, err)
-      return false
-    }
+    return this.wsClient?.isConnected === true && this.authenticated
   }
 
   /**
-   * Optional file-sending capability.
-   * Bound to this instance so callers don't need to hold a reference to the instance.
+   * Synchronous push via SDK aibot_send_msg. The SDK returns a Promise that
+   * resolves on ack, but the ImChannelInstance contract is `boolean` — we
+   * fire-and-forget and report whether the WS was ready to accept the send.
+   * Errors after the synchronous return are logged but do not retroactively
+   * change the return value.
+   */
+  pushToChat(
+    chatId: string,
+    text: string,
+    chatType: 'direct' | 'group',
+    trace?: string,
+  ): boolean {
+    if (!this.wsClient || !this.authenticated) {
+      logEvent(this.instanceId, 'warn', 'push_unavailable', {
+        trace,
+        chatId,
+        chatType,
+        authenticated: this.authenticated,
+        cat: 'network',
+      })
+      return false
+    }
+
+    const sanitized = ensureUtf8(text)
+    const bytes = Buffer.byteLength(sanitized, 'utf8')
+
+    // Fire and forget — the SDK queues + acks under the hood.
+    void this.wsClient
+      .sendMessage(chatId, {
+        msgtype: 'markdown',
+        markdown: { content: sanitized },
+      })
+      .then(() => {
+        this.counters.totalPush++
+        logEvent(this.instanceId, 'info', 'push_sent', {
+          trace,
+          chatId,
+          chatType,
+          bytes,
+        })
+      })
+      .catch((err: Error) => {
+        this.counters.totalError++
+        logEvent(this.instanceId, 'error', 'push_send_error', {
+          trace,
+          chatId,
+          chatType,
+          cat: 'network',
+          err: err.message,
+        })
+      })
+    return true
+  }
+
+  /**
+   * File send capability. The runtime supplies a SanctionedFile produced by
+   * FileExportGate, guaranteeing a safe resolved path.
    */
   readonly fileCapability: ImFileCapability = {
     sendFile: (chatId, file, chatType) =>
       this.sendFileToChat(chatId, file.resolvedPath, chatType, file.displayName),
   }
 
-  // ── Reply (using req_id from inbound message) ─────────────────
+  // ── SDK client lifecycle ──────────────────────────────────────
 
-  private replyToChat(chatId: string, text: string): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false
-
-    const entry = this.reqIdMap.get(chatId)
-    if (!entry) return false
-    if (Date.now() - entry.ts > REQ_ID_TTL_MS) {
-      this.reqIdMap.delete(chatId)
-      return false
-    }
-
-    try {
-      this.ws.send(JSON.stringify({
-        cmd: 'aibot_respond_msg',
-        headers: { req_id: entry.reqId },
-        body: {
-          msgtype: 'markdown',
-          markdown: { content: text },
-        },
-      }))
-      console.log(`[WecomBot:${this.instanceId}] Reply sent to chat ${chatId}`)
-      return true
-    } catch (err) {
-      console.error(`[WecomBot:${this.instanceId}] Failed to send reply:`, err)
-      return false
-    }
-  }
-
-  // ── File: Upload & Send ────────────────────────────────────────
-
-  /**
-   * Upload a local file to WeCom via WebSocket chunked upload.
-   *
-   * Protocol: init → N chunks → complete → media_id
-   *   - Each chunk ≤ 512 KB (before base64), max 100 chunks
-   *   - Upload session valid for 30 minutes
-   *   - media_id valid for 3 days
-   *   - Frequency limit: 30 req/min, 1000 req/hr
-   *
-   * @param filePath - Absolute path to the local file
-   * @param mediaType - WeCom media type ('file' | 'image' | 'voice' | 'video')
-   * @param filename - Display filename (defaults to basename)
-   * @returns media_id for use in message payloads
-   */
-  private async uploadMediaToWecom(
-    filePath: string,
-    mediaType: 'file' | 'image' | 'voice' | 'video',
-    filename?: string
-  ): Promise<string> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('[WecomBot] WebSocket not connected for upload')
-    }
-
-    const fileBuf = await readFile(filePath)
-    const totalSize = fileBuf.length
-    const displayName = filename || basename(filePath)
-    const md5 = createHash('md5').update(fileBuf).digest('hex')
-    const totalChunks = Math.ceil(totalSize / UPLOAD_CHUNK_SIZE)
-
-    if (totalChunks > UPLOAD_MAX_CHUNKS) {
-      throw new Error(
-        `File too large for WeCom upload: ${totalChunks} chunks required (max ${UPLOAD_MAX_CHUNKS})`
-      )
-    }
-
-    console.log(
-      `[WecomBot:${this.instanceId}] Upload start: ${displayName}, ` +
-      `${totalSize} bytes, ${totalChunks} chunk(s), type=${mediaType}`
-    )
-
-    // Step 1: Initialize upload session
-    const initReqId = generateReqId('upload_init')
-    const initResp = await this.sendAndWaitResponse(initReqId, {
-      cmd: 'aibot_upload_media_init',
-      headers: { req_id: initReqId },
-      body: {
-        type: mediaType,
-        filename: displayName,
-        total_size: totalSize,
-        total_chunks: totalChunks,
-        md5,
-      },
-    })
-
-    const uploadId: string = initResp.body?.upload_id
-    if (!uploadId) {
-      throw new Error('[WecomBot] No upload_id returned from aibot_upload_media_init')
-    }
-    console.log(`[WecomBot:${this.instanceId}] Upload session: upload_id=${uploadId}`)
-
-    // Step 2: Upload chunks (sequential for simplicity; WeCom supports out-of-order)
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * UPLOAD_CHUNK_SIZE
-      const end = Math.min(start + UPLOAD_CHUNK_SIZE, totalSize)
-      const chunkData = fileBuf.subarray(start, end).toString('base64')
-      const chunkReqId = generateReqId(`upload_chunk_${i}`)
-      await this.sendAndWaitResponse(chunkReqId, {
-        cmd: 'aibot_upload_media_chunk',
-        headers: { req_id: chunkReqId },
-        body: { upload_id: uploadId, chunk_index: i, base64_data: chunkData },
-      })
-      console.log(
-        `[WecomBot:${this.instanceId}] Upload chunk ${i + 1}/${totalChunks} sent (${end - start} bytes)`
-      )
-    }
-
-    // Step 3: Finalize upload and get media_id
-    const completeReqId = generateReqId('upload_finish')
-    const completeResp = await this.sendAndWaitResponse(completeReqId, {
-      cmd: 'aibot_upload_media_finish',
-      headers: { req_id: completeReqId },
-      body: { upload_id: uploadId },
-    })
-
-    const mediaId: string = completeResp.body?.media_id
-    if (!mediaId) {
-      throw new Error('[WecomBot] No media_id returned from aibot_upload_media_finish')
-    }
-
-    console.log(
-      `[WecomBot:${this.instanceId}] Upload complete: ${displayName} → media_id=${mediaId}`
-    )
-    return mediaId
-  }
-
-  /**
-   * Upload a local file and send it to a WeCom chat.
-   *
-   * Combines uploadMediaToWecom + message dispatch.
-   * Uses aibot_respond_msg (passive reply) when a valid req_id is available,
-   * falls back to aibot_send_msg (active push) otherwise.
-   *
-   * @param chatId - Target platform-side conversation ID
-   * @param filePath - Absolute path to the local file
-   * @param chatType - Conversation type
-   * @param filename - Display filename (defaults to basename of filePath)
-   * @returns true on success, false on recoverable failure
-   */
-  async sendFileToChat(
-    chatId: string,
-    filePath: string,
-    chatType: 'direct' | 'group',
-    filename?: string
-  ): Promise<boolean> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn(`[WecomBot:${this.instanceId}] sendFileToChat: WebSocket not connected`)
-      return false
-    }
-
-    try {
-      const displayName = filename || basename(filePath)
-      const ext = extname(filePath).toLowerCase()
-      const mediaType: 'image' | 'file' = IMAGE_EXTENSIONS.has(ext) ? 'image' : 'file'
-
-      const mediaId = await this.uploadMediaToWecom(filePath, mediaType, displayName)
-
-      // Build the message body based on media type
-      const msgBody = mediaType === 'image'
-        ? { msgtype: 'image', image: { media_id: mediaId } }
-        : { msgtype: 'file', file: { media_id: mediaId } }
-
-      // Prefer passive reply (aibot_respond_msg) when a fresh req_id is available
-      const entry = this.reqIdMap.get(chatId)
-      const canReply = entry && (Date.now() - entry.ts < REQ_ID_TTL_MS)
-
-      if (canReply) {
-        this.ws.send(JSON.stringify({
-          cmd: 'aibot_respond_msg',
-          headers: { req_id: entry!.reqId },
-          body: msgBody,
-        }))
-      } else {
-        this.ws.send(JSON.stringify({
-          cmd: 'aibot_send_msg',
-          headers: { req_id: generateReqId('send_file') },
-          body: {
-            chatid: chatId,
-            chat_type: chatType === 'direct' ? 1 : 2,
-            ...msgBody,
-          },
-        }))
-      }
-
-      console.log(
-        `[WecomBot:${this.instanceId}] File sent: ${displayName} → chat=${chatId} ` +
-        `(via ${canReply ? 'respond' : 'push'})`
-      )
-      return true
-    } catch (err) {
-      console.error(
-        `[WecomBot:${this.instanceId}] sendFileToChat failed: chatId=${chatId}`,
-        err
-      )
-      return false
-    }
-  }
-
-  // ── WebSocket: Request-Response RPC ───────────────────────────
-
-  /**
-   * Send a WebSocket message and wait for the matching response (matched by req_id).
-   *
-   * Used for upload protocol commands (init / chunk / complete).
-   * Rejects on WeCom errcode ≠ 0 or after WS_REQUEST_TIMEOUT_MS.
-   */
-  private sendAndWaitResponse(reqId: string, message: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingResponses.delete(reqId)
-        console.error(
-          `[WecomBot:${this.instanceId}] Response timeout (${WS_REQUEST_TIMEOUT_MS}ms): reqId=${reqId}`
-        )
-        reject(new Error(`WeCom WebSocket response timeout for reqId=${reqId}`))
-      }, WS_REQUEST_TIMEOUT_MS)
-
-      this.pendingResponses.set(reqId, { resolve, reject, timer })
-
-      try {
-        this.ws!.send(JSON.stringify(message))
-      } catch (err) {
-        clearTimeout(timer)
-        this.pendingResponses.delete(reqId)
-        reject(err as Error)
-      }
-    })
-  }
-
-  /**
-   * Reject all pending upload responses immediately.
-   * Called on stop() to prevent dangling Promises.
-   */
-  private rejectAllPendingResponses(reason: Error): void {
-    for (const [, pending] of this.pendingResponses) {
-      clearTimeout(pending.timer)
-      pending.reject(reason)
-    }
-    this.pendingResponses.clear()
-  }
-
-  // ── WebSocket Connection ──────────────────────────────────────
-
-  private connect(): void {
-    this.destroySocket()
-    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null }
-
+  private openClient(): void {
     const wsUrl = this.config.wsUrl || DEFAULT_WS_URL
-    console.log(`[WecomBot:${this.instanceId}] Connecting to ${wsUrl}...`)
 
-    try {
-      this.ws = new WebSocket(wsUrl, {
-        perMessageDeflate: false,
-        skipUTF8Validation: true,
+    const sdkLogger = this.makeSdkLogger()
+    const client = new AiBot.WSClient({
+      botId: this.config.botId,
+      secret: this.config.secret,
+      wsUrl,
+      // -1 = infinite — bot is long-lived; we'd rather keep retrying with
+      // exponential backoff than give up. Stop() always aborts cleanly.
+      maxReconnectAttempts: -1,
+      heartbeatInterval: 30_000,
+      logger: sdkLogger,
+    })
+
+    client.on('connected', () => {
+      logEvent(this.instanceId, 'info', 'ws_open', { wsUrl })
+    })
+    client.on('authenticated', () => {
+      this.authenticated = true
+      logEvent(this.instanceId, 'info', 'subscribe_ok', {})
+      this.flushPendingPushes()
+    })
+    client.on('disconnected', (reason: string) => {
+      const wasAuthenticated = this.authenticated
+      this.authenticated = false
+      logEvent(this.instanceId, 'warn', 'ws_close', {
+        reason,
+        wasAuthenticated,
+        activeStreams: this.activeStreamSessions.size,
+        cat: 'network',
       })
-    } catch (err) {
-      console.error(`[WecomBot:${this.instanceId}] Failed to create WebSocket:`, err)
-      this.scheduleReconnect()
-      return
-    }
-
-    this.ws.on('open', () => {
-      console.log(`[WecomBot:${this.instanceId}] Connected, subscribing...`)
-      this.reconnectAttempts = 0
-      this.ws!.send(JSON.stringify({
-        cmd: 'aibot_subscribe',
-        headers: { req_id: generateReqId('aibot_subscribe') },
-        body: {
-          bot_id: this.config.botId,
-          secret: this.config.secret,
-        },
-      }))
+      // Mark all in-flight stream sessions broken so finish() falls back to push.
+      this.activeStreamSessions.forEach((s) =>
+        s.markStreamBroken(`ws disconnected: ${reason}`),
+      )
+    })
+    client.on('reconnecting', (attempt: number) => {
+      logEvent(this.instanceId, 'info', 'reconnect_scheduled', { attempt })
+    })
+    client.on('error', (err: Error) => {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'ws_error', {
+        cat: 'network',
+        err: err.message,
+      })
     })
 
-    this.ws.on('message', (data: WebSocket.Data) => {
-      this.handleMessage(data)
-    })
+    // Inbound routing — one handler per message type, each translates to the
+    // normalized InboundMessage contract.
+    client.on('message.text', (data) => this.handleInbound(data, 'text'))
+    client.on('message.image', (data) => this.handleInbound(data, 'image'))
+    client.on('message.mixed', (data) => this.handleInbound(data, 'mixed'))
+    client.on('message.voice', (data) => this.handleInbound(data, 'voice'))
+    client.on('message.file', (data) => this.handleInbound(data, 'file'))
+    client.on('message.video', (data) => this.handleInbound(data, 'video'))
 
-    this.ws.on('ping', () => {
-      this.ws?.pong()
-    })
-
-    this.ws.on('close', (code: number, reason: Buffer) => {
-      console.log(`[WecomBot:${this.instanceId}] Connection closed (code=${code}, reason=${reason.toString()})`)
-      this.stopHeartbeat()
-      // Dispose active stream sessions — cleans up throttle timers that would
-      // otherwise fire into a dead socket and leak closure references.
-      this.activeStreamSessions.forEach(session => session.dispose())
-      this.activeStreamSessions.clear()
-      // Reject pending upload responses — they cannot complete after disconnect
-      this.rejectAllPendingResponses(
-        new Error(`WeCom WebSocket closed (code=${code}) — upload aborted`)
+    client.on('event.disconnected_event', () => {
+      // Server kicked us off because a newer connection took the bot slot.
+      // The SDK already marks isManualClose and won't auto-reconnect; we
+      // re-open here so the bot stays online if Halo is still running.
+      logEvent(this.instanceId, 'warn', 'disconnected_event', {
+        reason: 'new connection took bot slot',
+        cat: 'protocol',
+      })
+      this.activeStreamSessions.forEach((s) =>
+        s.markStreamBroken('disconnected_event: superseded'),
       )
       if (this.active) {
-        this.scheduleReconnect()
-      }
-    })
-
-    this.ws.on('error', (err: Error) => {
-      console.error(`[WecomBot:${this.instanceId}] WebSocket error:`, err.message)
-    })
-  }
-
-  private destroySocket(): void {
-    if (this.ws) {
-      try {
-        this.ws.removeAllListeners()
-        this.ws.terminate()
-      } catch { /* ignore */ }
-      this.ws = null
-    }
-  }
-
-  private handleMessage(data: WebSocket.Data): void {
-    const raw = typeof data === 'string' ? data : data.toString()
-    console.log(`[WecomBot:${this.instanceId}] Raw WebSocket message: ${raw}`)
-
-    let msg: any
-    try {
-      msg = JSON.parse(raw)
-    } catch {
-      console.warn(`[WecomBot:${this.instanceId}] Invalid JSON received`)
-      return
-    }
-
-    const reqId: string = msg.headers?.req_id ?? ''
-
-    // ── Resolve pending upload/command responses FIRST ─────────────────────────
-    // Upload protocol (init/chunk/complete) uses sendAndWaitResponse(). Match
-    // by req_id before any other routing to avoid falling into the cmd switch.
-    if (reqId) {
-      const pending = this.pendingResponses.get(reqId)
-      if (pending) {
-        clearTimeout(pending.timer)
-        this.pendingResponses.delete(reqId)
-        if (msg.errcode && msg.errcode !== 0) {
-          console.error(
-            `[WecomBot:${this.instanceId}] Command error: reqId=${reqId}, ` +
-            `errcode=${msg.errcode}, errmsg=${msg.errmsg ?? 'unknown'}`
-          )
-          pending.reject(new Error(`WeCom error ${msg.errcode}: ${msg.errmsg ?? 'unknown'}`))
-        } else {
-          console.log(`[WecomBot:${this.instanceId}] Command OK: reqId=${reqId}`)
-          pending.resolve(msg)
-        }
-        return
-      }
-    }
-
-    // Authentication response
-    if (typeof reqId === 'string' && reqId.startsWith('aibot_subscribe')) {
-      if (msg.errcode === 0) {
-        console.log(`[WecomBot:${this.instanceId}] Subscribed successfully`)
-        this.startHeartbeat()
-      } else {
-        console.error(`[WecomBot:${this.instanceId}] Subscribe failed: errcode=${msg.errcode} errmsg=${msg.errmsg}`)
-        this.destroySocket()
-      }
-      return
-    }
-
-    // Heartbeat ack
-    if (typeof reqId === 'string' && reqId.startsWith('ping')) return
-
-    // Command-based routing
-    switch (msg.cmd) {
-      case 'aibot_msg_callback':
-        // handleInboundMessage is async (media download). Fire-and-forget with
-        // error logging — we must not block the WebSocket message handler.
-        this.handleInboundMessage(msg).catch((err: Error) => {
-          console.error(`[WecomBot:${this.instanceId}] handleInboundMessage error:`, err)
+        // Schedule via microtask so SDK has a chance to finish its own close.
+        Promise.resolve().then(() => {
+          if (this.active) this.reconnect()
         })
-        break
-      case 'aibot_event_callback': {
-        const eventType = msg.body?.event?.eventtype ?? msg.body?.event_type ?? 'unknown'
-        console.log(`[WecomBot:${this.instanceId}] Event: ${eventType}`)
-        break
       }
-      default:
-        if (msg.cmd) {
-          console.log(`[WecomBot:${this.instanceId}] Unknown cmd: ${msg.cmd}`)
-        }
-        break
-    }
+    })
+
+    this.wsClient = client
+    client.connect()
   }
 
   /**
-   * Handle an inbound aibot_msg_callback message.
-   *
-   * For media messages (image / file / video), downloads and decrypts the
-   * content within the 5-minute URL validity window BEFORE dispatching to the
-   * inbound handler. Download failures are caught and logged; the message is
-   * still delivered with a text-only fallback.
-   *
-   * Made async to support media download. Called fire-and-forget from handleMessage().
+   * Single-line health snapshot — counters + connection state. Fires on a
+   * 5-minute timer plus once on stop().
    */
-  private async handleInboundMessage(msg: any): Promise<void> {
-    if (!this.active || !this.inboundHandler) return
+  private emitHealthSnapshot(trigger: 'periodic' | 'stop'): void {
+    logEvent(this.instanceId, 'info', 'health_snapshot', {
+      trigger,
+      uptimeMs: this.startedAt > 0 ? Date.now() - this.startedAt : 0,
+      active: this.active,
+      authenticated: this.authenticated,
+      activeStreams: this.activeStreamSessions.size,
+      pendingPushes: this.pendingPushes.length,
+      frameCacheSize: this.frameCache.size,
+      totalInbound: this.counters.totalInbound,
+      totalReply: this.counters.totalReply,
+      totalPush: this.counters.totalPush,
+      totalStreamPackets: this.counters.totalStreamPackets,
+      totalDispatched: this.counters.totalDispatched,
+      totalError: this.counters.totalError,
+    })
+  }
 
-    const body = msg.body
+  /**
+   * Wrap our `logEvent` as the SDK Logger interface. SDK-internal lines are
+   * tagged `event=sdk` so they remain grep-distinguishable from our own.
+   */
+  private makeSdkLogger(): SdkLogger {
+    const wrap = (level: LogLevel) =>
+      (msg: string, ...args: unknown[]): void => {
+        logEvent(this.instanceId, level, 'sdk', {
+          msg,
+          args: args.length > 0 ? args.map((a) => formatVal(a)).join(' ') : undefined,
+        })
+      }
+    return {
+      debug: wrap('info'), // SDK debug is too chatty — route to info but keep tagged
+      info: wrap('info'),
+      warn: wrap('warn'),
+      error: wrap('error'),
+    }
+  }
+
+  // ── Inbound translation ──────────────────────────────────────
+
+  private async handleInbound(
+    data: WsFrame<BaseMessage>,
+    msgType: 'text' | 'image' | 'mixed' | 'voice' | 'file' | 'video',
+  ): Promise<void> {
+    if (!this.active || !this.inboundHandler) return
+    const body = data.body
     if (!body) return
 
-    const reqId = msg.headers?.req_id
     const senderId = body.from?.userid
-    const senderName = body.from?.name ?? senderId
+    const senderName = (body.from as unknown as { name?: string })?.name ?? senderId
     const chatId = body.chatid ?? senderId
-    const chatType = body.chattype
+    const chatType: 'direct' | 'group' = body.chattype === 'group' ? 'group' : 'direct'
     const msgId = body.msgid
-    const msgType = body.msgtype
 
-    if (!senderId || !chatId) return
-
-    if (reqId) {
-      this.reqIdMap.set(chatId, { reqId, ts: Date.now() })
+    if (!senderId || !chatId) {
+      logEvent(this.instanceId, 'warn', 'inbound_drop_missing_fields', {
+        hasSender: Boolean(senderId),
+        hasChat: Boolean(chatId),
+        msgId,
+      })
+      return
     }
 
-    // ── Download & decrypt media (image / file / video) ────────────────────────
-    // Guard by url+aeskey presence, not chatType. WeCom docs say image/file/video
-    // are "direct-chat only" but that likely means the server won't send them in group
-    // context — if it does send url+aeskey, we should process regardless.
-    // The 5-minute URL window means we MUST download here before returning.
-    //
-    // Each media item is processed independently — a failed download does not
-    // discard already-downloaded attachments (per-item error isolation).
+    const trace: string = msgId || generateTraceId('inbound')
+    this.counters.totalInbound++
+
+    // Cache the frame (headers) so we can reply within the 24h window.
+    this.frameCache.set(chatId, {
+      frame: { headers: data.headers },
+      ts: Date.now(),
+    })
+
+    const inboundReceivedAt = Date.now()
+    logEvent(this.instanceId, 'info', 'inbound_received', {
+      trace,
+      chatId,
+      chatType,
+      from: senderId,
+      fromName: senderName !== senderId ? senderName : undefined,
+      msgType,
+      reqId: data.headers?.req_id,
+      hasQuote: Boolean(body.quote),
+    })
+
+    // Download / decode any media in the message. Failures are per-item;
+    // we still dispatch with whatever succeeded.
     const attachments: InboundAttachment[] = []
     const images: ImageAttachment[] = []
-
-    // Process top-level media from the message body
     await this.collectMedia(body, msgType, attachments, images)
 
-    // ── Process quoted message media (undocumented WeCom feature) ─────────────
-    // When a user replies/quotes a message containing media (file/image/video)
-    // and @-mentions the bot, WeCom includes the quoted message in `body.quote`
-    // with the same structure as a top-level message (msgtype + media payload
-    // with url + aeskey). This enables group-chat file processing: users quote
-    // a file message and @ the bot, bypassing the "file only in direct chat"
-    // limitation for top-level messages.
     if (body.quote) {
-      const quoteMsgType: string = body.quote.msgtype
-      const quoteMediaCountBefore = attachments.length + images.length
-      await this.collectMedia(body.quote, quoteMsgType, attachments, images)
-      const quoteMediaAdded = (attachments.length + images.length) - quoteMediaCountBefore
-      if (quoteMediaAdded > 0) {
-        console.log(
-          `[WecomBot:${this.instanceId}] Quoted media collected: ${quoteMediaAdded} item(s) ` +
-          `(quoteMsgType=${quoteMsgType})`
-        )
+      const quoteType = body.quote.msgtype as
+        | 'text' | 'image' | 'mixed' | 'voice' | 'file' | 'video'
+      const before = attachments.length + images.length
+      await this.collectMedia(body.quote, quoteType, attachments, images)
+      const added = attachments.length + images.length - before
+      if (added > 0) {
+        logEvent(this.instanceId, 'info', 'inbound_quote_media', {
+          trace,
+          count: added,
+          quoteMsgType: quoteType,
+        })
       }
     }
 
     const text = this.extractText(body)
+    const mediaPrepMs = Date.now() - inboundReceivedAt
 
-    console.log(
-      `[WecomBot:${this.instanceId}] Message received: chat=${chatId}, type=${chatType}, ` +
-      `from=${senderName}, msgType=${msgType}, len=${text.length}, ` +
-      `attachments=${attachments.length}, images=${images.length}`
-    )
+    logEvent(this.instanceId, 'info', 'inbound_parsed', {
+      trace,
+      chatId,
+      textLen: text.length,
+      attachments: attachments.length,
+      images: images.length,
+      mediaPrepMs,
+    })
 
-    // Buffer the part — debounce timer will merge + dispatch after DEBOUNCE_MS
-    this.bufferMessage({
+    const inbound: InboundMessage = {
       body: text,
-      attachments,
-      images,
-      reqId: reqId ?? '',
       from: senderId,
       fromName: senderName,
-      chatId,
+      channel: 'wecom-bot',
       chatType,
-      msgId,
-    })
-  }
+      chatId,
+      messageId: msgId,
+      timestamp: Date.now(),
+      ...(attachments.length > 0 ? { attachments } : {}),
+      ...(images.length > 0 ? { images } : {}),
+    }
 
-  /** Create a stream session and register it for cleanup on WS close. */
-  private createTrackedStreamSession(reqId: string): WecomStreamSession {
-    const session = new WecomStreamSession(this.ws!, reqId, this.instanceId)
-    this.activeStreamSessions.add(session)
-    session.onDispose = () => this.activeStreamSessions.delete(session)
-    return session
+    // ReplyHandle wires both passive reply (stream) and push fallback.
+    const reply = this.buildReplyHandle(chatId, chatType, trace, data.headers)
+
+    this.counters.totalDispatched++
+    logEvent(this.instanceId, 'info', 'inbound_dispatch_begin', {
+      trace,
+      chatId,
+      hasStream: this.authenticated,
+    })
+
+    // One-shot owner auto-claim for scan-auth bots. No-op for instances that
+    // were not provisioned via the QR-code flow (pendingOwnerClaim is unset).
+    // Awaited so the subsequent dispatch reads the updated owners list. See
+    // wecom-bot-owner-claim.ts for the protocol rationale.
+    //
+    // When a claim is performed, we proactively push a one-time welcome
+    // notice to the chat. The WeCom Intelligent Bot protocol does not let
+    // us greet the user before they speak first — we have no chatId until
+    // their first inbound arrives — so this is the earliest possible moment
+    // to confirm the binding to the user.
+    let claimed = false
+    try {
+      claimed = await maybeClaimOwner(this.instanceId, senderId)
+    } catch (err) {
+      // Claim failure is non-fatal — log and proceed; the user can retry by
+      // sending another message, which will hit the same code path.
+      logEvent(this.instanceId, 'warn', 'owner_claim_error', {
+        trace,
+        err: err instanceof Error ? err.message : String(err),
+      })
+    }
+    if (claimed) {
+      // Fire-and-forget — pushToChat is async-internal but exposed as boolean.
+      // We do not block AI dispatch on the welcome reaching WeCom.
+      try {
+        this.pushToChat(
+          chatId,
+          '✅ 已绑定你为本机器人的主人，权限控制已自动开启。',
+          chatType,
+        )
+        logEvent(this.instanceId, 'info', 'owner_claim_welcome_pushed', {
+          trace,
+          chatId,
+        })
+      } catch (err) {
+        logEvent(this.instanceId, 'warn', 'owner_claim_welcome_push_failed', {
+          trace,
+          err: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    try {
+      this.inboundHandler(inbound, reply)
+      logEvent(this.instanceId, 'info', 'inbound_dispatch_handed_off', {
+        trace,
+        chatId,
+        elapsedMs: Date.now() - inboundReceivedAt,
+      })
+    } catch (err) {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'inbound_dispatch_threw', {
+        trace,
+        chatId,
+        cat: 'internal',
+        err: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
   }
 
   /**
-   * Collect downloadable media from a message fragment into the shared
-   * attachments/images arrays.
-   *
-   * Works for both top-level `body` and nested `body.quote` — both share
-   * the same structure: `{ msgtype, image?, file?, video?, mixed? }`.
-   *
-   * Each item is processed independently — a failed download does not
-   * discard already-downloaded attachments (per-item error isolation).
+   * Build the ReplyHandle exposed to the runtime. Both `send` and the
+   * optional `streaming` capability dispatch through SDK-backed transport
+   * primitives that own ack/back-pressure.
    */
-  private async collectMedia(
-    fragment: any,
-    fragmentMsgType: string,
-    attachments: InboundAttachment[],
-    images: ImageAttachment[]
+  private buildReplyHandle(
+    chatId: string,
+    chatType: 'direct' | 'group',
+    trace: string,
+    headers: WsFrame['headers'],
+  ): ReplyHandle {
+    const frame: WsFrameHeaders = { headers }
+    let streamSession: WecomStreamSession | null = null
+    const ensureStream = (): WecomStreamSession | null => {
+      if (!this.authenticated) return null
+      if (!streamSession) {
+        streamSession = this.createTrackedStreamSession(frame, chatId, chatType, trace)
+      }
+      return streamSession
+    }
+
+    const streaming: StreamingHandle = {
+      update: async (event: ProgressEvent) => {
+        const s = ensureStream()
+        if (s) await s.update(event)
+        // No session yet and WS not authenticated: progress events are not
+        // critical to deliver. Silent skip is acceptable here — finish() owns
+        // the must-deliver guarantee.
+      },
+      finish: async (finalText: string) => {
+        const s = ensureStream()
+        if (s) {
+          await s.finish(finalText)
+          return
+        }
+        // No session could be acquired (WS unauthenticated at first call to
+        // streaming.update AND at finish time, so no session was ever lazily
+        // created). The final answer must not be silently dropped — mirror
+        // the `send()` fallback path: try the 24h reply window, then push.
+        await this.deliverFinalWithoutSession(chatId, chatType, trace, frame, finalText)
+      },
+      dispose: () => {
+        if (streamSession) {
+          streamSession.dispose()
+          streamSession = null
+        }
+      },
+    }
+
+    return {
+      channel: 'wecom-bot',
+      chatId,
+      replyTtlMs: REPLY_WINDOW_MS,
+      send: async (text: string): Promise<void> => {
+        // Single-shot reply: prefer aibot_respond_msg if we still have a
+        // valid frame; fall back to aibot_send_msg push otherwise.
+        const sanitized = ensureUtf8(text)
+        const replied = await this.replyMarkdown(chatId, sanitized, frame, trace)
+        if (replied) return
+        logEvent(this.instanceId, 'info', 'reply_fallback_to_push', {
+          trace,
+          chatId,
+        })
+        const pushed = await this.queuePush(
+          chatId, sanitized, chatType, `reply:${trace}`, trace,
+        )
+        if (!pushed) {
+          this.counters.totalError++
+          throw new Error(
+            `[WecomBot:${this.instanceId}] Both reply and push failed for chat ${chatId} (trace=${trace})`,
+          )
+        }
+      },
+      streaming,
+    }
+  }
+
+  private async replyMarkdown(
+    chatId: string,
+    text: string,
+    frame: WsFrameHeaders,
+    trace: string,
+  ): Promise<boolean> {
+    if (!this.wsClient || !this.authenticated) {
+      logEvent(this.instanceId, 'warn', 'reply_skip_ws_not_active', {
+        trace, chatId, cat: 'network',
+      })
+      return false
+    }
+    const entry = this.frameCache.get(chatId)
+    if (!entry || Date.now() - entry.ts > REPLY_WINDOW_MS) {
+      logEvent(this.instanceId, 'warn', 'reply_skip_window_expired', {
+        trace,
+        chatId,
+        ageMs: entry ? Date.now() - entry.ts : -1,
+        windowMs: REPLY_WINDOW_MS,
+      })
+      return false
+    }
+    try {
+      // The SDK uses the frame's req_id; we trust the cached frame.
+      await this.wsClient.reply(
+        frame,
+        { msgtype: 'markdown', markdown: { content: text } },
+      )
+      this.counters.totalReply++
+      logEvent(this.instanceId, 'info', 'reply_sent', {
+        trace,
+        chatId,
+        bytes: Buffer.byteLength(text, 'utf8'),
+      })
+      return true
+    } catch (err) {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'reply_send_error', {
+        trace,
+        chatId,
+        cat: 'network',
+        err: err instanceof Error ? err.message : String(err),
+      })
+      return false
+    }
+  }
+
+  // ── Stream session wiring ─────────────────────────────────────
+
+  private createTrackedStreamSession(
+    frame: WsFrameHeaders,
+    chatId: string,
+    chatType: 'direct' | 'group',
+    trace: string,
+  ): WecomStreamSession {
+    const session = new WecomStreamSession({
+      frame,
+      streamId: `stream_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      chatId,
+      chatType,
+      trace,
+      transport: this.makeStreamingTransport(),
+      logger: this.makeStreamLogger(),
+      onDispose: () => this.activeStreamSessions.delete(session),
+    })
+    this.activeStreamSessions.add(session)
+    return session
+  }
+
+  /** StreamLogger adapter forwarding to our logEvent. */
+  private makeStreamLogger(): StreamLogger {
+    return (level: StreamLogLevel, event: string, fields) => {
+      logEvent(this.instanceId, level, event, fields)
+    }
+  }
+
+  /**
+   * The StreamingTransport — the only API surface visible to
+   * WecomStreamSession. All calls route through the SDK so we never touch
+   * a WebSocket directly.
+   */
+  private makeStreamingTransport(): StreamingTransport {
+    return {
+      replyStreamNonBlocking: async (
+        f: WsFrameHeaders, streamId: string, content: string,
+      ): Promise<'sent' | 'skipped' | 'failed'> => {
+        if (!this.wsClient || !this.authenticated) return 'failed'
+        try {
+          const r = await this.wsClient.replyStreamNonBlocking(
+            f, streamId, content, false,
+          )
+          if (r === 'skipped') return 'skipped'
+          this.counters.totalStreamPackets++
+          return 'sent'
+        } catch {
+          return 'failed'
+        }
+      },
+      replyStreamFinish: async (
+        f: WsFrameHeaders, streamId: string, content: string,
+      ): Promise<'sent' | 'failed'> => {
+        if (!this.wsClient || !this.authenticated) return 'failed'
+        try {
+          await this.wsClient.replyStream(f, streamId, content, true)
+          this.counters.totalStreamPackets++
+          return 'sent'
+        } catch (err) {
+          logEvent(this.instanceId, 'warn', 'stream_finish_failed', {
+            streamId,
+            cat: 'protocol',
+            err: err instanceof Error ? err.message : String(err),
+          })
+          return 'failed'
+        }
+      },
+      queuePush: (chatId, text, chatType, sourceTag, trace) =>
+        this.queuePush(chatId, text, chatType, sourceTag, trace),
+      isAuthenticated: () => this.authenticated,
+    }
+  }
+
+  /**
+   * Fallback path for streaming.finish when no stream session was ever
+   * established (the WS was unauthenticated at every update + finish call).
+   * Mirrors `send()`'s 24h-reply-then-push fallback so the final answer is
+   * never silently dropped.
+   */
+  private async deliverFinalWithoutSession(
+    chatId: string,
+    chatType: 'direct' | 'group',
+    trace: string,
+    frame: WsFrameHeaders,
+    finalText: string,
   ): Promise<void> {
-    if (fragmentMsgType === 'image' && fragment.image?.url && fragment.image?.aeskey) {
-      const result = await downloadAndPrepareImage(fragment.image.url, fragment.image.aeskey, this.instanceId)
-      if (result) {
-        attachments.push(result.attachment)
-        images.push(result.image)
+    const sanitized = ensureUtf8(finalText)
+    logEvent(this.instanceId, 'info', 'streaming_finish_fallback_begin', {
+      trace,
+      chatId,
+      bytes: Buffer.byteLength(sanitized, 'utf8'),
+    })
+    const replied = await this.replyMarkdown(chatId, sanitized, frame, trace)
+    if (replied) {
+      logEvent(this.instanceId, 'info', 'streaming_finish_fallback_via_reply', {
+        trace,
+        chatId,
+      })
+      return
+    }
+    const pushed = await this.queuePush(
+      chatId,
+      sanitized,
+      chatType,
+      `stream-finish:${trace}`,
+      trace,
+    )
+    if (!pushed) {
+      this.counters.totalError++
+      throw new Error(
+        `[WecomBot:${this.instanceId}] streaming.finish fallback failed for chat ${chatId} (trace=${trace})`,
+      )
+    }
+    logEvent(this.instanceId, 'info', 'streaming_finish_fallback_via_push', {
+      trace,
+      chatId,
+    })
+  }
+
+  // ── Push queueing (across brief WS bounces) ─────────────────
+
+  /**
+   * Internal push that awaits the SDK's ack and reports honest delivery
+   * status. Used by `queuePush` and `flushPendingPushes` so the
+   * StreamingTransport.queuePush contract (Promise<boolean> = delivered)
+   * holds end-to-end.
+   *
+   * The public `pushToChat` keeps its fire-and-forget boolean shape to
+   * preserve the `ImChannelInstance` contract for external callers.
+   */
+  private async pushToChatAwaited(
+    chatId: string,
+    text: string,
+    chatType: 'direct' | 'group',
+    trace?: string,
+  ): Promise<boolean> {
+    if (!this.wsClient || !this.authenticated) {
+      logEvent(this.instanceId, 'warn', 'push_unavailable', {
+        trace,
+        chatId,
+        chatType,
+        authenticated: this.authenticated,
+        cat: 'network',
+      })
+      return false
+    }
+    const sanitized = ensureUtf8(text)
+    const bytes = Buffer.byteLength(sanitized, 'utf8')
+    try {
+      await this.wsClient.sendMessage(chatId, {
+        msgtype: 'markdown',
+        markdown: { content: sanitized },
+      })
+      this.counters.totalPush++
+      logEvent(this.instanceId, 'info', 'push_sent', {
+        trace,
+        chatId,
+        chatType,
+        bytes,
+      })
+      return true
+    } catch (err) {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'push_send_error', {
+        trace,
+        chatId,
+        chatType,
+        cat: 'network',
+        err: err instanceof Error ? err.message : String(err),
+      })
+      return false
+    }
+  }
+
+  private queuePush(
+    chatId: string,
+    text: string,
+    chatType: 'direct' | 'group',
+    sourceTag: string,
+    trace?: string,
+  ): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      if (this.authenticated) {
+        // Honest ack: await the SDK's send before resolving so the caller
+        // (e.g. WecomStreamSession.finalPushSent) sees real delivery state.
+        void this.pushToChatAwaited(chatId, text, chatType, trace).then(resolve)
+        return
       }
-    } else if (fragmentMsgType === 'file' && fragment.file?.url && fragment.file?.aeskey) {
-      try {
-        const filename = fragment.file.filename || `file_${Date.now()}`
-        const localPath = await downloadAndDecrypt(
-          fragment.file.url, fragment.file.aeskey, filename, this.instanceId
-        )
-        attachments.push({ type: 'file', filename, localPath })
-      } catch (err) {
-        console.error(`[WecomBot:${this.instanceId}] File download failed:`, err)
+      const entry: PendingPush = {
+        chatId,
+        text,
+        chatType,
+        enqueuedAt: Date.now(),
+        sourceTag,
+        trace,
+        resolve,
       }
-    } else if (fragmentMsgType === 'video' && fragment.video?.url && fragment.video?.aeskey) {
-      try {
-        const filename = `video_${Date.now()}.mp4`
-        const localPath = await downloadAndDecrypt(
-          fragment.video.url, fragment.video.aeskey, filename, this.instanceId
-        )
-        attachments.push({ type: 'video', filename, localPath })
-      } catch (err) {
-        console.error(`[WecomBot:${this.instanceId}] Video download failed:`, err)
+      this.pendingPushes.push(entry)
+      logEvent(this.instanceId, 'info', 'push_queued', {
+        trace,
+        chatId,
+        chatType,
+        source: sourceTag,
+        queueLen: this.pendingPushes.length,
+        bytes: Buffer.byteLength(text, 'utf8'),
+      })
+      setTimeout(() => {
+        const idx = this.pendingPushes.indexOf(entry)
+        if (idx === -1) return
+        this.pendingPushes.splice(idx, 1)
+        this.counters.totalError++
+        logEvent(this.instanceId, 'error', 'push_queue_timeout', {
+          trace,
+          chatId,
+          source: sourceTag,
+          waitMs: PUSH_QUEUE_WAIT_MS,
+          cat: 'network',
+        })
+        resolve(false)
+      }, PUSH_QUEUE_WAIT_MS)
+    })
+  }
+
+  private flushPendingPushes(): void {
+    if (this.pendingPushes.length === 0) return
+    const drained = this.pendingPushes.splice(0)
+    logEvent(this.instanceId, 'info', 'push_queue_flush_start', {
+      count: drained.length,
+    })
+    let delivered = 0
+    let dropped = 0
+    let remaining = drained.length
+    const finalize = (): void => {
+      logEvent(this.instanceId, 'info', 'push_queue_flush_done', {
+        delivered,
+        dropped,
+        failed: drained.length - delivered - dropped,
+      })
+    }
+    for (const entry of drained) {
+      if (Date.now() - entry.enqueuedAt > PUSH_QUEUE_WAIT_MS) {
+        dropped++
+        logEvent(this.instanceId, 'error', 'push_queue_flush_stale', {
+          trace: entry.trace,
+          chatId: entry.chatId,
+          source: entry.sourceTag,
+          ageMs: Date.now() - entry.enqueuedAt,
+          cat: 'internal',
+        })
+        entry.resolve(false)
+        if (--remaining === 0) finalize()
+        continue
       }
-    } else if (fragmentMsgType === 'mixed' && fragment.mixed?.msg_item) {
-      const items: any[] = fragment.mixed.msg_item
+      void this.pushToChatAwaited(
+        entry.chatId, entry.text, entry.chatType, entry.trace,
+      ).then((ok) => {
+        if (ok) delivered++
+        entry.resolve(ok)
+        if (--remaining === 0) finalize()
+      })
+    }
+  }
+
+  // ── File send (uploadMedia + replyMedia / sendMediaMessage) ───
+
+  private async sendFileToChat(
+    chatId: string,
+    filePath: string,
+    chatType: 'direct' | 'group',
+    filename?: string,
+  ): Promise<boolean> {
+    if (!this.wsClient || !this.authenticated) {
+      logEvent(this.instanceId, 'warn', 'send_file_skip_ws_not_open', {
+        chatId, cat: 'network',
+      })
+      return false
+    }
+    try {
+      const displayName = filename || basename(filePath)
+      const ext = extname(filePath).toLowerCase()
+      const mediaType: WeComMediaType = IMAGE_EXTENSIONS.has(ext) ? 'image' : 'file'
+      const fileBuf = await readFile(filePath)
+
+      logEvent(this.instanceId, 'info', 'send_file_start', {
+        chatId,
+        chatType,
+        displayName,
+        mediaType,
+        bytes: fileBuf.length,
+      })
+
+      const t0 = Date.now()
+      const uploadResult = await this.wsClient.uploadMedia(fileBuf, {
+        type: mediaType,
+        filename: displayName,
+      })
+      logEvent(this.instanceId, 'info', 'upload_complete', {
+        chatId,
+        mediaId: uploadResult.media_id,
+        displayName,
+        elapsedMs: Date.now() - t0,
+      })
+
+      // Prefer passive reply when we still have a valid frame, otherwise push.
+      const entry = this.frameCache.get(chatId)
+      const canReply = entry && Date.now() - entry.ts < REPLY_WINDOW_MS
+      if (canReply && entry) {
+        await this.wsClient.replyMedia(entry.frame, mediaType, uploadResult.media_id)
+        logEvent(this.instanceId, 'info', 'send_file_sent', {
+          chatId, displayName, mediaType, mediaId: uploadResult.media_id, via: 'reply',
+        })
+      } else {
+        await this.wsClient.sendMediaMessage(chatId, mediaType, uploadResult.media_id)
+        logEvent(this.instanceId, 'info', 'send_file_sent', {
+          chatId, displayName, mediaType, mediaId: uploadResult.media_id, via: 'push',
+        })
+      }
+      return true
+    } catch (err) {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'send_file_failed', {
+        chatId,
+        cat: 'protocol',
+        err: err instanceof Error ? err.message : String(err),
+      })
+      return false
+    }
+  }
+
+  // ── Media collection (download + decrypt + decode) ─────────────
+
+  private async collectMedia(
+    fragment: BaseMessage | NonNullable<BaseMessage['quote']>,
+    fragmentMsgType: 'text' | 'image' | 'mixed' | 'voice' | 'file' | 'video',
+    attachments: InboundAttachment[],
+    images: ImageAttachment[],
+  ): Promise<void> {
+    const frag = fragment as Record<string, unknown>
+    if (fragmentMsgType === 'image') {
+      const img = frag.image as ImageMessage['image'] | undefined
+      if (img?.url && img.aeskey) {
+        await this.fetchImage(img.url, img.aeskey, attachments, images)
+      }
+    } else if (fragmentMsgType === 'file') {
+      const file = frag.file as FileMessage['file'] | undefined
+      if (file?.url && file.aeskey) {
+        await this.fetchFile(file.url, file.aeskey, 'file', `file_${Date.now()}`, attachments)
+      }
+    } else if (fragmentMsgType === 'video') {
+      const video = frag.video as VideoMessage['video'] | undefined
+      if (video?.url && video.aeskey) {
+        await this.fetchFile(video.url, video.aeskey, 'video', `video_${Date.now()}.mp4`, attachments)
+      }
+    } else if (fragmentMsgType === 'mixed') {
+      const mixed = frag.mixed as MixedMessage['mixed'] | undefined
+      const items = mixed?.msg_item ?? []
       for (const item of items) {
-        if (item.msgtype === 'image' && item.image?.url && item.image?.aeskey) {
-          const result = await downloadAndPrepareImage(item.image.url, item.image.aeskey, this.instanceId)
-          if (result) {
-            attachments.push(result.attachment)
-            images.push(result.image)
-          }
+        if (item.msgtype === 'image' && item.image?.url && item.image.aeskey) {
+          await this.fetchImage(item.image.url, item.image.aeskey, attachments, images)
         }
       }
     }
   }
 
-  private extractText(body: any): string {
-    const mainText = this.extractTextFromFragment(body)
+  /** Download an encrypted image, save locally, and prepare for multimodal AI. */
+  private async fetchImage(
+    url: string,
+    aesKey: string,
+    attachments: InboundAttachment[],
+    images: ImageAttachment[],
+  ): Promise<void> {
+    if (!this.wsClient) return
+    try {
+      await mkdir(TEMP_DIR, { recursive: true })
+      const { buffer, filename } = await this.wsClient.downloadFile(url, aesKey)
+      const safeBase = filename || `image_${Date.now()}.jpg`
+      const localPath = join(
+        TEMP_DIR,
+        `${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${safeBase}`,
+      )
+      await writeFile(localPath, buffer)
 
-    // Append quoted message context so the AI knows what was referenced
+      const ext = (url.split('?')[0].split('.').pop() ?? '').toLowerCase()
+      const mimeMap: Record<string, ImageMediaType> = {
+        png: 'image/png',
+        gif: 'image/gif',
+      }
+      const mediaType: ImageMediaType = mimeMap[ext] ?? 'image/jpeg'
+
+      attachments.push({
+        type: 'image',
+        filename: safeBase,
+        localPath,
+        mimeType: 'image/jpeg',
+      })
+      images.push({
+        id: `wecom_img_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: 'image',
+        mediaType,
+        data: buffer.toString('base64'),
+        name: safeBase,
+      })
+      logEvent(this.instanceId, 'info', 'media_download_done', {
+        mediaType: 'image',
+        filename: safeBase,
+        bytes: buffer.length,
+      })
+    } catch (err) {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'image_download_failed', {
+        cat: 'network',
+        err: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  /** Download an encrypted file/video, save locally, register as attachment. */
+  private async fetchFile(
+    url: string,
+    aesKey: string,
+    type: 'file' | 'video',
+    fallbackName: string,
+    attachments: InboundAttachment[],
+  ): Promise<void> {
+    if (!this.wsClient) return
+    try {
+      await mkdir(TEMP_DIR, { recursive: true })
+      const { buffer, filename } = await this.wsClient.downloadFile(url, aesKey)
+      const safeBase = filename || fallbackName
+      const localPath = join(
+        TEMP_DIR,
+        `${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${safeBase}`,
+      )
+      await writeFile(localPath, buffer)
+      attachments.push({ type, filename: safeBase, localPath })
+      logEvent(this.instanceId, 'info', 'media_download_done', {
+        mediaType: type,
+        filename: safeBase,
+        bytes: buffer.length,
+      })
+    } catch (err) {
+      this.counters.totalError++
+      logEvent(this.instanceId, 'error', 'media_download_failed', {
+        mediaType: type,
+        cat: 'network',
+        err: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  // ── Text extraction (mirrors prior behaviour) ─────────────────
+
+  private extractText(body: BaseMessage): string {
+    const mainText = this.extractTextFromFragment(body)
     if (body.quote) {
-      const quoteText = this.extractTextFromFragment(body.quote)
+      const quoteText = this.extractTextFromFragment(
+        body.quote as unknown as Record<string, unknown>,
+      )
       if (quoteText) {
         return mainText
           ? `${mainText}\n\n[Quoted message: ${quoteText}]`
           : `[Quoted message: ${quoteText}]`
       }
     }
-
     return mainText
   }
 
-  /** Extract human-readable text from a single message fragment (body or quote). */
-  private extractTextFromFragment(fragment: any): string {
-    switch (fragment.msgtype) {
-      case 'text': return fragment.text?.content ?? ''
-      case 'image': return '(image)'
-      case 'voice': return '(voice message)'
-      case 'file': return `(file: ${fragment.file?.filename ?? 'unknown'})`
-      case 'video': return '(video)'
-      case 'link': return `(link: ${fragment.link?.title ?? fragment.link?.url ?? ''})`
+  private extractTextFromFragment(fragment: Record<string, unknown>): string {
+    const f = fragment as {
+      msgtype?: string
+      text?: { content?: string }
+      file?: { filename?: string }
+      link?: { title?: string; url?: string }
+      mixed?: { msg_item?: Array<{ msgtype?: string; text?: { content?: string } }> }
+    }
+    switch (f.msgtype) {
+      case 'text':
+        return (f.text as TextMessage['text'] | undefined)?.content ?? ''
+      case 'image':
+        return '(image)'
+      case 'voice':
+        return '(voice message)'
+      case 'file':
+        return `(file: ${f.file?.filename ?? 'unknown'})`
+      case 'video':
+        return '(video)'
+      case 'link':
+        return `(link: ${f.link?.title ?? f.link?.url ?? ''})`
       case 'mixed': {
-        // Extract and join all text items from the mixed message
-        const items: any[] = fragment.mixed?.msg_item ?? []
-        const textParts = items
-          .filter((item: any) => item.msgtype === 'text')
-          .map((item: any) => (item.text?.content ?? '').trim())
+        const items = f.mixed?.msg_item ?? []
+        const parts = items
+          .filter((it) => it.msgtype === 'text')
+          .map((it) => (it.text?.content ?? '').trim())
           .filter(Boolean)
-        return textParts.length > 0 ? textParts.join(' ') : '(mixed media)'
+        return parts.length > 0 ? parts.join(' ') : '(mixed media)'
       }
-      default: return `(${fragment.msgtype ?? 'unknown message type'})`
+      default:
+        return `(${f.msgtype ?? 'unknown message type'})`
     }
   }
 
-  // ── Debounce Buffer ───────────────────────────────────────────
+  // ── Frame cache cleanup ────────────────────────────────────────
 
-  /**
-   * Buffer an incoming message part and (re)start the debounce timer.
-   *
-   * Consecutive messages from the same chat arriving within DEBOUNCE_MS are
-   * merged into a single InboundMessage before dispatch. This handles the
-   * common pattern of a user sending a file immediately followed by a text
-   * question — without buffering, those arrive as two separate AI sessions.
-   */
-  private bufferMessage(part: BufferPart): void {
-    const existing = this.chatBuffers.get(part.chatId)
-    if (existing) {
-      clearTimeout(existing.timer)
-      existing.parts.push(part)
-      existing.timer = setTimeout(() => this.flushChatBuffer(part.chatId), WecomBotInstance.DEBOUNCE_MS)
-    } else {
-      const buffer: ChatBuffer = {
-        parts: [part],
-        timer: setTimeout(() => this.flushChatBuffer(part.chatId), WecomBotInstance.DEBOUNCE_MS),
-      }
-      this.chatBuffers.set(part.chatId, buffer)
-    }
-  }
-
-  /**
-   * Merge all buffered parts for a chat and dispatch as a single InboundMessage.
-   *
-   * Merges bodies (newline-separated), attachments, and images.
-   * Uses the last part's req_id for streaming — it's the most recent and
-   * has the longest remaining TTL within the 5-minute WeCom window.
-   */
-  private flushChatBuffer(chatId: string): void {
-    const buffer = this.chatBuffers.get(chatId)
-    this.chatBuffers.delete(chatId)
-    if (!buffer || !this.inboundHandler) return
-
-    const { parts } = buffer
-    if (parts.length === 0) return
-
-    const first = parts[0]
-    const last = parts[parts.length - 1]
-
-    const mergedBody = parts.map(p => p.body).filter(Boolean).join('\n')
-    const mergedAttachments = parts.flatMap(p => p.attachments)
-    const mergedImages = parts.flatMap(p => p.images)
-    const chatTypeNorm: 'direct' | 'group' = first.chatType === 'group' ? 'group' : 'direct'
-
-    console.log(
-      `[WecomBot:${this.instanceId}] Debounce flush: ${parts.length} part(s) → ` +
-      `chat=${chatId}, body="${mergedBody.slice(0, 80)}", ` +
-      `attachments=${mergedAttachments.length}, images=${mergedImages.length}`
-    )
-
-    const inbound: InboundMessage = {
-      body: mergedBody,
-      from: first.from,
-      fromName: first.fromName,
-      channel: 'wecom-bot',
-      chatType: chatTypeNorm,
-      chatId,
-      messageId: first.msgId,
-      timestamp: Date.now(),
-      ...(mergedAttachments.length > 0 ? { attachments: mergedAttachments } : {}),
-      ...(mergedImages.length > 0 ? { images: mergedImages } : {}),
-    }
-
-    const canStream = Boolean(last.reqId) && this.ws !== null && this.ws.readyState === WebSocket.OPEN
-    const reply: ReplyHandle = {
-      channel: 'wecom-bot',
-      chatId,
-      replyTtlMs: REQ_ID_TTL_MS,
-
-      send: async (replyText: string): Promise<void> => {
-        const replied = this.replyToChat(chatId, replyText)
-        if (replied) return
-        console.log(`[WecomBot:${this.instanceId}] req_id expired for chat ${chatId}, falling back to pushToChat`)
-        const pushed = this.pushToChat(chatId, replyText, chatTypeNorm)
-        if (!pushed) {
-          throw new Error(`[WecomBot:${this.instanceId}] Both replyToChat and pushToChat failed for chat ${chatId}`)
-        }
-      },
-
-      streaming: canStream
-        ? this.createTrackedStreamSession(last.reqId)
-        : undefined,
-    }
-
-    this.inboundHandler(inbound, reply)
-  }
-
-  // ── Heartbeat ─────────────────────────────────────────────────
-
-  private startHeartbeat(): void {
-    this.stopHeartbeat()
-    this.heartbeatTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        try {
-          this.ws.send(JSON.stringify({
-            cmd: 'ping',
-            headers: { req_id: generateReqId('ping') },
-          }))
-        } catch { /* ignore */ }
-      }
-    }, HEARTBEAT_INTERVAL_MS)
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null }
-  }
-
-  // ── Reconnect ─────────────────────────────────────────────────
-
-  private scheduleReconnect(): void {
-    if (!this.active) return
-    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.error(`[WecomBot:${this.instanceId}] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached`)
-      return
-    }
-    const delay = Math.min(
-      RECONNECT_BASE_DELAY_MS * Math.pow(2, this.reconnectAttempts),
-      RECONNECT_MAX_DELAY_MS
-    )
-    this.reconnectAttempts++
-    console.log(`[WecomBot:${this.instanceId}] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`)
-    this.reconnectTimer = setTimeout(() => {
-      if (this.active) this.connect()
-    }, delay)
-  }
-
-  // ── req_id Cleanup ────────────────────────────────────────────
-
-  private cleanupExpiredReqIds(): void {
+  private cleanupExpiredFrames(): void {
     const now = Date.now()
-    for (const [chatId, entry] of this.reqIdMap) {
-      if (now - entry.ts > REQ_ID_TTL_MS) {
-        this.reqIdMap.delete(chatId)
+    let cleaned = 0
+    for (const [chatId, entry] of this.frameCache) {
+      if (now - entry.ts > REPLY_WINDOW_MS) {
+        this.frameCache.delete(chatId)
+        cleaned++
       }
+    }
+    if (cleaned > 0) {
+      logEvent(this.instanceId, 'info', 'frame_cache_cleanup', {
+        cleaned,
+        remaining: this.frameCache.size,
+      })
     }
   }
 }
+

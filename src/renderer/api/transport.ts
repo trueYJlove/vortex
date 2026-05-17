@@ -445,6 +445,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'app:escalation:new': 'onAppEscalation',
       'app:navigate': 'onAppNavigate',
       'app:im-session-updated': 'onImSessionUpdated',
+      'im-channels:instance-updated': 'onImChannelInstanceUpdated',
       'notification:toast': 'onNotificationToast'
     }
 

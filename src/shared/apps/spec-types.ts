@@ -232,6 +232,15 @@ export interface StoreMetadata {
   repository?: string
   /** Install provenance: registry identifier used for update checks */
   registry_id?: string
+  /**
+   * Install provenance: how this app reached the user's machine.
+   * - 'store':   downloaded from a registry (default for store installs)
+   * - 'builtin': bundled with the build itself (auto-installed at startup,
+   *              protected from permanent deletion, refreshed on every launch)
+   * - 'manual':  added via direct IPC/HTTP call (e.g. drag-and-drop)
+   * Older records may not carry this field; treat 'undefined' as 'store'.
+   */
+  install_source?: 'store' | 'builtin' | 'manual'
 }
 
 // ============================================

@@ -44,6 +44,24 @@ export interface CodexResolvedOptions {
   mcpServers: Record<string, any>
   /** Local bridge for SDK-backed MCP servers. Owned by CodexAppServerSession. */
   mcpBridge?: CodexSdkMcpBridge
+  /**
+   * Mirrors Claude Code SDK's `includePartialMessages`:
+   *   - true  → consumer wants stream_event (token-level deltas) for live UI.
+   *             Codex normalizer suppresses the redundant text payload in the
+   *             aggregate `type:'assistant'` envelope so stream-processor's
+   *             stream_event path is the sole source of bubble text and
+   *             nothing gets double-appended.
+   *   - false → consumer wants only the aggregate `type:'assistant'`
+   *             envelope (execute.ts automation runtime, post-hoc replay).
+   *             Codex normalizer suppresses stream_event text/thinking
+   *             deltas so the aggregate is the sole source.
+   *
+   * Tool_use aggregate is always emitted regardless of this flag because
+   * session-store JSONL replay needs the tool_use envelope to arrive BEFORE
+   * the matching user.tool_result for id-based linking (see
+   * event-normalizer.aggregateBlock rationale).
+   */
+  includePartialMessages: boolean
 }
 
 export async function resolveCodexOptions(sdkOptions: Record<string, any>): Promise<CodexResolvedOptions> {
@@ -78,6 +96,11 @@ export async function resolveCodexOptions(sdkOptions: Record<string, any>): Prom
       threadParams,
       mcpServers: pickInjectedMcpServers(sdkOptions.mcpServers || {}, preparedMcp.injectedServerNames),
       mcpBridge: preparedMcp.bridge,
+      // Default to true to match Halo's chat path (sdk-config.ts sets it
+      // explicitly to true for interactive sessions). execute.ts overrides
+      // to false for automation. Falling back to true keeps live-UI parity
+      // with Claude SDK when the caller forgets to set it.
+      includePartialMessages: sdkOptions.includePartialMessages !== false,
     }
   } catch (err) {
     await preparedMcp.bridge?.close().catch(() => {})

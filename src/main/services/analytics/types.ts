@@ -36,6 +36,11 @@ export const AnalyticsEvents = {
   APP_RUN_FAILED: 'app.run.failed',
   APP_RUN_REPLAY: 'app.run.replay',           // Startup catch-up batch
   INSTALLED_APPS_SNAPSHOT: 'installed_apps.snapshot', // Startup full snapshot
+
+  // ── Telemetry: model + tool observability ─────────────────────────
+  LLM_INVOCATION: 'llm.invocation',           // Each model call (per turn)
+  TOOL_USAGE_SUMMARY: 'tool.usage_summary',   // Aggregated tool stats per agent-complete
+  ERROR_SURFACE: 'error.surface',             // Coarse error map (area + errorCode)
 } as const
 
 export type AnalyticsEventName = typeof AnalyticsEvents[keyof typeof AnalyticsEvents]

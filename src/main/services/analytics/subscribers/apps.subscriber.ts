@@ -25,6 +25,7 @@ import type {
 } from '../../../apps/runtime/types'
 import { analytics } from '../analytics.service'
 import { AnalyticsEvents } from '../types'
+import { deriveErrorCode } from '../error-code'
 
 /** Unsubscribe functions returned by the two services, stored for cleanup. */
 type Unsub = () => void
@@ -69,8 +70,16 @@ export function installAppsSubscribers(
 
   unsubscribers.push(
     runtime.onRunStarted((evt: RunStartedEvent) => {
+      // Reverse-lookup specId so the backend can label runs even when the
+      // event payload doesn't carry it directly. The optional chain guards
+      // the tiny race where an uninstall completes between RunStarted/Finished
+      // and this subscriber — losing specId is fine, the appId stays the
+      // aggregation key. specId is gated by SENSITIVE_KEYS at sanitize time,
+      // so open-source builds drop it before transmission.
+      const specId = appManager.getApp(evt.appId)?.specId
       void analytics.track(AnalyticsEvents.APP_RUN_STARTED, {
         appId: evt.appId,
+        specId,
         runId: evt.runId,
         trigger: evt.triggerType,
       })
@@ -86,8 +95,10 @@ export function installAppsSubscribers(
           ? AnalyticsEvents.APP_RUN_FAILED
           : AnalyticsEvents.APP_RUN_COMPLETED
 
+      const specId = appManager.getApp(evt.appId)?.specId
       void analytics.track(eventName, {
         appId: evt.appId,
+        specId,
         runId: evt.runId,
         trigger: evt.triggerType,
         status: evt.status,
@@ -111,20 +122,4 @@ export function installAppsSubscribers(
       }
     }
   }
-}
-
-/**
- * Derive a short, privacy-safe error code from a raw error message.
- *
- * Strategy: take the first token up to 48 chars. The telemetry backend only
- * needs a coarse bucket for dashboards; the full message stays in the main
- * process. Returns undefined for empty input so the blocklist/whitelist
- * can drop the field entirely.
- */
-function deriveErrorCode(message: string): string | undefined {
-  const trimmed = message.trim()
-  if (!trimmed) return undefined
-  // Use the first colon / whitespace-delimited token, capped at 48 chars.
-  const firstToken = trimmed.split(/[\s:]+/, 1)[0] ?? trimmed
-  return firstToken.slice(0, 48)
 }

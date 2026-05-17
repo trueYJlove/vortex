@@ -7,12 +7,16 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../stores/app.store'
 import { api } from '../api'
-import { LoginSelector } from '../components/setup/LoginSelector'
+import { LoginSelector, type AuthProviderConfig } from '../components/setup/LoginSelector'
 import { ApiSetup } from '../components/setup/ApiSetup'
+import { PreferencesStep } from '../components/setup/PreferencesStep'
 import { useTranslation } from '../i18n'
 import { Loader2, Brain, ExternalLink, Copy, Check } from 'lucide-react'
 
-type SetupStep = 'select' | 'oauth-waiting' | 'claude-login' | 'custom'
+// First step is `preferences` only on the very first launch (gated by
+// config.isFirstLaunch). Old users re-entering Setup (e.g., after clearing
+// the AI source) skip preferences and land on `select` directly.
+type SetupStep = 'preferences' | 'select' | 'oauth-waiting' | 'claude-login' | 'custom' | 'preset'
 
 /** Device code info for display in UI */
 interface DeviceCodeInfo {
@@ -35,14 +39,25 @@ interface ClaudeLoginState {
 
 export function SetupPage() {
   const { t } = useTranslation()
-  const { setView, setConfig } = useAppStore()
+  const { setView, setConfig, config } = useAppStore()
+  // Step is derived per render so the wizard remains correct even if:
+  //   (a) `config` arrives after SetupPage first mounts (async IPC race), or
+  //   (b) React Fast Refresh preserves stale useState across HMR.
+  // The `hasPassedPreferences` flag is the one-way latch that lets the user
+  // move forward; once true, internal `step` state controls navigation.
+  const [hasPassedPreferences, setHasPassedPreferences] = useState(false)
   const [step, setStep] = useState<SetupStep>('select')
+  const shouldShowPreferences = config?.isFirstLaunch === true && !hasPassedPreferences
+  const effectiveStep: SetupStep = shouldShowPreferences ? 'preferences' : step
+
   const [currentProvider, setCurrentProvider] = useState<string | null>(null)
   const [oauthState, setOauthState] = useState<string | null>(null)
   const [loginStatus, setLoginStatus] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [deviceCodeInfo, setDeviceCodeInfo] = useState<DeviceCodeInfo | null>(null)
   const [claudeLogin, setClaudeLogin] = useState<ClaudeLoginState | null>(null)
+  // Preset-API entry currently being configured (drives the ApiSetup form)
+  const [presetProvider, setPresetProvider] = useState<AuthProviderConfig | null>(null)
 
   // Handle OAuth provider login (generic)
   const handleSelectProvider = async (providerType: string) => {
@@ -207,6 +222,18 @@ export function SetupPage() {
     setStep('select')
   }
 
+  // Handle preset-API selection (fixed-baseUrl API key form)
+  const handleSelectPreset = (provider: AuthProviderConfig) => {
+    setPresetProvider(provider)
+    setStep('preset')
+  }
+
+  // Handle back from preset
+  const handleBackFromPreset = () => {
+    setPresetProvider(null)
+    setStep('select')
+  }
+
   // Listen for login progress updates (generic)
   useEffect(() => {
     if (step !== 'oauth-waiting' || !currentProvider) return
@@ -221,12 +248,17 @@ export function SetupPage() {
     return unsubscribe
   }, [step, currentProvider])
 
-  // Render based on step
-  if (step === 'select') {
+  // Render based on derived step (see hasPassedPreferences comment above)
+  if (effectiveStep === 'preferences') {
+    return <PreferencesStep onContinue={() => setHasPassedPreferences(true)} />
+  }
+
+  if (effectiveStep === 'select') {
     return (
       <LoginSelector
         onSelectProvider={handleSelectProvider}
         onSelectCustom={handleSelectCustom}
+        onSelectPreset={handleSelectPreset}
       />
     )
   }
@@ -471,6 +503,16 @@ export function SetupPage() {
 
   if (step === 'custom') {
     return <ApiSetup showBack onBack={handleBackFromCustom} />
+  }
+
+  if (step === 'preset' && presetProvider) {
+    return (
+      <ApiSetup
+        showBack
+        onBack={handleBackFromPreset}
+        preset={presetProvider}
+      />
+    )
   }
 
   return null

@@ -34,7 +34,8 @@ import {
 import { getTempSpacePath, getSpacesDir, getConfig as getServiceConfig, saveConfig } from '../../services/config.service'
 import { getSpace, getAllSpacePaths } from '../../services/space.service'
 import { getAppManager } from '../../apps/manager'
-import { getAppRuntime, getImChannelManager, sendAppChatMessage, stopAppChat, isAppChatGenerating, loadAppChatMessages, loadImChatMessages, getAppChatSessionState, getAppChatConversationId, clearAppChat, clearImSession, dispatchInboundMessage } from '../../apps/runtime'
+import { getAppRuntime, getImChannelManager, sendAppChatMessage, stopAppChat, isAppChatGenerating, loadAppChatMessages, loadImChatMessages, getAppChatSessionState, getAppChatConversationId, clearAppChat, clearImSession, restartAppChat, dispatchInboundMessage } from '../../apps/runtime'
+import { buildDefaultAssistantSpec } from '../../apps/runtime/im-channels/wecom-bot-default-spec'
 import type { AppListFilter, UninstallOptions, InstalledApp } from '../../apps/manager'
 import type { ActivityQueryOptions, EscalationResponse, AppChatRequest } from '../../apps/runtime'
 import { readSessionMessages } from '../../apps/runtime/session-store'
@@ -48,6 +49,11 @@ import { modelCapabilitiesService } from '../../services/model-capabilities.serv
 import type { ModelCapabilityOverride } from '../../../shared/types/model-capabilities'
 import { fetchJson, ILINK_BASE_URL } from '../../apps/runtime/im-channels/ilink-api'
 import { saveIlinkToken, disconnectIlink } from '../../controllers/weixin-ilink.controller'
+import {
+  generateScode as wecomGenerateScode,
+  pollResult as wecomPollResult,
+  ScanAuthError as WecomScanAuthError,
+} from '../../apps/runtime/im-channels/wecom-bot-scan-auth'
 
 // Helper: get working directory for a space
 function getWorkingDir(spaceId: string): string {
@@ -819,6 +825,83 @@ export function registerApiRoutes(app: Express): void {
     }
   })
 
+  // ===== WeCom Bot — Scan-Auth Routes (QR-code device flow) =====
+  // Implementation lives in src/main/apps/runtime/im-channels/wecom-bot-scan-auth.ts
+  // and the IPC handler in src/main/ipc/wecom-bot.ts owns the per-scode AbortController
+  // session map. These HTTP routes are thin shims for remote/Capacitor clients.
+  //
+  // Because Express-side session state needs to mirror the IPC-side AbortController map,
+  // we re-import the helpers directly here and use a route-local map that is kept
+  // separate from the IPC map (clients only see one transport at a time per scode).
+  const wecomScanAuthHttpSessions = new Map<string, { abort: AbortController; startedAt: number }>()
+
+  app.post('/api/wecom-bot/scan-auth/start', async (_req: Request, res: Response) => {
+    try {
+      const { scode, authUrl } = await wecomGenerateScode()
+      const existing = wecomScanAuthHttpSessions.get(scode)
+      if (existing) existing.abort.abort()
+      wecomScanAuthHttpSessions.set(scode, { abort: new AbortController(), startedAt: Date.now() })
+      res.json({ success: true, data: { scode, authUrl } })
+    } catch (error) {
+      const err = error instanceof WecomScanAuthError
+        ? { success: false, error: error.message, kind: error.kind }
+        : { success: false, error: (error as Error).message }
+      res.json(err)
+    }
+  })
+
+  app.post('/api/wecom-bot/scan-auth/poll', async (req: Request, res: Response) => {
+    const scode = req.body?.scode as string | undefined
+    if (!scode) {
+      res.json({ success: false, error: 'Missing scode' })
+      return
+    }
+    const session = wecomScanAuthHttpSessions.get(scode)
+    if (!session) {
+      res.json({ success: false, error: 'No active scan session', kind: 'expired' })
+      return
+    }
+    try {
+      const creds = await wecomPollResult(scode, { signal: session.abort.signal })
+      res.json({ success: true, data: creds })
+    } catch (error) {
+      const err = error instanceof WecomScanAuthError
+        ? { success: false, error: error.message, kind: error.kind }
+        : { success: false, error: (error as Error).message }
+      res.json(err)
+    } finally {
+      wecomScanAuthHttpSessions.delete(scode)
+    }
+  })
+
+  app.post('/api/wecom-bot/scan-auth/cancel', async (req: Request, res: Response) => {
+    const scode = req.body?.scode as string | undefined
+    if (scode) {
+      const session = wecomScanAuthHttpSessions.get(scode)
+      if (session) {
+        session.abort.abort()
+        wecomScanAuthHttpSessions.delete(scode)
+      }
+    }
+    res.json({ success: true })
+  })
+
+  app.post('/api/wecom-bot/scan-auth/create-assistant', async (req: Request, res: Response) => {
+    try {
+      const manager = getAppManager()
+      if (!manager) {
+        res.status(503).json({ success: false, error: 'AppManager not initialized' })
+        return
+      }
+      const prefix = String(req.body?.botIdPrefix ?? '').slice(0, 8) || 'bot'
+      const spec = buildDefaultAssistantSpec(prefix)
+      const appId = await manager.install('halo-temp', spec)
+      res.json({ success: true, data: { appId, appName: spec.name } })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
   // ===== IM Channel Routes (multi-instance) =====
 
   // GET /api/im-channels/status — all instance statuses, or single instance when ?instanceId= is provided
@@ -1347,6 +1430,9 @@ export function registerApiRoutes(app: Express): void {
   })
 
   // DELETE /api/apps/:appId/permanent — permanently delete an App and all its data
+  // External callers must NOT be able to bypass the built-in protection guard.
+  // We deliberately do NOT forward any options from the request body — built-in
+  // apps will fail with BuiltinAppProtectedError as designed.
   app.delete('/api/apps/:appId/permanent', async (req: Request, res: Response) => {
     try {
       const { appId } = req.params
@@ -1362,7 +1448,11 @@ export function registerApiRoutes(app: Express): void {
       console.log('[HTTP] DELETE /api/apps/%s/permanent', appId)
       res.json({ success: true })
     } catch (error) {
-      res.json({ success: false, error: (error as Error).message })
+      const err = error as Error
+      // Preserve errorName so HTTP clients can route by discriminator and
+      // surface a localized message for built-in protection (and other
+      // discriminated errors like AppNotFoundError).
+      res.json({ success: false, error: err.message, errorName: err.name })
     }
   })
 
@@ -1868,6 +1958,24 @@ export function registerApiRoutes(app: Express): void {
       await clearAppChat(appId, spaceId)
       console.log('[HTTP] POST /api/apps/%s/chat/clear', appId)
       res.json({ success: true })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
+  // POST /api/apps/:appId/chat/restart — restart all chat sessions for an app
+  // Closes the CC subprocesses so the next message reloads the system prompt
+  // and config. Conversation history is preserved via saved sessionId.
+  app.post('/api/apps/:appId/chat/restart', async (req: Request, res: Response) => {
+    try {
+      const { appId } = req.params
+      if (!appId) {
+        res.status(400).json({ success: false, error: 'Missing appId' })
+        return
+      }
+      const result = await restartAppChat(appId)
+      console.log('[HTTP] POST /api/apps/%s/chat/restart: closed=%d', appId, result.sessionsClosed)
+      res.json({ success: true, data: result })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
     }

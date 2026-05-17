@@ -42,12 +42,19 @@ vi.mock('os', async (importOriginal) => {
 vi.mock('electron', () => {
   return {
     app: {
+      // Force "packaged" mode so config.service points HALO_DIR at the test home,
+      // not ~/.halo-dev (which would escape the per-test sandbox).
+      isPackaged: true,
       getPath: (name: string) => {
         const dir = globalThis.__HALO_TEST_DIR__ || '/tmp/halo-test-fallback'
         if (name === 'home') return dir
         if (name === 'userData') return path.join(dir, '.halo')
+        if (name === 'downloads') return path.join(dir, 'Downloads')
+        if (name === 'temp') return path.join(dir, '.halo', 'temp')
         return dir
       },
+      // Mirrors a packaged build: code under the test-home tree, no real asar.
+      getAppPath: () => path.join(globalThis.__HALO_TEST_DIR__ || '/tmp/halo-test-fallback', 'app'),
       setLoginItemSettings: vi.fn(),
       getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
       getName: vi.fn(() => 'Halo'),

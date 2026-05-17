@@ -196,6 +196,8 @@ export function extractFileChangesSummary(thoughts: Thought[]): FileChangesSumma
  * Convert FileChangesSummary back to FileChanges for display components.
  * The resulting FileChange objects have no diff content (oldString/newString),
  * so the diff modal won't show actual diffs — only stats and file names.
+ *
+ * Callers must pass a normalized summary (see normalizeFileChangesSummary).
  */
 export function summaryToFileChanges(summary: FileChangesSummary): FileChanges {
   const edits: FileChange[] = summary.edited.map((e, i) => ({

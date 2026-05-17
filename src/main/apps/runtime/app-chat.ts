@@ -49,7 +49,8 @@ import {
   createSessionState,
   registerActiveSession,
   unregisterActiveSession,
-  activeSessions
+  activeSessions,
+  v2Sessions
 } from '../../services/agent/session-manager'
 import { stopGeneration } from '../../services/agent/control'
 import { buildAppChatSystemPrompt } from './prompt-chat'
@@ -63,7 +64,7 @@ import { getImSessionRegistry } from './im-session-registry'
 import { createHaloAppsMcpServer } from '../conversation-mcp'
 import { createWebSearchMcpServer } from '../../services/web-search'
 import { createEmailMcpServer } from '../../services/email-mcp'
-import { getSpace } from '../../services/space.service'
+import { getSpace, getSpaceDir } from '../../services/space.service'
 import { openSessionWriter, readSessionMessages, saveChatSessionId, loadChatSessionId, deleteChatSessionId } from './session-store'
 import { getAppMemoryService, getActivityStore } from './index'
 import { createMemoryStatusMcpServer } from '../../platform/memory/snapshot'
@@ -73,6 +74,7 @@ import { getAppChatConversationId, buildImSessionKey } from '../../../shared/app
 import type { ProgressEvent } from '../../../shared/types/inbound-message'
 import type { ImageAttachment } from '../../services/agent/types'
 import { ProgressEventParser } from './progress-formatter'
+import { flushSupplementBuffer } from './dispatch-inbound'
 export { getAppChatConversationId, buildImSessionKey }
 
 // ============================================
@@ -323,7 +325,7 @@ export async function sendAppChatMessage(
   const memoryInstructions = memory.getPromptInstructions()
   const usesAIBrowser = resolvePermission(app, 'ai-browser')
   const usesEmail = resolvePermission(app, 'email', false) // default false — higher trust
-  const usesImPush = resolvePermission(app, 'im-push', false) // default false — AI-driven IM push
+  const usesImPush = resolvePermission(app, 'im-push') // default true — AI-driven IM push
 
   // ── Merge config_schema defaults into userConfig ────
   const mergedConfig = mergeConfigWithDefaults(app.userConfig, app.spec.config_schema)
@@ -360,9 +362,11 @@ export async function sendAppChatMessage(
     }
   }
 
-  // Notify tool: allows AI to send notifications to channels and IM contacts
-  // FileExportGate restricts outbound file sends to space directory + tmpdir
-  const exportGate = new FileExportGate([memoryScope.spacePath, osTmpdir()])
+  // Notify tool: allows AI to send notifications to channels and IM contacts.
+  // FileExportGate roots = the space's working directory (matches the AI's
+  // cwd) + tmpdir. Not the same as memoryScope.spacePath, which targets
+  // space.path (internal storage) — see getSpaceDir().
+  const exportGate = new FileExportGate([getSpaceDir(app.spaceId!), osTmpdir()])
   const imSessions = usesImPush
     ? (getImSessionRegistry()?.getAllSessions(app.id) ?? [])
     : []
@@ -660,6 +664,17 @@ export async function sendAppChatMessage(
     }
 
     console.log(`[AppChat][${appId}] Active session cleaned up`)
+
+    // Flush buffered IM supplements (deferred so busy lock is released first)
+    if (conversationId !== defaultConvId) {
+      setImmediate(() => {
+        try {
+          flushSupplementBuffer(conversationId)
+        } catch (err) {
+          console.error(`[AppChat][${appId}] flushSupplementBuffer failed:`, err)
+        }
+      })
+    }
   }
 }
 
@@ -839,6 +854,82 @@ export async function clearAppChat(appId: string, spaceId: string): Promise<void
   const conversationId = getAppChatConversationId(appId)
   await clearSessionByConversationId(conversationId, appId, spaceId)
   console.log(`[AppChat][${appId}] Chat history cleared`)
+}
+
+// ============================================
+// Restart (no history loss)
+// ============================================
+
+/**
+ * Restart all chat sessions for an app — closes V2 sessions so the system
+ * prompt and config are reloaded on the next message.
+ *
+ * Why this exists: Claude Code subprocesses load their system prompt at
+ * session creation time and persist across messages for reuse. When a user
+ * edits the prompt or config_schema values, existing sessions keep using
+ * the stale prompt until they're torn down. This function tears them down.
+ *
+ * Scope: native Halo chat (`app-chat:{appId}`) + every IM channel session
+ * for this app (`app-chat:{appId}:*`). Cross-app sessions are untouched.
+ *
+ * History: the JSONL transcript and the saved SDK session ID are kept, so
+ * the next message resumes the conversation context via SDK session resume.
+ * Only the in-process CC subprocess + cached V2 session are reset.
+ *
+ * In-flight generations are aborted first via `stopGeneration()`, then the
+ * V2 session is closed and any per-session browser context is destroyed.
+ *
+ * Idempotent: returns `sessionsClosed: 0` when nothing is active.
+ *
+ * @param appId - App ID
+ * @returns Count of sessions that were closed
+ */
+export async function restartAppChat(appId: string): Promise<{ sessionsClosed: number }> {
+  const prefix = getAppChatConversationId(appId)
+
+  // Collect all session keys belonging to this app from both maps:
+  //   - activeSessions: currently generating (needs abort)
+  //   - v2Sessions:     cached CC subprocesses (idle but stuck with old prompt)
+  // A session may live in only one of the two; use a Set to dedupe.
+  const sessionIds = new Set<string>()
+  for (const k of activeSessions.keys()) {
+    if (k === prefix || k.startsWith(prefix + ':')) sessionIds.add(k)
+  }
+  for (const k of v2Sessions.keys()) {
+    if (k === prefix || k.startsWith(prefix + ':')) sessionIds.add(k)
+  }
+
+  let closed = 0
+  for (const convId of sessionIds) {
+    try {
+      // 1. Abort any in-flight generation before closing the underlying session.
+      if (activeSessions.has(convId)) {
+        await stopGeneration(convId)
+      }
+
+      // 2. Close the V2 session — next message will create a fresh CC process
+      //    with the up-to-date system prompt; saved sessionId resumes history.
+      closeV2Session(convId)
+
+      // 3. Destroy any per-session browser context. The next message rebuilds
+      //    it on demand; keeping a stale context tied to a dead CC process is
+      //    pointless and wastes resources.
+      const ctx = scopedContexts.get(convId)
+      if (ctx) {
+        ctx.destroy()
+        scopedContexts.delete(convId)
+      }
+
+      closed++
+    } catch (err) {
+      // Per-session failures are logged but do not abort the loop: a stuck
+      // IM session must not prevent the native chat from being restarted.
+      console.error(`[AppChat][${appId}] Restart failed for ${convId}:`, err)
+    }
+  }
+
+  console.log(`[AppChat][${appId}] Restart complete: ${closed} session(s) closed (history preserved)`)
+  return { sessionsClosed: closed }
 }
 
 /**

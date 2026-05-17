@@ -12,37 +12,54 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import {
-  ChevronDown, Search, Check, Loader2, Eye, EyeOff, ExternalLink, X, Star
+  ChevronDown, Search, Check, Loader2, Eye, EyeOff, ExternalLink, X, Star, RefreshCw
 } from 'lucide-react'
 import type {
   AISource,
   AISourcesConfig,
   ProviderId,
   ModelOption,
-  BuiltinProvider
+  BuiltinProvider,
+  AuthProviderConfig
 } from '../../types'
 import {
   getBuiltinProvider,
   getApiKeyProviders,
   isAnthropicProvider
 } from '../../types'
-import { useTranslation } from '../../i18n'
+import { resolveLocalizedText } from '../../../shared/types'
+import { useTranslation, getCurrentLanguage } from '../../i18n'
 import { api } from '../../api'
 import { ModelConfigPanel } from './ModelConfigPanel'
 import type { ModelCapabilityOverride } from '../../../shared/types/model-capabilities'
+import { usePresetModels } from '../../hooks/usePresetModels'
 
 interface ProviderSelectorProps {
   aiSources: AISourcesConfig
   onSave: (source: AISource) => Promise<void>
   onCancel: () => void
   editingSourceId?: string | null
+  /**
+   * Preset-API provider entry. When set (and no `editingSourceId`), the
+   * selector renders a stripped-down "Add preset source" panel: apiKey input
+   * + model select from `preset.fallbackModels`. The provider dropdown and
+   * the generic builtin-provider editor are skipped entirely.
+   *
+   * Settings flow uses this to add a preset source. The first-time setup flow
+   * (`ApiSetup.tsx`) does its own live model fetching with race protection;
+   * here we deliberately rely on the static `fallbackModels` list to keep
+   * the settings code path minimal and avoid duplicating the fetch logic.
+   * Users who want to refresh the model list can re-login from setup.
+   */
+  presetProvider?: AuthProviderConfig
 }
 
 export function ProviderSelector({
   aiSources,
   onSave,
   onCancel,
-  editingSourceId
+  editingSourceId,
+  presetProvider
 }: ProviderSelectorProps) {
   const { t } = useTranslation()
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -52,24 +69,42 @@ export function ProviderSelector({
     ? aiSources.sources.find(s => s.id === editingSourceId)
     : null
 
+  // Preset-origin sources are configured via a fixed-baseUrl entry in
+  // product.json (`authProviders[].preset`). They use `provider: 'custom'`
+  // which has no BuiltinProvider entry, so the generic editor below would
+  // render an empty config panel. We branch out to a dedicated preset editor
+  // that exposes only the fields the user can safely change (apiKey + model)
+  // and keeps the gateway baseUrl / apiType immutable.
+  const isPresetEdit = editingSource?.isPreset === true
+  // Adding a brand-new preset source (clicked from AISourcesSection list).
+  const isPresetAdd = !editingSource && presetProvider !== undefined
+
   // Get all API key providers
   const allProviders = useMemo(() => getApiKeyProviders(), [])
   const recommendedProviders = useMemo(() => allProviders.filter(p => p.recommended), [allProviders])
   const otherProviders = useMemo(() => allProviders.filter(p => !p.recommended), [allProviders])
 
-  // State
+  // State — seeded from `editingSource` (edit mode), `presetProvider` (preset
+  // add mode), or hardcoded defaults (generic add mode), in that priority.
   const [selectedProvider, setSelectedProvider] = useState<ProviderId>(
-    editingSource?.provider || 'anthropic'
+    editingSource?.provider || (presetProvider ? 'custom' : 'anthropic')
   )
   const [showProviderDropdown, setShowProviderDropdown] = useState(false)
   const [providerSearchQuery, setProviderSearchQuery] = useState('')
 
   const [apiKey, setApiKey] = useState(editingSource?.apiKey || '')
-  const [apiUrl, setApiUrl] = useState(editingSource?.apiUrl || '')
-  const [selectedModel, setSelectedModel] = useState(editingSource?.model || '')
+  const [apiUrl, setApiUrl] = useState(
+    editingSource?.apiUrl || presetProvider?.preset?.baseUrl || ''
+  )
+  const [selectedModel, setSelectedModel] = useState(
+    editingSource?.model || presetProvider?.preset?.fallbackModels?.[0]?.id || ''
+  )
   const [customModelInput, setCustomModelInput] = useState('')
   const [showCustomModel, setShowCustomModel] = useState(false)
-  const [sourceName, setSourceName] = useState(editingSource?.name || '')
+  const [sourceName, setSourceName] = useState(
+    editingSource?.name ||
+    (presetProvider ? resolveLocalizedText(presetProvider.displayName, getCurrentLanguage()) : '')
+  )
 
   const [showApiKey, setShowApiKey] = useState(false)
   const [isValidating, setIsValidating] = useState(false)
@@ -79,11 +114,45 @@ export function ProviderSelector({
     message?: string
   } | null>(null)
 
+  // Generic editor's model list state. Preset modes get their list from
+  // `usePresetModels` below (single source of truth for the preset panel).
   const [fetchedModels, setFetchedModels] = useState<ModelOption[]>(
     editingSource?.availableModels || []
   )
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [showModelDropdown, setShowModelDropdown] = useState(false)
+
+  // Preset model fetcher — race-safe AbortController, fallback handling,
+  // unmount cleanup. Inert when neither preset path is active. Initial
+  // fallback list is taken from the edit source (preset edit) or the preset
+  // entry's static fallbackModels (preset add).
+  const presetFallback: ModelOption[] = isPresetEdit
+    ? (editingSource?.availableModels ?? [])
+    : (presetProvider?.preset?.fallbackModels ?? [])
+  const presetBaseUrl: string | undefined = isPresetEdit
+    ? editingSource?.apiUrl
+    : presetProvider?.preset?.baseUrl
+  const presetModelsHook = usePresetModels({
+    baseUrl: presetBaseUrl,
+    // In preset-add mode we honour the configured modelsPath. In preset-edit
+    // mode the original product.json modelsPath is not persisted on AISource
+    // (we only have baseUrl + apiType), so we let the hook default to
+    // '/v1/models'. This is the practical assumption for OpenAI-compatible
+    // gateways; if a deployment uses a non-standard path, the user can
+    // re-login from setup to pull a fresh list.
+    modelsPath: presetProvider?.preset?.modelsPath,
+    fallbackModels: presetFallback,
+    apiKey,
+    model: selectedModel,
+    setModel: setSelectedModel,
+    enabled: isPresetEdit || isPresetAdd
+  })
+
+  // Single source of truth for the model list shown in the model dropdown.
+  // Preset modes read from the hook; generic editor reads from fetchedModels.
+  const effectiveModelList: ModelOption[] = (isPresetEdit || isPresetAdd)
+    ? presetModelsHook.models
+    : fetchedModels
 
   // Per-model capability overrides for this source
   const [modelOverrides, setModelOverrides] = useState<Record<string, ModelCapabilityOverride>>(
@@ -234,9 +303,14 @@ export function ProviderSelector({
     setValidationResult(null)
 
     try {
-      const availableModels: ModelOption[] = fetchedModels.length > 0
-        ? fetchedModels
-        : (currentProvider?.models || [{ id: finalModel, name: finalModel }])
+      // Prefer the live list (generic editor's fetched list, or the preset
+      // hook's current models). Fall back to the builtin provider's static
+      // catalog (generic) or a single-entry list seeded with `finalModel`
+      // (preset with empty fetch). The unshift below guarantees the chosen
+      // model is always present in the persisted list.
+      const availableModels: ModelOption[] = effectiveModelList.length > 0
+        ? [...effectiveModelList]
+        : (currentProvider?.models ? [...currentProvider.models] : [{ id: finalModel, name: finalModel }])
 
       if (!availableModels.some(m => m.id === finalModel)) {
         availableModels.unshift({ id: finalModel, name: finalModel })
@@ -244,20 +318,38 @@ export function ProviderSelector({
 
       const now = new Date().toISOString()
 
+      // Resolve preset-specific fields. In preset-add mode we lift values from
+      // `presetProvider.preset` (single source of truth). In preset-edit mode
+      // they come from `editingSource`. In generic mode they fall back to the
+      // builtin-provider defaults — identical to pre-preset behavior.
+      const isPresetSource = Boolean(editingSource?.isPreset || presetProvider)
+      const presetCfg = presetProvider?.preset
+      const resolvedApiUrl = apiUrl
+        || presetCfg?.baseUrl
+        || currentProvider?.apiUrl
+        || 'https://api.openai.com'
+      const resolvedApiType = editingSource?.apiType
+        || presetCfg?.apiType
+        || currentProvider?.apiType
+      const resolvedProvider: ProviderId = presetProvider ? 'custom' : selectedProvider
+
       const source: AISource = {
         id: editingSource?.id || uuidv4(),
         name: sourceName || currentProvider?.name || selectedProvider,
-        provider: selectedProvider,
+        provider: resolvedProvider,
         authType: 'api-key',
-        apiUrl: apiUrl || currentProvider?.apiUrl || 'https://api.openai.com',
-        apiType: editingSource?.apiType || currentProvider?.apiType,
+        apiUrl: resolvedApiUrl,
+        apiType: resolvedApiType,
         apiKey,
         model: finalModel,
         availableModels,
         createdAt: editingSource?.createdAt || now,
         updatedAt: now,
         // Only persist modelOverrides if there's at least one entry
-        ...(Object.keys(modelOverrides).length > 0 ? { modelOverrides } : {})
+        ...(Object.keys(modelOverrides).length > 0 ? { modelOverrides } : {}),
+        // Mark preset-origin sources so the settings editor (re-open) renders
+        // the preset-edit form instead of the generic builtin-provider form.
+        ...(isPresetSource ? { isPreset: true as const } : {})
       }
 
       await onSave(source)
@@ -346,6 +438,234 @@ export function ProviderSelector({
       )}
     </button>
   )
+
+  // ── Preset-source panel (covers both ADD-from-settings and EDIT) ──────
+  // Preset entries from product.json carry a fixed baseUrl + apiType. The
+  // user can choose name / API key / model; everything else is locked. We
+  // share one panel between the two flows to keep the UX consistent and
+  // avoid duplicating the model list rendering twice.
+  if (isPresetAdd || (isPresetEdit && editingSource)) {
+    // The visible model list always comes from the preset hook (single source
+    // of truth) — fed by either the live /v1/models result or the configured
+    // fallbackModels. The user can refresh it via the Fetch button below.
+    const presetModels: ModelOption[] = presetModelsHook.models
+
+    const headerName = editingSource?.name
+      ?? (presetProvider ? resolveLocalizedText(presetProvider.displayName, getCurrentLanguage()) : '')
+
+    const fixedApiUrl = editingSource?.apiUrl ?? presetProvider?.preset?.baseUrl ?? ''
+
+    const description = presetProvider
+      ? resolveLocalizedText(presetProvider.description, getCurrentLanguage())
+      : null
+
+    return (
+      <div className="space-y-4">
+        <div className="space-y-4 p-4 bg-secondary/30 rounded-lg border border-border">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-foreground">
+              {t('Configure')} {headerName}
+            </h3>
+          </div>
+
+          {/* Preset description (ADD mode only — gives the user context for
+              this gateway). EDIT mode shows the user-defined name, which is
+              already meaningful. */}
+          {description && isPresetAdd && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
+
+          {/* Display Name */}
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
+              {t('Display Name')}
+            </label>
+            <input
+              type="text"
+              value={sourceName}
+              onChange={(e) => setSourceName(e.target.value)}
+              placeholder={headerName}
+              className="w-full px-3 py-2 bg-input border border-border rounded-lg
+                       text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          {/* API Key (editable — key rotation in EDIT, initial key in ADD) */}
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
+              API Key
+            </label>
+            <div className="relative">
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full px-3 py-2 pr-10 bg-input border border-border rounded-lg
+                         text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <button
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+              >
+                {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Docs link (ADD mode only — EDIT mode users already know the gateway) */}
+          {isPresetAdd && presetProvider?.preset?.docs && (
+            <button
+              type="button"
+              onClick={() => { void api.openExternal(presetProvider.preset!.docs!.url) }}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <ExternalLink className="w-3 h-3" />
+              {presetProvider.preset.docs.label
+                ? resolveLocalizedText(presetProvider.preset.docs.label, getCurrentLanguage())
+                : t('Learn more')}
+            </button>
+          )}
+
+          {/* API URL (read-only — fixed by the preset entry) */}
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">
+              API URL
+            </label>
+            <input
+              type="text"
+              value={fixedApiUrl}
+              readOnly
+              className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg
+                       text-muted-foreground cursor-not-allowed"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('Gateway URL is fixed by the preset configuration')}
+            </p>
+          </div>
+
+          {/* Model select + Fetch from gateway + custom model toggle */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-muted-foreground">
+                {t('Model')}
+              </label>
+              <button
+                type="button"
+                onClick={() => { void presetModelsHook.fetchModels() }}
+                disabled={presetModelsHook.isFetching || !apiKey.trim()}
+                className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={t('Fetch the latest model list from the gateway')}
+              >
+                {presetModelsHook.isFetching ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={14} />
+                )}
+                {t('Fetch Models')}
+              </button>
+            </div>
+
+            {/* Custom model toggle — lets users type a model id that is not
+                (yet) in the gateway's /models response. The id is persisted to
+                availableModels via the unshift logic in handleSave. */}
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="checkbox"
+                id="presetCustomModel"
+                checked={showCustomModel}
+                onChange={(e) => setShowCustomModel(e.target.checked)}
+                className="rounded border-border"
+              />
+              <label htmlFor="presetCustomModel" className="text-sm text-muted-foreground">
+                {t('Use custom model ID')}
+              </label>
+            </div>
+
+            {showCustomModel ? (
+              <input
+                type="text"
+                value={customModelInput}
+                onChange={(e) => setCustomModelInput(e.target.value)}
+                placeholder={t('Enter model ID')}
+                className="w-full px-3 py-2 bg-input border border-border rounded-lg
+                         text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            ) : presetModels.length > 0 ? (
+              <div className="relative">
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className="w-full px-3 py-2 pr-9 bg-input border border-border rounded-lg
+                           text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none"
+                >
+                  {!presetModels.some(m => m.id === selectedModel) && selectedModel && (
+                    <option value={selectedModel}>{selectedModel}</option>
+                  )}
+                  {presetModels.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name || m.id}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              </div>
+            ) : (
+              <div className="w-full px-3 py-2 bg-input border border-border rounded-lg text-sm text-muted-foreground">
+                {t('No models available — fetch from gateway or enter a custom ID')}
+              </div>
+            )}
+
+            {presetModelsHook.warning && (
+              <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-500">
+                {presetModelsHook.warning}
+              </p>
+            )}
+          </div>
+
+          {/* Model Configuration — context window, output tokens, vision, thinking */}
+          {selectedModel && (
+            <ModelConfigPanel
+              modelId={selectedModel}
+              overrides={modelOverrides}
+              onChange={setModelOverrides}
+            />
+          )}
+
+          {/* Validation result */}
+          {validationResult && (
+            <div className={`flex items-center gap-2 p-2 rounded-lg ${
+              validationResult.valid
+                ? 'bg-green-500/10 text-green-600'
+                : 'bg-red-500/10 text-red-600'
+            }`}>
+              {validationResult.valid ? <Check size={16} /> : <X size={16} />}
+              <span className="text-sm">{validationResult.message}</span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 bg-secondary text-muted-foreground hover:bg-secondary/80 hover:text-foreground rounded-lg transition-colors"
+            >
+              {t('Cancel')}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isValidating || !apiKey}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg
+                       hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isValidating && <Loader2 size={16} className="animate-spin" />}
+              {isPresetAdd ? t('Add') : t('Update')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">

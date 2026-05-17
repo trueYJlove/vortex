@@ -953,6 +953,39 @@ export const api = {
     return httpRequest('POST', '/api/wecom-bot/reconnect')
   },
 
+  // ===== WeCom Bot — Scan-Auth (QR-code device flow) =====
+  wecomBotScanAuthStart: async (): Promise<ApiResponse<{ scode: string; authUrl: string }>> => {
+    if (isElectron()) {
+      return window.halo.wecomBotScanAuthStart()
+    }
+    return httpRequest('POST', '/api/wecom-bot/scan-auth/start')
+  },
+
+  wecomBotScanAuthPoll: async (
+    scode: string,
+  ): Promise<ApiResponse<{ botId: string; secret: string }> & { kind?: string }> => {
+    if (isElectron()) {
+      return window.halo.wecomBotScanAuthPoll(scode)
+    }
+    return httpRequest('POST', '/api/wecom-bot/scan-auth/poll', { scode })
+  },
+
+  wecomBotScanAuthCancel: async (scode: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.wecomBotScanAuthCancel(scode)
+    }
+    return httpRequest('POST', '/api/wecom-bot/scan-auth/cancel', { scode })
+  },
+
+  wecomBotScanAuthCreateAssistant: async (
+    input: { botIdPrefix: string },
+  ): Promise<ApiResponse<{ appId: string; appName: string }>> => {
+    if (isElectron()) {
+      return window.halo.wecomBotScanAuthCreateAssistant(input)
+    }
+    return httpRequest('POST', '/api/wecom-bot/scan-auth/create-assistant', input)
+  },
+
   // ===== IM Channels (multi-instance) =====
   imChannelsStatus: async (): Promise<ApiResponse> => {
     if (isElectron()) {
@@ -1834,6 +1867,13 @@ export const api = {
     return httpRequest('POST', `/api/apps/${appId}/chat/clear`, { spaceId })
   },
 
+  appChatRestart: async (appId: string): Promise<ApiResponse<{ sessionsClosed: number }>> => {
+    if (isElectron()) {
+      return window.halo.appChatRestart(appId)
+    }
+    return httpRequest('POST', `/api/apps/${appId}/chat/restart`)
+  },
+
   appImChatMessages: async (appId: string, spaceId: string, channel: string, chatType: 'direct' | 'group', chatId: string): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.halo.appImChatMessages({ appId, spaceId, channel, chatType, chatId })
@@ -1863,6 +1903,16 @@ export const api = {
 
   onImSessionUpdated: (callback: (data: unknown) => void) =>
     onEvent('app:im-session-updated', callback),
+
+  /**
+   * Subscribe to main-initiated IM channel instance config mutations.
+   *
+   * Fires when the main process writes a change to an instance's persisted
+   * config without renderer involvement — currently used by the WeCom bot
+   * scan-auth owner auto-claim flow. Payload: `{ instanceId, instance }`.
+   */
+  onImChannelInstanceUpdated: (callback: (data: unknown) => void) =>
+    onEvent('im-channels:instance-updated', callback),
 
   // ===== Store (App Registry) =====
   storeQuery: async (params: { search?: string; type?: string; category?: string; page?: number; pageSize?: number; locale?: string }): Promise<ApiResponse> => {

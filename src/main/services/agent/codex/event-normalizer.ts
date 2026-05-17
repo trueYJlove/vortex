@@ -81,6 +81,28 @@ export interface NormalizerContext {
   sessionId: string
   model: string
   mcpServers: Record<string, any>
+  /**
+   * Mirrors Claude Code SDK's `includePartialMessages`. Drives the
+   * stream_event ↔ aggregate split for TEXT and THINKING blocks so the
+   * normalizer never feeds the same content to BOTH consumer paths at the
+   * same time (which is what produced the doubled-bubble bug after eeb6f08).
+   *
+   *   - true  → live-UI mode: emit stream_event deltas as the sole bubble
+   *             source. The aggregate `type:'assistant'` envelope is still
+   *             emitted for protocol shape, but its text/thinking content
+   *             is empty — consumers that key off it (app-chat
+   *             lastAssistantText, execute.ts finalText) fall back to the
+   *             stream_event accumulation already in lastTextContent /
+   *             streamResult.finalContent.
+   *   - false → aggregate-only mode: skip stream_event text/thinking
+   *             deltas so the aggregate is the sole text source. This is
+   *             what execute.ts (automation) expects.
+   *
+   * Tool_use is unaffected: it always streams via content_block_start +
+   * input_json_delta + content_block_stop AND emits the aggregate (the
+   * aggregate must precede user.tool_result for id-based JSONL linking).
+   */
+  includePartialMessages: boolean
 }
 
 interface BlockState {
@@ -769,10 +791,36 @@ export class CodexEventNormalizer {
   private aggregateBlock(blockKind: BlockKind, state: BlockState): any[] {
     if (blockKind === 'text') {
       if (!state.textSoFar) return []
+      // Mode split mirrors Claude Code SDK: when stream_event is the live
+      // bubble source (includePartialMessages=true), DO NOT also send the
+      // text inside the aggregate envelope. Otherwise stream-processor.ts
+      // would append the same text twice — once at content_block_stop, then
+      // again from the aggregate text thought (the doubled bubble bug).
+      //
+      // Known trade-off: app-chat.ts persists aggregate `assistant` events
+      // to JSONL (stream_event is filtered out per app-chat.ts:581). With
+      // text suppressed here, session-store.convertEventsToMessages can no
+      // longer reconstruct the bubble text for Codex digital-human chat
+      // history replay. Mitigation paths if that bites:
+      //   a) Stop filtering stream_event from JSONL for Codex sessions
+      //      (engine-aware persistence — explicitly called out as a smell
+      //      by app-chat.ts:579 but the practical choice).
+      //   b) Have session-store fall back to reading `result.result` (the
+      //      final text Codex normalizer already puts in the terminal
+      //      `result` envelope) when aggregate text is missing.
+      // The interactive bubble is the priority — replay can be addressed
+      // separately without re-introducing the doubling.
+      if (this.context.includePartialMessages) return []
       return assistantWithBlocks([{ type: 'text', text: state.textSoFar }])
     }
     if (blockKind === 'thinking' || blockKind === 'thinking-summary') {
       if (!state.textSoFar) return []
+      // Same rationale as text: suppress aggregate thinking when stream_event
+      // is the live source so the timeline doesn't duplicate the chain-of-
+      // thought (parseSDKMessage skips thinking thoughts, but session-store
+      // and other top-level `type:'assistant'` consumers would still see
+      // double thinking blocks on replay).
+      if (this.context.includePartialMessages) return []
       return assistantWithBlocks([{ type: 'thinking', thinking: state.textSoFar }])
     }
     if (blockKind === 'tool') {

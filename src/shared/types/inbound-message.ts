@@ -110,7 +110,9 @@ export interface InboundAttachment {
  * for platforms that support typing indicators.
  *
  * Channel TTL notes:
- * - WeCom bot: req_id expires after 5 minutes — adapter auto-falls back to pushToChat()
+ * - WeCom bot: 24h reply window for aibot_respond_msg; 10-min lifetime on a single
+ *   stream message (server-enforced). Adapter auto-transitions to aibot_send_msg push
+ *   inside both windows when needed.
  * - Feishu/DingTalk: similar protocol-level TTLs — adapters handle internally
  * - Webhook/Schedule: no TTL — reply path is always available
  *
@@ -131,7 +133,7 @@ export interface ReplyHandle {
    * Undefined means no TTL — the synchronous reply path is always valid.
    *
    * Examples:
-   *   WeCom bot: 5 * 60 * 1000 (req_id expires after 5 minutes)
+   *   WeCom bot: 24 * 60 * 60 * 1000 (24h reply window per official docs)
    *   Webhook:   undefined (HTTP response is immediate, no TTL)
    */
   replyTtlMs?: number
@@ -178,4 +180,7 @@ export interface StreamingHandle {
    * After this call, no more update() calls should be made.
    */
   finish(finalText: string): Promise<void>
+
+  /** Abandon the stream without sending. Releases internal state. Safe to call multiple times. */
+  dispose?(): void
 }

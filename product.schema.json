@@ -54,7 +54,7 @@
     },
     "authProviders": {
       "type": "array",
-      "description": "Authentication provider configurations",
+      "description": "Authentication provider configurations. An entry can be one of three forms: (1) builtin=true for in-tree providers (e.g. custom), (2) path=... for dynamic OAuth provider modules, (3) preset=... for a fixed-baseUrl API-key form (mutually exclusive with `path`). The `type` field is a free-form identifier; the special value 'preset-api' is recommended for preset entries but the renderer routes purely on the presence of `preset`.",
       "items": {
         "type": "object",
         "required": ["type", "enabled"],
@@ -81,6 +81,49 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "preset": {
+            "type": "object",
+            "description": "Preset API configuration. When present, this provider renders as an API-key form with a fixed baseUrl. Mutually exclusive with `path` (dynamic OAuth providers).",
+            "required": ["baseUrl", "apiType"],
+            "properties": {
+              "baseUrl": {
+                "type": "string",
+                "description": "Fixed base URL of the gateway (no path suffix). e.g. 'http://example.com/public'"
+              },
+              "apiType": {
+                "type": "string",
+                "enum": ["chat_completions", "responses", "anthropic_passthrough", "kiro"],
+                "description": "Persisted to AISource.apiType. Determines dispatch path for Anthropic/Halo SDK engines. Codex engine ignores this and uses OpenAI protocol."
+              },
+              "modelsPath": {
+                "type": "string",
+                "description": "Path appended to baseUrl for GET model list. Default: '/v1/models'. The endpoint must return OpenAI-compatible { data: [{ id }] }."
+              },
+              "fallbackModels": {
+                "type": "array",
+                "description": "Used when GET models fails or returns empty.",
+                "items": {
+                  "type": "object",
+                  "required": ["id"],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "name": { "type": "string" }
+                  }
+                }
+              },
+              "docs": {
+                "type": "object",
+                "description": "Optional documentation link shown in the form.",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string" },
+                  "label": {
+                    "description": "Localized text. Defaults to 'Learn more' / '了解更多' if absent."
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -110,6 +153,53 @@
         }
       },
       "required": ["mode"]
+    },
+    "telemetry": {
+      "type": "object",
+      "description": "Telemetry configuration (enterprise/custom builds only). Controls which user-authored / user-identifiable fields may be forwarded to the self-hosted telemetry backend. Omit for open-source builds — every sensitive field is dropped by default.",
+      "properties": {
+        "allowedSensitiveFields": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Whitelist of SENSITIVE_KEYS property names permitted to be sent. Recognized keys: specId, spaceName, modelName, sourceName, mcpId, skillId, imBotName, inputTokens, outputTokens, errorCode."
+        }
+      }
+    },
+    "builtinApps": {
+      "type": "object",
+      "description": "Built-in digital humans bundled with the build (VSCode-style built-in extensions). Each entry is materialized into resources/builtin-apps/<specId>/ at build time by scripts/sync-builtin-apps.mjs and auto-installed on first launch by the App Manager. Open-source builds typically omit this field; enterprise builds (e.g. product.<variant>.json) declare their own list pointing to a private SSOT repository.",
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "description": "Path to the external SSOT directory containing each built-in app folder. Resolved relative to product.json's directory (i.e. project root). Each entry's specId must match a subdirectory containing spec.yaml and an optional skills/ directory. May be overridden at build time via the HALO_BUILTIN_APPS_SOURCE environment variable."
+        },
+        "apps": {
+          "type": "array",
+          "description": "List of built-in apps to bundle. The order has no functional meaning.",
+          "items": {
+            "type": "object",
+            "required": ["specId"],
+            "properties": {
+              "specId": {
+                "type": "string",
+                "description": "Subdirectory name inside sourcePath. Becomes the canonical spec identifier."
+              },
+              "spaceId": {
+                "type": ["string", "null"],
+                "description": "Target space for installation. Use 'halo-temp' for the default temp space, or null for global scope. Defaults to 'halo-temp'."
+              },
+              "defaultStatus": {
+                "type": "string",
+                "enum": ["active", "paused"],
+                "description": "Initial status when first installed. Use 'paused' for apps that require user configuration or browser login before they can run safely. Defaults to 'paused'."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["sourcePath", "apps"],
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

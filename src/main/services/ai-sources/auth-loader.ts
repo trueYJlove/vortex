@@ -14,35 +14,16 @@ import { pathToFileURL } from 'url'
 import { existsSync } from 'fs'
 import { app } from 'electron'
 import type { AISourceProvider, OAuthAISourceProvider } from '../../../shared/interfaces'
-import { type AISourceType, type LocalizedText } from '../../../shared/types'
+import { type AuthProviderConfig, type AISourceType } from '../../../shared/types'
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * Provider configuration from product.json
- */
-export interface AuthProviderConfig {
-  /** Provider type identifier (e.g., 'oauth', 'custom') */
-  type: AISourceType
-  /** Display name for UI (supports i18n: string or { "en": "...", "zh-CN": "..." }) */
-  displayName: LocalizedText
-  /** Description text for UI (supports i18n: string or { "en": "...", "zh-CN": "..." }) */
-  description: LocalizedText
-  /** Lucide icon name */
-  icon: string
-  /** Icon background color (hex color) */
-  iconBgColor: string
-  /** Whether this is the recommended option */
-  recommended: boolean
-  /** Path to provider module (relative to product.json) */
-  path?: string
-  /** Whether this is a built-in provider */
-  builtin?: boolean
-  /** Whether this provider is enabled */
-  enabled: boolean
-}
+// AuthProviderConfig is defined in src/shared/types/ai-sources.ts so the main
+// loader and the renderer setup UI share one source of truth. Re-exported here
+// for ergonomic local imports from this module.
+export { type AuthProviderConfig }
 
 /**
  * Update configuration for auto-updater
@@ -212,6 +193,22 @@ export interface ProductConfig {
    * no effect unless the telemetry provider is also configured.
    */
   identitySource?: string
+
+  /**
+   * Telemetry configuration (optional, enterprise/custom builds only).
+   *
+   * Whitelists which property keys in the analytics module's SENSITIVE_KEYS
+   * set may be forwarded to the self-hosted telemetry backend. The
+   * SENSITIVE_KEYS set covers user-authored / user-identifiable fields
+   * (spec.name, space name, model name, MCP/skill/im bot names, token
+   * counts, error codes). Open-source builds MUST omit this entirely —
+   * every SENSITIVE_KEYS property is dropped at sanitize time, in addition
+   * to the empty-endpoint provider-disabled safety net. Enterprise builds
+   * opt-in per field.
+   */
+  telemetry?: {
+    allowedSensitiveFields?: string[]
+  }
 }
 
 /**
@@ -314,6 +311,18 @@ export function getImChannelsPermissionDefaults(): ImChannelsPermissionDefaults 
  */
 export function getIdentitySource(): string | undefined {
   return loadProductConfig().identitySource
+}
+
+/**
+ * Get the telemetry config block from product.json.
+ *
+ * Returns undefined when not configured (open-source builds). When
+ * present, `allowedSensitiveFields` whitelists which SENSITIVE_KEYS may
+ * be forwarded to the telemetry backend — see telemetry provider's
+ * sanitize pass for the enforcement.
+ */
+export function getTelemetryConfig(): ProductConfig['telemetry'] | undefined {
+  return loadProductConfig().telemetry
 }
 
 /**
@@ -432,6 +441,12 @@ export async function loadAuthProvidersAsync(): Promise<LoadedProvider[]> {
       // Built-in provider (loaded separately by manager)
       console.log(`[AuthLoader] Built-in provider: ${providerConfig.type}`)
       loaded.provider = null // Will be loaded by manager
+    } else if (providerConfig.preset) {
+      // Preset API provider - rendered as an API-key form in the renderer.
+      // No backend module to load; the chat dispatcher handles requests via
+      // the persisted AISource.apiType + apiUrl.
+      console.log(`[AuthLoader] Preset API provider: ${providerConfig.type}`)
+      loaded.provider = null
     } else if (providerConfig.path) {
       // External provider - load from path using dynamic import
       const providerPath = resolveProviderPath(providerConfig)
@@ -460,7 +475,9 @@ export function loadAuthProviders(): LoadedProvider[] {
     .map(providerConfig => ({
       config: providerConfig,
       provider: null,
-      loadError: providerConfig.builtin ? undefined : 'Use loadAuthProvidersAsync for dynamic loading'
+      loadError: (providerConfig.builtin || providerConfig.preset)
+        ? undefined
+        : 'Use loadAuthProvidersAsync for dynamic loading'
     }))
 }
 
@@ -479,7 +496,11 @@ export function getEnabledAuthProviderConfigs(): AuthProviderConfig[] {
 export function isProviderAvailable(type: AISourceType): boolean {
   const providers = loadAuthProviders()
   const provider = providers.find(p => p.config.type === type)
-  return provider !== undefined && (provider.config.builtin || provider.provider !== null)
+  return provider !== undefined && (
+    provider.config.builtin === true ||
+    provider.config.preset !== undefined ||
+    provider.provider !== null
+  )
 }
 
 /**

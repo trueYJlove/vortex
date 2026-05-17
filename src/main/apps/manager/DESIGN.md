@@ -132,6 +132,55 @@ This keeps the interface clean:
 **Decision**: Add `updateLastRun(appId, outcome, errorMessage?)` as a dedicated method
 for runtime to record execution results. This is cleaner than overloading `updateStatus`.
 
+### 2.11 Built-in Apps (VSCode-style bundled digital humans)
+
+**Decision**: Bundle "built-in" digital humans with the build itself, install
+them into the regular `installed_apps` table, and protect them from
+permanent deletion. Mark them with `spec.store.install_source = 'builtin'`.
+
+**Rationale**: Different product variants (open-source vs enterprise
+variants) ship different default app sets. Hard-coding the spec content in
+TypeScript would explode the source files and break maintainability; routing
+through the App Store at first launch would require network connectivity. The
+bundled-and-managed approach mirrors VSCode's built-in extension model:
+
+- **Source of Truth** lives in an external repository per variant
+  (e.g. `../digital-human-protocol-<variant>/packages/digital-humans/`), declared
+  in `product.json` under the new `builtinApps` field.
+- **Build-time sync**: `scripts/sync-builtin-apps.mjs` copies each declared
+  app folder into `resources/builtin-apps/<specId>/` and writes a
+  `manifest.json`. Runs automatically as a `prebuild` npm hook so any
+  `npm run build` flow is covered. The destination is `.gitignore`d so the
+  open-source repo never carries enterprise content.
+- **Runtime loader**: `builtin-loader.ts` scans `resources/builtin-apps/` as
+  a Tier-3 idle task, installs missing entries via the standard
+  `appManager.install()` path (so all existing IPC, runtime, and analytics
+  hooks just work), refreshes `spec_json` when the bundled version moves
+  forward, and garbage-collects rows whose `specId` no longer appears in the
+  manifest.
+- **User state preservation**: `userConfig`, `userOverrides`, and `status`
+  live in DB columns that the loader never touches when refreshing — only
+  `spec_json` and `spec_id` are updated via `service.updateSpec`.
+- **Disable semantics**: a "uninstall" on a built-in is a soft uninstall
+  (status=`uninstalled`); the loader respects it across launches. Standard
+  `reinstall` flow re-enables. This matches VSCode's per-user disable flag.
+- **Hard-delete protection**: `service.deleteApp()` rejects built-ins with
+  `BuiltinAppProtectedError` so a UI bug or curl call cannot wipe a built-in
+  whose row would just respawn on next launch. The loader's GC sets a
+  process-level bypass flag (`isBuiltinGcInProgress()`) when it legitimately
+  needs to remove an obsolete built-in.
+
+**Why not pure scanner / virtual entries?** A scanner-only design (no DB row,
+merge in `listApps`/`getApp`) would have to rewrite ~40 caller sites across
+IPC, runtime, services, and analytics — all of which currently assume a
+single source of truth (the `installed_apps` table). The chosen design
+achieves the same UX (auto-install, auto-upgrade, protected delete, user-
+controlled disable) with zero changes to those callers.
+
+**Performance**: The loader does N spec.yaml reads + N JSON parses per launch
+(N = number of bundled apps, typically ≤10). For unchanged builds this is
+~10–20ms total, all of which runs in the idle queue and never blocks the UI.
+
 ---
 
 ## 3. SQLite Schema
@@ -163,12 +212,15 @@ CREATE INDEX idx_installed_apps_status ON installed_apps(status);
 
 ```
 src/main/apps/manager/
-  index.ts       -- initAppManager(), shutdownAppManager(), re-exports
-  types.ts       -- InstalledApp, AppManagerService, AppStatus, etc.
-  migrations.ts  -- Migration[] for the installed_apps table
-  store.ts       -- SQLite CRUD operations (AppManagerStore class)
-  service.ts     -- AppManagerService implementation
-  errors.ts      -- Custom error types
+  index.ts            -- initAppManager(), shutdownAppManager(), re-exports
+  types.ts            -- InstalledApp, AppManagerService, AppStatus, isBuiltinApp helper
+  migrations.ts       -- Migration[] for the installed_apps table
+  store.ts            -- SQLite CRUD operations (AppManagerStore class)
+  service.ts          -- AppManagerService implementation (state machine, builtin guard)
+  errors.ts           -- Custom error types (incl. BuiltinAppProtectedError)
+  skill-sync.ts       -- Filesystem sync for skill apps (SDK-discoverable .md files)
+  seed.ts             -- One-shot "Halo 助手" placeholder when no apps exist
+  builtin-loader.ts   -- Built-in (bundled) digital human loader; runs as Tier-3 idle task
 ```
 
 ---
