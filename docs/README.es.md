@@ -359,7 +359,7 @@ MIT — [LICENSE](../LICENSE)
 </a>
 
 <p align="center">
-  <a href="https://buy.polar.sh/polar_cl_x7bTGvMvt3rbUt6oE98z0zb2zFz1sT7dG37BA3foNsZ">Conviértete en patrocinador</a>
+  <a href="https://buy.polar.sh/polar_cl_x7bTGvMvt3rbUt6oE98z0zb2zFz1sT7dG37BA3foNsZ">Polar (International)</a> · <a href="https://ifdian.net/a/hello-halo">爱发电 (Alipay / WeChat)</a>
 </p>
 
 ---
