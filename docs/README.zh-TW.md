@@ -359,7 +359,7 @@ MIT — [LICENSE](../LICENSE)
 </a>
 
 <p align="center">
-  <a href="https://polar.sh/openkursar">成為贊助商</a>
+  <a href="https://buy.polar.sh/polar_cl_x7bTGvMvt3rbUt6oE98z0zb2zFz1sT7dG37BA3foNsZ">成為贊助商</a>
 </p>
 
 ---
