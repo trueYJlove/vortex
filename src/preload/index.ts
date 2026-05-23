@@ -352,6 +352,12 @@ export interface HaloAPI {
   getWecomBotStatus: () => Promise<IpcResponse>
   reconnectWecomBot: () => Promise<IpcResponse>
 
+  // WeCom Bot — Scan-Auth (QR-code device flow)
+  wecomBotScanAuthStart: () => Promise<IpcResponse<{ scode: string; authUrl: string }>>
+  wecomBotScanAuthPoll: (scode: string) => Promise<IpcResponse<{ botId: string; secret: string }> & { kind?: string }>
+  wecomBotScanAuthCancel: (scode: string) => Promise<IpcResponse>
+  wecomBotScanAuthCreateAssistant: (input: { botIdPrefix: string }) => Promise<IpcResponse<{ appId: string; appName: string }>>
+
   // IM Channels (multi-instance)
   imChannelsStatus: () => Promise<IpcResponse>
   imChannelsInstanceStatus: (instanceId: string) => Promise<IpcResponse>
@@ -420,6 +426,7 @@ export interface HaloAPI {
   onAppEscalation: (callback: (data: unknown) => void) => () => void
   onAppNavigate: (callback: (data: unknown) => void) => () => void
   onImSessionUpdated: (callback: (data: unknown) => void) => () => void
+  onImChannelInstanceUpdated: (callback: (data: unknown) => void) => () => void
 
   // Notification (in-app toast)
   onNotificationToast: (callback: (data: unknown) => void) => () => void
@@ -736,6 +743,12 @@ const api: HaloAPI = {
   getWecomBotStatus: () => ipcRenderer.invoke('wecom-bot:status'),
   reconnectWecomBot: () => ipcRenderer.invoke('wecom-bot:reconnect'),
 
+  // WeCom Bot — Scan-Auth (QR-code device flow)
+  wecomBotScanAuthStart: () => ipcRenderer.invoke('wecom-bot:scan-auth:start'),
+  wecomBotScanAuthPoll: (scode) => ipcRenderer.invoke('wecom-bot:scan-auth:poll', scode),
+  wecomBotScanAuthCancel: (scode) => ipcRenderer.invoke('wecom-bot:scan-auth:cancel', scode),
+  wecomBotScanAuthCreateAssistant: (input) => ipcRenderer.invoke('wecom-bot:scan-auth:create-assistant', input),
+
   // IM Channels (multi-instance)
   imChannelsStatus: () => ipcRenderer.invoke('im-channels:status'),
   imChannelsInstanceStatus: (instanceId: string) => ipcRenderer.invoke('im-channels:instance-status', instanceId),
@@ -804,6 +817,7 @@ const api: HaloAPI = {
   onAppEscalation: (callback) => createEventListener('app:escalation:new', callback),
   onAppNavigate: (callback) => createEventListener('app:navigate', callback),
   onImSessionUpdated: (callback) => createEventListener('app:im-session-updated', callback),
+  onImChannelInstanceUpdated: (callback) => createEventListener('im-channels:instance-updated', callback),
 
   // Store (App Registry)
   storeQuery: (params) => ipcRenderer.invoke('store:query', params),

@@ -29,6 +29,7 @@ import type {
   Unsubscribe,
   UninstallOptions,
   UpgradeStrategy,
+  DeleteAppOptions,
 } from './types'
 import { AppManagerStore } from './store'
 import {
@@ -36,8 +37,10 @@ import {
   AppAlreadyInstalledError,
   InvalidStatusTransitionError,
   SpaceNotFoundError,
+  BuiltinAppProtectedError,
 } from './errors'
 import { syncSkillToFilesystem, removeSkillFromFilesystem } from './skill-sync'
+import { isBuiltinApp } from './types'
 
 // ============================================
 // MCP Apps Change Event
@@ -467,8 +470,17 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
       console.log(`[AppManager] Reinstalled app ${appId}`)
     },
 
-    async deleteApp(appId: string): Promise<void> {
+    async deleteApp(appId: string, options?: DeleteAppOptions): Promise<void> {
       const app = requireApp(appId)
+
+      // Built-in apps are bundled with the build itself and cannot be permanently
+      // deleted by user-initiated paths — the loader would just re-create them on
+      // next launch, silently reviving userConfig the user thought they erased.
+      // Internal callers (loader GC, full-space deletion) may bypass via the
+      // `allowBuiltin` option. IPC / HTTP layers must NOT forward that option.
+      if (isBuiltinApp(app) && options?.allowBuiltin !== true) {
+        throw new BuiltinAppProtectedError(appId, app.specId, 'deleteApp')
+      }
 
       if (app.status !== 'uninstalled') {
         throw new InvalidStatusTransitionError(
@@ -891,9 +903,21 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
       // Get all apps in this space (including uninstalled)
       const apps = store.list({ spaceId })
       let deleted = 0
+      let builtinCount = 0
 
       for (const app of apps) {
         try {
+          // Built-in apps in this space are deleted as part of the cascade — the
+          // enclosing space no longer exists, so the BuiltinAppProtectedError
+          // guard does not apply (it protects against accidental single-app
+          // delete from the UI, not against legitimate space teardown). On the
+          // next launch, the loader will re-install them in the spaceId declared
+          // by the manifest, which is typically `halo-temp` — a different space
+          // from the one being destroyed here. Worst case, userConfig for that
+          // builtin in this destroyed space is lost, which is the expected
+          // outcome of destroying a space.
+          if (isBuiltinApp(app)) builtinCount++
+
           // Remove skill files from filesystem
           if (app.spec.type === 'skill') {
             removeSkillFromFilesystem(app, getSpacePath)
@@ -920,7 +944,8 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
       }
 
       if (deleted > 0) {
-        console.log(`[AppManager] Deleted ${deleted} apps from space ${spaceId}`)
+        const builtinNote = builtinCount > 0 ? ` (incl. ${builtinCount} built-in)` : ''
+        console.log(`[AppManager] Deleted ${deleted} apps from space ${spaceId}${builtinNote}`)
       }
 
       return deleted

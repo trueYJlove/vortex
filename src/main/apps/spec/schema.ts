@@ -371,6 +371,21 @@ export const StoreMetadataSchema = z.object({
   repository: z.string().url().optional(),
   /** Install provenance: which registry this app was installed from */
   registry_id: z.string().optional(),
+  /**
+   * Install provenance: how this app reached the user's machine.
+   * - 'store':   downloaded from a registry (default for store installs)
+   * - 'builtin': bundled with the Halo build itself, auto-installed by the
+   *              built-in loader at startup (see apps/manager/builtin-loader.ts).
+   *              Built-in apps are protected from permanent deletion and are
+   *              re-synced from disk on every launch (spec content auto-upgrades
+   *              with the application; user-controlled state — userConfig,
+   *              status, overrides — is preserved across upgrades).
+   * - 'manual':  added directly via IPC/HTTP without going through the store
+   *              (e.g. drag-and-drop a SKILL.md file).
+   * Older records may not carry this field; treat 'undefined' as 'store' for
+   * backwards-compatibility purposes.
+   */
+  install_source: z.enum(['store', 'builtin', 'manual']).optional(),
 }).optional()
 
 // ============================================

@@ -45,7 +45,11 @@ export type {
   Unsubscribe,
   UninstallOptions,
   UpgradeStrategy,
+  DeleteAppOptions,
 } from './types'
+
+// Re-export helpers
+export { isBuiltinApp } from './types'
 
 // Re-export error types
 export {
@@ -53,7 +57,11 @@ export {
   AppAlreadyInstalledError,
   InvalidStatusTransitionError,
   SpaceNotFoundError,
+  BuiltinAppProtectedError,
 } from './errors'
+
+// Re-export the built-in loader entry point so bootstrap can wire it up
+export { loadBuiltinApps, countBuiltinAppsOnDisk } from './builtin-loader'
 
 // ============================================
 // Module State

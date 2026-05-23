@@ -185,6 +185,10 @@ export function registerAppHandlers(): void {
   )
 
   // ── app:delete ─────────────────────────────────────────────────────────
+  // NOTE: external callers (renderer, HTTP) must NOT be able to bypass the
+  // built-in protection guard. We deliberately do NOT forward any options
+  // from the input — `deleteApp` is invoked with no second argument, so
+  // `BuiltinAppProtectedError` will fire as designed for built-in apps.
   ipcMain.handle(
     'app:delete',
     async (_event, input: { appId: string }) => {
@@ -199,7 +203,13 @@ export function registerAppHandlers(): void {
       } catch (error: unknown) {
         const err = error as Error
         console.error('[AppIPC] app:delete error:', err.message)
-        return { success: false, error: err.message }
+        // Preserve `errorName` (e.g. "BuiltinAppProtectedError") so the
+        // renderer can route the error by discriminator instead of parsing
+        // the message string. Lets the UI provide a localized prompt for
+        // protected built-ins ("This app is bundled with Halo and can't be
+        // permanently deleted; uninstall to disable instead.") rather than
+        // surfacing the raw English error text.
+        return { success: false, error: err.message, errorName: err.name }
       }
     }
   )

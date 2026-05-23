@@ -71,3 +71,33 @@ export class SpaceNotFoundError extends Error {
     this.spaceId = spaceId
   }
 }
+
+/**
+ * Thrown when a destructive operation targets a built-in app.
+ *
+ * Built-in apps are bundled with the build itself (resources/builtin-apps/)
+ * and re-materialized on every launch by the loader. Allowing users to hard-
+ * delete them would create a confusing UX: the row would silently reappear
+ * on next start, but with `userConfig` reset. The Manager rejects such ops
+ * with this error so the IPC layer can return a clear message instead.
+ *
+ * Soft-uninstall (status='uninstalled') is still permitted and is the supported
+ * way for users to "disable" a built-in — equivalent to VSCode's per-user
+ * extension disable flag.
+ */
+export class BuiltinAppProtectedError extends Error {
+  readonly appId: string
+  readonly specId: string
+  readonly operation: string
+
+  constructor(appId: string, specId: string, operation: string) {
+    super(
+      `Built-in app '${specId}' (${appId}) cannot be ${operation}d. ` +
+      `Built-in apps are bundled with the application; use uninstall to disable instead.`
+    )
+    this.name = 'BuiltinAppProtectedError'
+    this.appId = appId
+    this.specId = specId
+    this.operation = operation
+  }
+}

@@ -151,6 +151,46 @@ export interface UninstallOptions {
 }
 
 /**
+ * Options for `deleteApp`.
+ *
+ * `allowBuiltin` is an internal contract reserved for two callers:
+ *   1. `apps/manager/builtin-loader.ts` GC, when removing a built-in row whose
+ *      manifest entry has been removed (variant switch, rename in SSOT).
+ *   2. `service.deleteAppsInSpace`, when the entire enclosing space is being
+ *      destroyed and every row inside it must go.
+ *
+ * IPC and HTTP layers MUST NOT forward this option from external input —
+ * doing so would defeat the user-facing protection that prevents accidental
+ * permanent deletion of bundled built-in apps.
+ */
+export interface DeleteAppOptions {
+  /** Internal: bypass the BuiltinAppProtectedError guard. Default: false. */
+  allowBuiltin?: boolean
+}
+
+// ============================================
+// Built-in App Helpers
+// ============================================
+
+/**
+ * Returns true when the given app was installed by the built-in loader
+ * (apps/manager/builtin-loader.ts) rather than by the user via the store
+ * or direct IPC.
+ *
+ * Built-in apps:
+ *   - are bundled with the application binary (resources/builtin-apps/)
+ *   - get re-synced from disk on every launch (auto-upgrade)
+ *   - are protected from permanent deletion (deleteApp is rejected)
+ *   - honor user pause / soft-uninstall persistently across boots
+ *
+ * The marker lives on `spec.store.install_source === 'builtin'` so it survives
+ * round-trips through SQLite (spec_json column) and IPC.
+ */
+export function isBuiltinApp(app: InstalledApp): boolean {
+  return app.spec.store?.install_source === 'builtin'
+}
+
+/**
  * App Manager Service -- lifecycle management for installed Apps.
  *
  * This is the public API consumed by apps/runtime and IPC handlers.
@@ -200,10 +240,17 @@ export interface AppManagerService {
    * Only allowed when the App is in 'uninstalled' status. Removes the record
    * from SQLite and optionally purges the work directory.
    *
+   * Built-in apps (spec.store.install_source === 'builtin') are protected:
+   * the call rejects with `BuiltinAppProtectedError` unless the caller passes
+   * `options.allowBuiltin = true`. That option is reserved for internal
+   * callers (loader GC, full-space deletion) and must never be forwarded
+   * from IPC / HTTP input.
+   *
    * @throws AppNotFoundError if the App does not exist
    * @throws InvalidStatusTransitionError if the App is not in 'uninstalled' status
+   * @throws BuiltinAppProtectedError if the App is built-in and allowBuiltin is not set
    */
-  deleteApp(appId: string): Promise<void>
+  deleteApp(appId: string, options?: DeleteAppOptions): Promise<void>
 
   /**
    * Delete all Apps belonging to a space (for space deletion cleanup).

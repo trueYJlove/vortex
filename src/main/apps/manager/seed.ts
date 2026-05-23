@@ -7,10 +7,16 @@
  *
  * Idempotency: subsequent launches skip seeding because an automation app
  * already exists. Skill/MCP apps are ignored — only automation apps count.
+ *
+ * Built-in awareness: if the build ships at least one built-in automation
+ * digital human (resources/builtin-apps/, materialized by the builtin loader),
+ * this seed is skipped entirely — the bundled apps already give the user a
+ * useful starting point and adding "Halo 助手" on top would clutter the UI.
  */
 
 import type { AppManagerService } from './types'
 import type { AutomationSpec } from '../spec'
+import { countBuiltinAppsOnDisk } from './builtin-loader'
 
 /** Space ID for the default temporary space */
 const SEED_SPACE_ID = 'halo-temp'
@@ -32,11 +38,14 @@ const DEFAULT_APP_SPEC: AutomationSpec = {
 }
 
 /**
- * Seed the default app if no automation apps exist.
+ * Seed the default app if no automation apps exist AND no built-ins ship
+ * with this build.
  *
- * Only checks automation-type apps — skill/mcp apps do not count.
- * This ensures the seed fires even when the user has installed
- * non-automation apps but has never created a digital human.
+ * The built-in check is intentionally based on the on-disk manifest, not on
+ * what the loader has already inserted — the loader runs as a sibling idle
+ * task and the order between the two is not guaranteed. Reading the manifest
+ * is cheap (single small JSON file) and lets this seed make a correct decision
+ * regardless of timing.
  *
  * @param appManager - The initialized AppManagerService
  */
@@ -47,7 +56,13 @@ export async function seedDefaultAppIfNeeded(appManager: AppManagerService): Pro
     return
   }
 
-  console.log('[Seed] No automation apps found — seeding default "AI 数字人" app')
+  const builtinCount = countBuiltinAppsOnDisk()
+  if (builtinCount > 0) {
+    console.log(`[Seed] Skipped — ${builtinCount} built-in app(s) bundled with this build will be installed by the loader`)
+    return
+  }
+
+  console.log('[Seed] No automation apps found — seeding default "Halo 助手" app')
 
   try {
     const appId = await appManager.install(SEED_SPACE_ID, DEFAULT_APP_SPEC)
