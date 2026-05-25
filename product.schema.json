@@ -165,6 +165,52 @@
         }
       }
     },
+    "security": {
+      "type": "object",
+      "description": "Security policy for enterprise/custom builds. Each flag follows the '<surface>Safe' convention: true enables restrictions, omitted/false keeps the permissive default. Open-source builds omit this entirely. Flag definitions live in src/main/services/security-policy.ts.",
+      "properties": {
+        "remoteMcpSafe": {
+          "type": "boolean",
+          "description": "When true, every remote HTTP endpoint that could land an MCP server configuration (AppSpec type=mcp, mcp_server patch, mcpServers map, store install of MCP type) returns 403. Local UI install paths are unaffected. Use this to prevent remote callers from registering arbitrary native commands."
+        },
+        "credentialAtRestSafe": {
+          "type": "boolean",
+          "description": "When true, the stored remote-access credential is encrypted at rest with SM4-CBC plus HMAC-SM3 (encrypt-then-MAC; GM/T 0002 + GM/T 0091) under a machine-bound KEK. When omitted/false (open-source default), the credential is stored as plain text. The plaintext value is held in memory in both modes so the UI can keep displaying the current PIN; login validation uses crypto.timingSafeEqual against the in-memory value."
+        },
+        "tunnelSafe": {
+          "type": "boolean",
+          "description": "When true, the Cloudflare Quick Tunnel feature is disabled at every layer: the service refuses to spawn cloudflared, the remote:tunnel:enable IPC short-circuits before reaching the service, and the renderer hides the 'Internet Access' subsection plus the Cloudflared row in System Diagnostics. Use this when policy forbids outbound HTTPS tunnels that bypass the corporate proxy."
+        }
+      },
+      "additionalProperties": false
+    },
+    "registryOverrides": {
+      "type": "object",
+      "description": "Per-built-in-registry override map (enterprise/custom builds only). Keys are built-in registry IDs ('official', 'mcp-official', 'smithery', 'claude-skills', 'skillhub'). Each entry is merged on top of the built-in defaults during ensureBuiltinRegistries() on every startup. Omit any field to keep the built-in default. Open-source builds omit this entirely.",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Override for one built-in registry. Only declared fields are applied; omitted fields retain their built-in defaults.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Replace the registry endpoint (e.g. point to an internal mirror)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Replace the display name shown in the Store UI."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Force-enable or force-disable the registry on every startup; overrides the user's manual toggle. The entry remains visible in the Store UI, just locked."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "When true, the registry is removed entirely from the Store UI and any persisted copy from a previous run is dropped on the next startup. Takes precedence over `enabled`. Use this — not `enabled: false` — when policy forbids the registry outright."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "builtinApps": {
       "type": "object",
       "description": "Built-in digital humans bundled with the build (VSCode-style built-in extensions). Each entry is materialized into resources/builtin-apps/<specId>/ at build time by scripts/sync-builtin-apps.mjs and auto-installed on first launch by the App Manager. Open-source builds typically omit this field; enterprise builds (e.g. product.<variant>.json) declare their own list pointing to a private SSOT repository.",

@@ -46,6 +46,30 @@ import { broadcastToAll } from '../websocket'
 import * as appController from '../../controllers/app.controller'
 import type { AppErrorCode } from '../../controllers/app.controller'
 import * as storeController from '../../controllers/store.controller'
+import {
+  rejectIfRemoteMcpForbidden,
+  rejectIfRemoteMcpForbiddenAsync,
+  isMcpAppSpec,
+  patchTouchesMcp,
+  configTouchesMcp,
+  yamlIsMcpSpec,
+  getPublicSecurityPolicy,
+} from '../../services/security-policy'
+
+/**
+ * Peek a store entry's spec type. Returns true when the resolved spec is
+ * an MCP. Used to gate /api/store/install routes — only called when
+ * remoteMcpSafe is on, so the (cached) network/disk lookup never runs in
+ * default open-source builds.
+ */
+async function storeSlugIsMcp(slug: string): Promise<boolean> {
+  try {
+    const detail = await storeController.getStoreAppDetail(slug)
+    return detail.success && isMcpAppSpec(detail.data.spec)
+  } catch {
+    return false
+  }
+}
 import { modelCapabilitiesService } from '../../services/model-capabilities.service'
 import type { ModelCapabilityOverride } from '../../../shared/types/model-capabilities'
 import { fetchJson, ILINK_BASE_URL } from '../../apps/runtime/im-channels/ilink-api'
@@ -146,6 +170,14 @@ function validateFilePath(res: Response, filePath?: string): string | null {
  * Register all API routes
  */
 export function registerApiRoutes(app: Express): void {
+  // ===== Security Policy =====
+  // Renderer-safe slice of the security policy. Returned to both the
+  // Electron renderer (via the IPC mirror) and to remote/web clients so
+  // every UI surface gates consistently.
+  app.get('/api/security/policy', async (_req: Request, res: Response) => {
+    res.json({ success: true, data: getPublicSecurityPolicy() })
+  })
+
   // ===== Config Routes =====
   app.get('/api/config', async (req: Request, res: Response) => {
     const result = configController.getConfig()
@@ -153,6 +185,7 @@ export function registerApiRoutes(app: Express): void {
   })
 
   app.post('/api/config', async (req: Request, res: Response) => {
+    if (rejectIfRemoteMcpForbidden(res, () => configTouchesMcp(req.body), 'POST /api/config')) return
     const result = configController.setConfig(req.body)
     res.json(result)
   })
@@ -1259,6 +1292,7 @@ export function registerApiRoutes(app: Express): void {
         res.status(400).json({ success: false, error: 'Missing required field: spec' })
         return
       }
+      if (rejectIfRemoteMcpForbidden(res, () => isMcpAppSpec(spec), 'POST /api/apps/install')) return
       const appId = await manager.install(resolvedSpaceId, spec as import('../../apps/spec').AppSpec, userConfig)
 
       // Auto-activate in runtime if available
@@ -1707,6 +1741,16 @@ export function registerApiRoutes(app: Express): void {
       const manager = getManagerOrFail(res)
       if (!manager) return
       const specPatch = req.body as Record<string, unknown>
+      // Guard both directions: a patch touching mcp_server/type, OR a patch
+      // against an app that is already type=mcp (any field change there
+      // could re-persist a malicious command).
+      if (
+        rejectIfRemoteMcpForbidden(
+          res,
+          () => patchTouchesMcp(specPatch) || isMcpAppSpec(manager.getApp(appId)?.spec),
+          'PATCH /api/apps/:appId/spec',
+        )
+      ) return
       manager.updateSpec(appId, specPatch)
 
       // Hot-sync subscriptions if subscriptions changed.
@@ -1794,6 +1838,14 @@ export function registerApiRoutes(app: Express): void {
         res.status(400).json({ success: false, error: 'Missing or invalid yamlContent' })
         return
       }
+
+      if (
+        rejectIfRemoteMcpForbidden(
+          res,
+          () => yamlIsMcpSpec(yamlContent),
+          'POST /api/apps/import-spec',
+        )
+      ) return
 
       const result = await appController.importSpec({ spaceId, yamlContent, userConfig })
       if (!result.success) {
@@ -2077,6 +2129,13 @@ export function registerApiRoutes(app: Express): void {
         res.status(400).json({ success: false, error: 'Missing required field: slug' })
         return
       }
+      if (
+        await rejectIfRemoteMcpForbiddenAsync(
+          res,
+          () => storeSlugIsMcp(slug),
+          'POST /api/store/install',
+        )
+      ) return
       // spaceId may be null for global installs (MCP/Skill available across all spaces)
       const resolvedSpaceId = spaceId || null
       const result = await storeController.installStoreApp(slug, resolvedSpaceId, userConfig)
@@ -2098,6 +2157,13 @@ export function registerApiRoutes(app: Express): void {
         res.status(400).json({ success: false, error: 'Missing required param: slug' })
         return
       }
+      if (
+        await rejectIfRemoteMcpForbiddenAsync(
+          res,
+          () => storeSlugIsMcp(slug),
+          'POST /api/store/apps/:slug/install',
+        )
+      ) return
       // spaceId may be null for global installs (MCP/Skill available across all spaces)
       const resolvedSpaceId = spaceId || null
       const result = await storeController.installStoreApp(slug, resolvedSpaceId, userConfig)

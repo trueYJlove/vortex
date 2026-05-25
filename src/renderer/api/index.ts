@@ -797,6 +797,18 @@ export const api = {
     return httpRequest('POST', `/api/spaces/${spaceId}/onboarding/conversation`, { userMessage, aiResponse })
   },
 
+  // ===== Security Policy =====
+  // Renderer-safe slice of the security policy from product.json. The
+  // value cannot change at runtime, so consumers should cache the result
+  // (see hooks/useSecurityPolicy.ts). Available in both Electron and
+  // remote/web mode so every surface gates the same way.
+  getSecurityPolicy: async (): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.getSecurityPolicy()
+    }
+    return httpRequest('GET', '/api/security/policy')
+  },
+
   // ===== Remote Access (Electron only) =====
   enableRemoteAccess: async (port?: number): Promise<ApiResponse> => {
     if (!isElectron()) {

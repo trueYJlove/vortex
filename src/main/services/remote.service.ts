@@ -15,14 +15,24 @@ import {
   startTunnel,
   stopTunnel,
   getTunnelStatus,
-  onTunnelStatusChange
+  onTunnelStatusChange,
+  TunnelDisabledByPolicyError,
 } from './tunnel.service'
 import { getConfig, saveConfig } from './config.service'
-import { setCustomAccessToken, generateAccessToken } from '../http/auth'
+import {
+  setCustomAccessToken,
+  generateAccessToken,
+  encodeForStorage,
+  CredentialRestoreError,
+  logAuthEvent,
+} from '../http/auth/index'
+import { isTunnelSafe } from './security-policy'
 
 /**
- * Persist the access token to config so it survives restarts.
- * Centralized here to keep config writes out of the HTTP/auth layer.
+ * Persist the access token to config so it survives restarts. The token
+ * is encoded through {@link encodeForStorage}: plain when the open-
+ * source default is in effect, SM4-CBC + HMAC-SM3 wrapped when
+ * `credentialAtRestSafe` is on.
  */
 function persistRemotePassword(token: string): void {
   const config = getConfig()
@@ -30,7 +40,7 @@ function persistRemotePassword(token: string): void {
     ...config,
     remoteAccess: {
       ...config.remoteAccess,
-      password: token
+      password: encodeForStorage(token)
     }
   })
 }
@@ -140,21 +150,66 @@ export async function enableRemoteAccess(
   }
 
   // Reuse the persisted PIN so paired devices keep working across restarts.
+  // The stored value may be plain (legacy / open-source) or encoded
+  // (gmcred:v1:...); startHttpServer hands it to the auth layer which
+  // decodes internally and exposes the plaintext via getAccessToken.
+  //
+  // When decoding fails (tampered file, profile mismatch, key derivation
+  // change) we DO NOT silently rotate the PIN — that would invalidate
+  // every previously paired device with no audit trail. Instead we
+  // disable remote access in config, write an audit event, and re-throw
+  // so the IPC layer can surface a structured `CREDENTIAL_RESTORE_FAILED`
+  // code to the UI.
   const config = getConfig()
   const savedToken = config.remoteAccess.password
   const effectivePort = port ?? config.remoteAccess.port
 
-  // actualPort may differ from effectivePort when the preferred port is taken
-  // (EADDRINUSE fallback); persist whichever we actually bound to.
-  const { port: actualPort, token } = await startHttpServer(effectivePort, savedToken)
+  let actualPort: number
+  let token: string
+  try {
+    // actualPort may differ from effectivePort when the preferred port is taken
+    // (EADDRINUSE fallback); persist whichever we actually bound to.
+    const result = await startHttpServer(effectivePort, savedToken)
+    actualPort = result.port
+    token = result.token
+  } catch (err) {
+    if (err instanceof CredentialRestoreError) {
+      logAuthEvent('credential_restore_failed', {})
+      // The plaintext is already lost — keeping the unreadable blob would
+      // only force the user through this error path again on the next
+      // enable attempt. Wipe it (and disable the feature) so a subsequent
+      // user-initiated enable starts cleanly with a freshly generated PIN.
+      // The UI receives the code below and is expected to tell the user
+      // their paired devices must be re-paired.
+      saveConfig({
+        ...config,
+        remoteAccess: {
+          ...config.remoteAccess,
+          enabled: false,
+          password: '',
+        },
+      })
+      if (statusCallback) {
+        statusCallback(getRemoteAccessStatus())
+      }
+    }
+    throw err
+  }
 
+  // Always re-encode the live token. This unifies three paths:
+  //   - first launch (no saved value)
+  //   - profile change (plain → gm, or gm → plain)
+  //   - corrupted ciphertext recovery (saved value failed to decrypt,
+  //     a fresh PIN was generated, and we must overwrite the bad blob)
+  // For AEAD profiles the salt/IV refresh on every save is fine — the
+  // ciphertext is bound to the same plaintext.
   saveConfig({
     ...config,
     remoteAccess: {
       ...config.remoteAccess,
       enabled: true,
       port: actualPort,
-      password: token
+      password: encodeForStorage(token)
     }
   })
 
@@ -201,9 +256,17 @@ export async function shutdownRemoteAccess(): Promise<void> {
 }
 
 /**
- * Start tunnel for external access
+ * Start tunnel for external access.
+ *
+ * Re-checks `tunnelSafe` here so that any future caller that bypasses
+ * the IPC layer still hits the policy gate (defense in depth). The
+ * underlying {@link startTunnel} will reject as well.
  */
 export async function enableTunnel(): Promise<string> {
+  if (isTunnelSafe()) {
+    throw new TunnelDisabledByPolicyError()
+  }
+
   const serverInfo = getServerInfo()
 
   if (!serverInfo.running) {
@@ -215,7 +278,9 @@ export async function enableTunnel(): Promise<string> {
 }
 
 /**
- * Stop tunnel
+ * Stop tunnel. Always allowed — even when `tunnelSafe` is on we want
+ * the service to clean up any tunnel state that might have been
+ * persisted before the policy flag was flipped on.
  */
 export async function disableTunnel(): Promise<void> {
   await stopTunnel()
@@ -300,8 +365,8 @@ export async function generateQRCode(includeToken: boolean = false): Promise<str
 }
 
 /**
- * Set a custom password for remote access
- * @param password Custom password (4-32 alphanumeric characters)
+ * Set a custom password for remote access.
+ * @param password Custom password (8-64 chars, mixed case + digit + special)
  * @returns Object with success status and optional error message
  */
 export function setCustomPassword(password: string): { success: boolean; error?: string } {
@@ -310,7 +375,7 @@ export function setCustomPassword(password: string): { success: boolean; error?:
   }
 
   const result = setCustomAccessToken(password)
-  if (result) {
+  if (result.ok) {
     // Persist so the password survives restarts.
     persistRemotePassword(password)
     console.log('[Remote] Custom password set successfully')
@@ -319,9 +384,8 @@ export function setCustomPassword(password: string): { success: boolean; error?:
       statusCallback(getRemoteAccessStatus())
     }
     return { success: true }
-  } else {
-    return { success: false, error: 'Password must be 4-32 alphanumeric characters' }
   }
+  return { success: false, error: result.error }
 }
 
 /**
