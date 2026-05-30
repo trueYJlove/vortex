@@ -11,8 +11,10 @@
 
 import { memo } from 'react'
 import { Streamdown } from 'streamdown'
+import type { PluginConfig } from 'streamdown'
 import 'streamdown/styles.css'
-import { useCodePlugin } from '../../lib/streamdown-plugins'
+import 'katex/dist/katex.min.css'
+import { useCodePlugin, useMathPlugin } from '../../lib/streamdown-plugins'
 
 interface MarkdownRendererProps {
   content: string
@@ -120,8 +122,13 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
   mode = 'static',
 }: MarkdownRendererProps) {
   const codePlugin = useCodePlugin()
+  const mathPlugin = useMathPlugin()
 
   if (!content) return null
+
+  const plugins: PluginConfig = {}
+  if (codePlugin) plugins.code = codePlugin
+  if (mathPlugin) plugins.math = mathPlugin
 
   return (
     <div className={`markdown-content overflow-x-auto ${className}`}>
@@ -129,7 +136,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({
         mode={mode}
         components={components as any}
         controls={{ code: true }}
-        plugins={codePlugin ? { code: codePlugin } : undefined}
+        plugins={plugins}
       >
         {content}
       </Streamdown>

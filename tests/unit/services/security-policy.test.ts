@@ -25,6 +25,10 @@ import {
   rejectIfRemoteMcpForbidden,
   rejectIfRemoteMcpForbiddenAsync,
   MCP_REMOTE_INSTALL_FORBIDDEN,
+  getMcpCommandBlacklist,
+  isMcpCommandBlocked,
+  MCP_COMMAND_BLOCKED,
+  MCP_COMMAND_BLOCKED_MESSAGE,
 } from '../../../src/main/services/security-policy'
 
 type MockedLoader = ReturnType<typeof vi.fn>
@@ -242,6 +246,127 @@ describe('security-policy', () => {
       )
       expect(blocked).toBe(false)
       expect(res.status).not.toHaveBeenCalled()
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // MCP command blacklist
+  // --------------------------------------------------------------------------
+
+  describe('getMcpCommandBlacklist', () => {
+    it('returns an empty array when product.json omits security (open-source default)', () => {
+      setProductConfig(undefined)
+      expect(getMcpCommandBlacklist()).toEqual([])
+    })
+
+    it('returns an empty array when mcpCommandBlacklist is absent', () => {
+      setProductConfig({ remoteMcpSafe: true })
+      expect(getMcpCommandBlacklist()).toEqual([])
+    })
+
+    it('returns an empty array when mcpCommandBlacklist is malformed (not an array)', () => {
+      setProductConfig({ mcpCommandBlacklist: 'rm' as unknown as string[] })
+      expect(getMcpCommandBlacklist()).toEqual([])
+    })
+
+    it('returns the configured list verbatim when present', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm', 'sudo', 'cmd'] })
+      expect(getMcpCommandBlacklist()).toEqual(['rm', 'sudo', 'cmd'])
+    })
+  })
+
+  describe('isMcpCommandBlocked', () => {
+    it('returns false when blacklist is empty (open-source default)', () => {
+      setProductConfig(undefined)
+      expect(isMcpCommandBlocked('rm')).toBe(false)
+      expect(isMcpCommandBlocked('cmd.exe')).toBe(false)
+    })
+
+    it('matches by bare basename', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm', 'sudo'] })
+      expect(isMcpCommandBlocked('rm')).toBe(true)
+      expect(isMcpCommandBlocked('sudo')).toBe(true)
+      expect(isMcpCommandBlocked('ls')).toBe(false)
+    })
+
+    it('strips POSIX path prefix before matching (/usr/bin/rm)', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm'] })
+      expect(isMcpCommandBlocked('/usr/bin/rm')).toBe(true)
+      expect(isMcpCommandBlocked('/bin/rm')).toBe(true)
+      expect(isMcpCommandBlocked('/opt/local/bin/rm')).toBe(true)
+    })
+
+    it('strips Windows path prefix before matching', () => {
+      setProductConfig({ mcpCommandBlacklist: ['cmd'] })
+      expect(isMcpCommandBlocked('C:\\Windows\\System32\\cmd.exe')).toBe(true)
+      expect(isMcpCommandBlocked('C:\\Windows\\System32\\CMD.EXE')).toBe(true)
+    })
+
+    it('strips Windows executable suffixes before matching (case-insensitive)', () => {
+      // Single blacklist token `powershell` must match every common
+      // Windows executable-entry extension so an admin doesn't have to
+      // enumerate `.exe / .bat / .cmd / .ps1 / .com`.
+      setProductConfig({ mcpCommandBlacklist: ['powershell'] })
+      expect(isMcpCommandBlocked('powershell.exe')).toBe(true)
+      expect(isMcpCommandBlocked('PowerShell.EXE')).toBe(true)
+      expect(isMcpCommandBlocked('powershell.bat')).toBe(true)
+      expect(isMcpCommandBlocked('powershell.cmd')).toBe(true)
+      expect(isMcpCommandBlocked('powershell.ps1')).toBe(true)
+      expect(isMcpCommandBlocked('powershell.COM')).toBe(true)
+      expect(isMcpCommandBlocked('powershell')).toBe(true)
+    })
+
+    it('does not strip unrelated suffixes (e.g. .sh, .py)', () => {
+      // Unix shebang entries and language launchers are NOT stripped —
+      // those program names are typically the literal blacklist entry.
+      setProductConfig({ mcpCommandBlacklist: ['attack'] })
+      expect(isMcpCommandBlocked('attack.sh')).toBe(false)
+      expect(isMcpCommandBlocked('attack.py')).toBe(false)
+      // To block these, admin lists the full filename:
+      setProductConfig({ mcpCommandBlacklist: ['attack.sh'] })
+      expect(isMcpCommandBlocked('attack.sh')).toBe(true)
+    })
+
+    it('is case-insensitive on both sides of the comparison', () => {
+      setProductConfig({ mcpCommandBlacklist: ['RM', 'Sudo'] })
+      expect(isMcpCommandBlocked('rm')).toBe(true)
+      expect(isMcpCommandBlocked('SUDO')).toBe(true)
+      expect(isMcpCommandBlocked('SuDo')).toBe(true)
+    })
+
+    it('does not match substrings (rm-rf would not match rm)', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm'] })
+      expect(isMcpCommandBlocked('rm-rf')).toBe(false)
+      expect(isMcpCommandBlocked('rmdir')).toBe(false)
+      expect(isMcpCommandBlocked('arm')).toBe(false)
+    })
+
+    it('returns false for empty/non-string inputs without throwing', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm'] })
+      expect(isMcpCommandBlocked('')).toBe(false)
+      expect(isMcpCommandBlocked(undefined as unknown as string)).toBe(false)
+      expect(isMcpCommandBlocked(null as unknown as string)).toBe(false)
+      expect(isMcpCommandBlocked(42 as unknown as string)).toBe(false)
+    })
+
+    it('returns false when the path resolves to an empty basename', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm'] })
+      // Trailing slash → basename is empty after split-pop
+      expect(isMcpCommandBlocked('/usr/bin/')).toBe(false)
+    })
+
+    it('ignores non-string entries in the blacklist (defensive)', () => {
+      setProductConfig({ mcpCommandBlacklist: ['rm', 42 as unknown as string, null as unknown as string, 'sudo'] })
+      expect(isMcpCommandBlocked('rm')).toBe(true)
+      expect(isMcpCommandBlocked('sudo')).toBe(true)
+    })
+
+    it('exposes the stable error code and message constants', () => {
+      // These constants are part of the public contract — clients match
+      // on code, transport layers render the message.
+      expect(MCP_COMMAND_BLOCKED).toBe('MCP_COMMAND_BLOCKED')
+      expect(typeof MCP_COMMAND_BLOCKED_MESSAGE).toBe('string')
+      expect(MCP_COMMAND_BLOCKED_MESSAGE.length).toBeGreaterThan(0)
     })
   })
 })

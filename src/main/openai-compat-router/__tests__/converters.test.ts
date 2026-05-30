@@ -26,14 +26,28 @@ describe('Request Converters', () => {
       const result = convertAnthropicToOpenAIChat(request)
 
       expect(result.request.model).toBe('claude-3-opus')
-      // max_tokens is deliberately omitted — providers have their own defaults
-      expect(result.request.max_tokens).toBeUndefined()
+      // max_tokens is forwarded so providers honor the user's output length setting
+      expect(result.request.max_tokens).toBe(1024)
       expect(result.request.messages).toHaveLength(1)
       expect(result.request.messages[0]).toEqual({
         role: 'user',
         content: 'Hello, world!'
       })
       expect(result.hasImages).toBe(false)
+    })
+
+    it('should omit max_tokens when not a positive value', () => {
+      const request: AnthropicRequest = {
+        model: 'claude-3-opus',
+        max_tokens: 0,
+        messages: [
+          { role: 'user', content: 'Hello' }
+        ]
+      }
+
+      const result = convertAnthropicToOpenAIChat(request)
+
+      expect(result.request.max_tokens).toBeUndefined()
     })
 
     it('should convert system prompt to system message', () => {

@@ -37,7 +37,8 @@
 import { ipcMain, shell } from 'electron'
 import { existsSync } from 'fs'
 import { getAppManager } from '../apps/manager'
-import { AppAlreadyInstalledError } from '../apps/manager/errors'
+import { AppAlreadyInstalledError, McpCommandBlockedError } from '../apps/manager/errors'
+import { MCP_COMMAND_BLOCKED_MESSAGE } from '../services/security-policy'
 import { getSkillDir } from '../apps/manager/skill-sync'
 import {
   getAppRuntime,
@@ -125,6 +126,10 @@ export function registerAppHandlers(): void {
         // Surface a stable discriminator so the renderer can render a
         // localized, friendly message for known failure modes instead of
         // dumping the raw English error text from the manager.
+        if (error instanceof McpCommandBlockedError) {
+          console.warn(`[AppIPC] app:install blocked by policy: command='${error.command}'`)
+          return { success: false, error: MCP_COMMAND_BLOCKED_MESSAGE, code: 'MCP_COMMAND_BLOCKED' }
+        }
         if (error instanceof AppAlreadyInstalledError) {
           return { success: false, error: err.message, code: 'ALREADY_INSTALLED' }
         }
@@ -489,6 +494,10 @@ export function registerAppHandlers(): void {
         return { success: true }
       } catch (error: unknown) {
         const err = error as Error
+        if (error instanceof McpCommandBlockedError) {
+          console.warn(`[AppIPC] app:update-spec blocked by policy: command='${error.command}' appId=${input.appId}`)
+          return { success: false, error: MCP_COMMAND_BLOCKED_MESSAGE, code: 'MCP_COMMAND_BLOCKED' }
+        }
         console.error('[AppIPC] app:update-spec error:', err.message)
         return { success: false, error: err.message }
       }

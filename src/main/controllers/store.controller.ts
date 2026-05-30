@@ -26,6 +26,8 @@ import {
   updateRegistryAdapterConfig,
 } from '../store'
 import { getAppManager } from '../apps/manager'
+import { McpCommandBlockedError } from '../apps/manager/errors'
+import { MCP_COMMAND_BLOCKED_MESSAGE } from '../services/security-policy'
 
 const ALLOWED_APP_TYPES: ReadonlySet<AppType> = new Set<AppType>(['automation', 'skill', 'mcp', 'extension'])
 
@@ -39,10 +41,22 @@ export interface StoreControllerSuccess<T> {
   data: T
 }
 
+/**
+ * Stable error codes returned by Store controller methods. Callers
+ * (HTTP / IPC) translate these into transport-specific responses
+ * without parsing error message strings.
+ *
+ * Currently used only by installStoreApp. Other Store methods return
+ * `code === undefined`.
+ */
+export type StoreErrorCode =
+  | 'MCP_COMMAND_BLOCKED' // MCP install rejected by security.mcpCommandBlacklist (→ HTTP 403)
+
 /** Controller error response */
 export interface StoreControllerError {
   success: false
   error: string
+  code?: StoreErrorCode
 }
 
 export type StoreControllerResponse<T> = StoreControllerSuccess<T> | StoreControllerError
@@ -128,6 +142,10 @@ export async function installStoreApp(
     return { success: true, data: { appId } }
   } catch (error: unknown) {
     const err = error as Error
+    if (error instanceof McpCommandBlockedError) {
+      console.warn(`[StoreController] installStoreApp: blocked MCP command '${error.command}' (slug=${slug})`)
+      return { success: false, error: MCP_COMMAND_BLOCKED_MESSAGE, code: 'MCP_COMMAND_BLOCKED' }
+    }
     console.error('[StoreController] installStoreApp error:', err.message)
     return { success: false, error: err.message }
   }

@@ -34,7 +34,7 @@ import {
 import { getTempSpacePath, getSpacesDir, getConfig as getServiceConfig, saveConfig } from '../../services/config.service'
 import { getSpace, getAllSpacePaths } from '../../services/space.service'
 import { getAppManager } from '../../apps/manager'
-import { AppAlreadyInstalledError } from '../../apps/manager/errors'
+import { AppAlreadyInstalledError, McpCommandBlockedError } from '../../apps/manager/errors'
 import { getAppRuntime, getImChannelManager, sendAppChatMessage, stopAppChat, isAppChatGenerating, loadAppChatMessages, loadImChatMessages, getAppChatSessionState, getAppChatConversationId, clearAppChat, clearImSession, restartAppChat, dispatchInboundMessage } from '../../apps/runtime'
 import { buildDefaultAssistantSpec } from '../../apps/runtime/im-channels/wecom-bot-default-spec'
 import type { AppListFilter, UninstallOptions, InstalledApp } from '../../apps/manager'
@@ -54,7 +54,28 @@ import {
   configTouchesMcp,
   yamlIsMcpSpec,
   getPublicSecurityPolicy,
+  MCP_COMMAND_BLOCKED,
+  MCP_COMMAND_BLOCKED_MESSAGE,
 } from '../../services/security-policy'
+
+/**
+ * Shape the HTTP 403 returned when an MCP install is rejected by
+ * `security.mcpCommandBlacklist`. The user-facing message is the generic
+ * policy-text constant (avoids leaking which exact name was matched);
+ * structured logging keeps the offending command for operators.
+ */
+function writeMcpCommandBlockedResponse(
+  res: Response,
+  error: McpCommandBlockedError,
+  surface: string,
+): void {
+  console.warn(`[SecurityPolicy] Blocked MCP install at ${surface} (command='${error.command}')`)
+  res.status(403).json({
+    success: false,
+    error: MCP_COMMAND_BLOCKED_MESSAGE,
+    code: MCP_COMMAND_BLOCKED,
+  })
+}
 
 /**
  * Peek a store entry's spec type. Returns true when the resolved spec is
@@ -1306,6 +1327,10 @@ export function registerApiRoutes(app: Express): void {
       console.log('[HTTP] POST /api/apps/install: appId=%s, space=%s', appId, resolvedSpaceId ?? 'global')
       res.json({ success: true, data: { appId } })
     } catch (error) {
+      if (error instanceof McpCommandBlockedError) {
+        writeMcpCommandBlockedResponse(res, error, 'POST /api/apps/install')
+        return
+      }
       if (error instanceof AppAlreadyInstalledError) {
         res.status(409).json({ success: false, error: (error as Error).message, code: 'ALREADY_INSTALLED' })
         return
@@ -1766,6 +1791,10 @@ export function registerApiRoutes(app: Express): void {
       console.log('[HTTP] PATCH /api/apps/%s/spec', appId)
       res.json({ success: true })
     } catch (error) {
+      if (error instanceof McpCommandBlockedError) {
+        writeMcpCommandBlockedResponse(res, error, 'PATCH /api/apps/:appId/spec')
+        return
+      }
       res.json({ success: false, error: (error as Error).message })
     }
   })
@@ -1796,6 +1825,7 @@ export function registerApiRoutes(app: Express): void {
     INVALID_YAML: 400,
     VALIDATION_FAILED: 422,
     ALREADY_INSTALLED: 409,
+    MCP_COMMAND_BLOCKED: 403,
   }
 
   // GET /api/apps/:appId/export-spec — export app spec as YAML
@@ -2139,6 +2169,10 @@ export function registerApiRoutes(app: Express): void {
       // spaceId may be null for global installs (MCP/Skill available across all spaces)
       const resolvedSpaceId = spaceId || null
       const result = await storeController.installStoreApp(slug, resolvedSpaceId, userConfig)
+      if (!result.success && result.code === 'MCP_COMMAND_BLOCKED') {
+        res.status(403).json(result)
+        return
+      }
       res.json(result)
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -2167,6 +2201,10 @@ export function registerApiRoutes(app: Express): void {
       // spaceId may be null for global installs (MCP/Skill available across all spaces)
       const resolvedSpaceId = spaceId || null
       const result = await storeController.installStoreApp(slug, resolvedSpaceId, userConfig)
+      if (!result.success && result.code === 'MCP_COMMAND_BLOCKED') {
+        res.status(403).json(result)
+        return
+      }
       res.json(result)
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })

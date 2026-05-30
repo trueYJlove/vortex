@@ -37,7 +37,9 @@ import {
   InvalidStatusTransitionError,
   SpaceNotFoundError,
   BuiltinAppProtectedError,
+  McpCommandBlockedError,
 } from './errors'
+import { isMcpCommandBlocked } from '../../services/security-policy'
 import { syncSkillToFilesystem, removeSkillFromFilesystem } from './skill-sync'
 import { isBuiltinApp } from './types'
 
@@ -289,6 +291,17 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
 
       // Validate spec before any DB operations
       validateAppSpec(spec)
+
+      // Security policy: reject MCP installs whose stdio command matches the
+      // configured blacklist. The predicate short-circuits to false on
+      // open-source builds (no policy → no blacklist → never blocked), so
+      // this branch is free except in enterprise variants that opt in.
+      if (spec.type === 'mcp') {
+        const mcpCommand = spec.mcp_server?.command
+        if (mcpCommand && isMcpCommandBlocked(mcpCommand)) {
+          throw new McpCommandBlockedError(mcpCommand)
+        }
+      }
 
       // Check for duplicate installation
       const specId = spec.name // Use spec name as the canonical spec identifier
@@ -679,6 +692,16 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
 
       // Re-validate the merged spec through Zod
       const validatedSpec = validateAppSpec(merged)
+
+      // Security policy: a spec update can change `mcp_server.command` (or
+      // flip a non-MCP app into an MCP app). Re-run the blacklist check on
+      // the merged result so a PATCH cannot bypass the install-time gate.
+      if (validatedSpec.type === 'mcp') {
+        const mcpCommand = validatedSpec.mcp_server?.command
+        if (mcpCommand && isMcpCommandBlocked(mcpCommand)) {
+          throw new McpCommandBlockedError(mcpCommand)
+        }
+      }
 
       // Persist
       store.updateSpec(appId, validatedSpec)

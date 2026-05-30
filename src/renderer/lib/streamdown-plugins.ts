@@ -1,47 +1,79 @@
 /**
  * Streamdown plugin configuration (lazy-loaded)
  *
- * Loads @streamdown/code (Shiki) asynchronously to avoid blocking
- * the module graph in Vite dev mode. The plugin initializes on first
- * use and caches the result for subsequent renders.
+ * Heavy markdown plugins (Shiki code highlighter, KaTeX math) are imported
+ * asynchronously to avoid blocking the module graph in Vite dev mode and to
+ * keep them out of the initial bundle. Each plugin initializes on first use
+ * and caches the result for subsequent renders.
  */
 
 import { useState, useEffect } from 'react'
-import type { CodeHighlighterPlugin } from 'streamdown'
+import type { CodeHighlighterPlugin, MathPlugin } from 'streamdown'
 
-let cachedPlugin: CodeHighlighterPlugin | null = null
-let loadPromise: Promise<CodeHighlighterPlugin> | null = null
+/**
+ * Builds a React hook that lazy-loads a Streamdown plugin once, caches it at
+ * module scope, and returns `undefined` until the plugin is ready.
+ *
+ * The cache is shared across all hook callers so the plugin is constructed at
+ * most once per session, regardless of how many renderers mount.
+ */
+function createLazyPluginHook<T>(loader: () => Promise<T>): () => T | undefined {
+  let cached: T | null = null
+  let loadPromise: Promise<T> | null = null
 
-function loadCodePlugin(): Promise<CodeHighlighterPlugin> {
-  if (!loadPromise) {
-    loadPromise = import('@streamdown/code').then(m => {
-      // Dark theme first: inline `color` uses the first theme's values,
-      // which must be readable on dark backgrounds (our default).
-      // The second theme goes into --shiki-dark CSS var for light mode.
-      const plugin = m.createCodePlugin({
-        themes: ['github-dark', 'github-light'],
+  const load = (): Promise<T> => {
+    if (!loadPromise) {
+      loadPromise = loader().then(plugin => {
+        cached = plugin
+        return plugin
       })
-      cachedPlugin = plugin
-      return plugin
-    })
+    }
+    return loadPromise
   }
-  return loadPromise
+
+  return function useLazyPlugin(): T | undefined {
+    const [plugin, setPlugin] = useState<T | undefined>(cached ?? undefined)
+
+    useEffect(() => {
+      if (cached) {
+        setPlugin(cached)
+        return
+      }
+      load().then(setPlugin)
+    }, [])
+
+    return plugin
+  }
 }
 
 /**
- * Hook that returns the Shiki code highlighter plugin.
- * Returns undefined until the plugin is loaded, then the cached instance.
+ * Shiki code highlighter plugin.
+ *
+ * Dark theme first: inline `color` uses the first theme's values, which must
+ * be readable on dark backgrounds (our default). The second theme goes into
+ * the `--shiki-dark` CSS var for light mode.
  */
-export function useCodePlugin(): CodeHighlighterPlugin | undefined {
-  const [plugin, setPlugin] = useState<CodeHighlighterPlugin | undefined>(cachedPlugin ?? undefined)
+export const useCodePlugin = createLazyPluginHook<CodeHighlighterPlugin>(() =>
+  import('@streamdown/code').then(m =>
+    m.createCodePlugin({ themes: ['github-dark', 'github-light'] })
+  )
+)
 
-  useEffect(() => {
-    if (cachedPlugin) {
-      setPlugin(cachedPlugin)
-      return
-    }
-    loadCodePlugin().then(setPlugin)
-  }, [])
-
-  return plugin
-}
+/**
+ * KaTeX math plugin — enables `$...$` inline and `$$...$$` block formulas.
+ *
+ * Streamdown declares `MathPlugin.getStyles` but never injects it, so the
+ * KaTeX stylesheet is imported directly by the renderer instead.
+ */
+export const useMathPlugin = createLazyPluginHook<MathPlugin>(async () => {
+  const [remarkMath, rehypeKatex] = await Promise.all([
+    import('remark-math').then(m => m.default),
+    import('rehype-katex').then(m => m.default),
+  ])
+  return {
+    name: 'katex',
+    type: 'math',
+    remarkPlugin: remarkMath,
+    rehypePlugin: rehypeKatex,
+  }
+})

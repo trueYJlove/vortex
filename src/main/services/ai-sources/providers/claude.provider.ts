@@ -238,6 +238,8 @@ class ClaudeProvider implements OAuthAISourceProvider {
     // [1m] suffix indicates 1M context window variant (stripped before API call)
     return [
       'claude-mythos-preview',
+      'claude-opus-4-8',
+      'claude-opus-4-8[1m]',
       'claude-opus-4-7',
       'claude-opus-4-7[1m]',
       'claude-opus-4-6',
@@ -386,6 +388,8 @@ class ClaudeProvider implements OAuthAISourceProvider {
       const models = await this.getAvailableModels({} as AISourcesConfig)
       const modelNames: Record<string, string> = {
         'claude-mythos-preview': 'Claude Mythos (Preview)',
+        'claude-opus-4-8': 'Claude Opus 4.8',
+        'claude-opus-4-8[1m]': 'Claude Opus 4.8 (1M context)',
         'claude-opus-4-7': 'Claude Opus 4.7',
         'claude-opus-4-7[1m]': 'Claude Opus 4.7 (1M context)',
         'claude-opus-4-6': 'Claude Opus 4.6',
@@ -546,6 +550,8 @@ class ClaudeProvider implements OAuthAISourceProvider {
       const models = await this.getAvailableModels(config)
       const modelNames: Record<string, string> = {
         'claude-mythos-preview': 'Claude Mythos (Preview)',
+        'claude-opus-4-8': 'Claude Opus 4.8',
+        'claude-opus-4-8[1m]': 'Claude Opus 4.8 (1M context)',
         'claude-opus-4-7': 'Claude Opus 4.7',
         'claude-opus-4-7[1m]': 'Claude Opus 4.7 (1M context)',
         'claude-opus-4-6': 'Claude Opus 4.6',

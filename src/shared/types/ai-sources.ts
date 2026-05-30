@@ -541,6 +541,17 @@ export type AISourceUserInfo = AISourceUser
 // ============================================================================
 
 /**
+ * Documentation link shown alongside a login entry (e.g. how to apply for an
+ * account or API key). Rendered on the login selector card and inside preset
+ * API-key forms.
+ */
+export interface ProviderDocsLink {
+  url: string
+  /** Localized link label. Defaults to a generic "Learn more" string. */
+  label?: LocalizedText
+}
+
+/**
  * Authentication provider entry as declared in product.json `authProviders[]`.
  *
  * Used as the single source of truth across the main process loader
@@ -578,6 +589,12 @@ export interface AuthProviderConfig {
    * Mutually exclusive with `path`.
    */
   preset?: PresetApiConfig
+  /**
+   * Optional documentation link rendered on the login selector card (e.g. how to
+   * apply for an account). For `preset` entries the link also appears inside the
+   * API-key form via `preset.docs`.
+   */
+  docs?: ProviderDocsLink
 }
 
 // ============================================================================
@@ -608,9 +625,5 @@ export interface PresetApiConfig {
   /** Used when the live /models call fails or returns an empty list */
   fallbackModels?: ModelOption[]
   /** Optional documentation link rendered next to the API Key input */
-  docs?: {
-    url: string
-    /** Localized link label. Defaults to a generic "Learn more" string. */
-    label?: LocalizedText
-  }
+  docs?: ProviderDocsLink
 }

@@ -39,11 +39,18 @@ export function convertAnthropicToOpenAIChat(anthropicRequest: AnthropicRequest)
   const tools = convertAnthropicToolsToOpenAIChat(anthropicRequest.tools)
 
   // Build OpenAI request - only include essential parameters
-  // Omit max_tokens/temperature as providers have their own defaults
   const openaiRequest: OpenAIChatRequest = {
     model: anthropicRequest.model,
     messages,
     stream: anthropicRequest.stream
+  }
+
+  // Forward the user-configured output length. Anthropic requires max_tokens,
+  // so honoring it lets downstream OpenAI-compatible providers respect the
+  // user's Halo "max output tokens" setting instead of falling back to a
+  // provider default that may truncate long responses.
+  if (typeof anthropicRequest.max_tokens === 'number' && anthropicRequest.max_tokens > 0) {
+    openaiRequest.max_tokens = anthropicRequest.max_tokens
   }
 
   // Add tools if present
