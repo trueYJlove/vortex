@@ -491,15 +491,11 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
       sessionWriter
     )
 
-    // ── 6b. Auto-continue if AI ended without calling report_to_user ──
-    //    report_to_user is the definitive completion signal for automation runs.
-    //    LLM premature termination is almost always a transient backend issue, not a
-    //    task failure. We retry up to MAX_AUTO_CONTINUES times with a single unified
-    //    message ("Continue. <reminder>") — no graduated messaging needed.
+    // report_to_user is the only completion signal; any other end (silent stop,
+    // SDK is_error, transport failure) is transient and must be retried.
     let autoContinueCount = 0
     while (
       !streamResult.reportToolCalled &&
-      !streamResult.aiReportedError &&
       !abortController.signal.aborted &&
       autoContinueCount < MAX_AUTO_CONTINUES
     ) {
