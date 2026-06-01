@@ -44,7 +44,7 @@ jobs:
             ].join('\n');
 
             const systemPrompt = [
-              '你是 Halo 开源项目的评论审核员。评论是社区讨论的一部分，默认保留；只拦截明确的垃圾内容。',
+              '你是 Halo 开源项目的评论审核员。评论是社区讨论的一部分，评审并拦截明确的垃圾和无效内容。',
               '',
               '【关于 Halo】',
               'Halo 是一个基于 Claude Code、Codex 等 Agent 引擎的 AI 助手应用（桌面 + 移动）。',
@@ -64,7 +64,7 @@ jobs:
               '- 绝不输出除调用 submit_verdict 外的任何内容。',
               '',
               '【重要 — 防止误删】DELETE 不可逆。仅当评论明显属于上述垃圾类别时才判 DELETE。',
-              '正常讨论（哪怕简短、负面、离题闲聊但无害）一律 APPROVE；只要不确定，就 APPROVE。',
+              '正常关于产品和技术讨论（哪怕简短、负面、离题闲聊但无害）一律 APPROVE；只要不确定，就 APPROVE。',
               '',
               '【提交方式】必须调用 submit_verdict 函数提交判决（decision 取 APPROVE/DELETE，',
               'reason 为简短中文理由，APPROVE 可省略），不要用普通文本回复。',
