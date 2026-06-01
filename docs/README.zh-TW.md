@@ -6,7 +6,7 @@
 
 ### 你的 AI 工作站 — 面向團隊與個人
 
-本地部署，全天候自動化。AI 數位人替你幹活，你只需做決策。
+本地部署，7x24 小時自動化。AI 數位人替你幹活，你只需做決策。
 
 [![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
@@ -79,6 +79,10 @@ AI 數位人擁有與對話模式完全相同的 Agent 能力——同樣的 Cla
 
 ![AI Digital Human](./assets/ai-digital-human.png)
 
+*實際效果 — 數位人 7x24 操作知乎、B站、小紅書與 X（商店有現成 Skill）：*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/) &nbsp; [![Watch the Video](https://img.shields.io/badge/▶_Watch_the_Video-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/)
+
 ### Halo Browser Skill — AI 決策，腳本執行
 
 這是 Halo 和那些「AI 瀏覽器 Agent 到處亂點」的根本區別。
@@ -125,6 +129,8 @@ AI 呼叫方式：`browser_run({ file: ".claude/skills/bili-get-messages/index.j
 **AI 決策，Skill 執行。穩定、可複用、可稽核。**
 
 已有現成 Skill 覆蓋小紅書、B站、知乎、Twitter / X、微信等平台。企業團隊可以為內部系統編寫私有 Skill。社群也可以貢獻和分享。
+
+想自己打造一個？完整教學——打造一個定時巡檢登入態內部系統的 **OA 審批助手**——詳見文件：[**打造 Browser Skill 數位人 →**](https://hello-halo.cc/docs/digital-humans/guide-02-build.html)
 
 ### 遠端存取 — 隨時隨地管理你的 AI 團隊
 
@@ -218,6 +224,10 @@ npm run dev
 *AI 瀏覽器*
 
 https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
+
+*產品操作演示*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/) &nbsp; [![Watch the Demo](https://img.shields.io/badge/▶_Watch_the_Demo-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/)
 
 ---
 

@@ -6,7 +6,7 @@
 
 ### Deine KI-Arbeitsstation — Für Teams und Einzelpersonen
 
-Lokal bereitstellen. Rund um die Uhr automatisieren. KI-Digitalmenschen arbeiten, während du die Entscheidungen triffst.
+Lokal bereitstellen. Alles automatisieren, rund um die Uhr. KI-Digitalmenschen arbeiten, während du die Entscheidungen triffst.
 
 [![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
@@ -79,6 +79,10 @@ KI-Digitalmenschen haben genau die gleichen Agent-Fähigkeiten wie der Konversat
 
 ![AI Digital Human](./assets/ai-digital-human.png)
 
+*In Aktion — Digitalmenschen bedienen Zhihu, Bilibili, Xiaohongshu & X rund um die Uhr (fertige Skills im Store):*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/) &nbsp; [![Watch the Video](https://img.shields.io/badge/▶_Watch_the_Video-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/)
+
 ### Halo Browser Skill — KI Entscheidet, Skripte Führen Aus
 
 Das unterscheidet Halo von "KI-Browser-Agenten", die ziellos herumklicken.
@@ -125,6 +129,8 @@ Die KI ruft es auf mit: `browser_run({ file: ".claude/skills/bili-get-messages/i
 **Die KI entscheidet. Skills führen aus. Stabil, wiederholbar, auditierbar.**
 
 Fertige Skills sind verfügbar für Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat und mehr. Unternehmensteams können private Skills für interne Systeme schreiben. Die Community kann eigene beitragen und teilen.
+
+Selbst einen bauen? Eine vollständige Anleitung — ein **OA-Genehmigungsassistent**, der ein anmeldepflichtiges internes System nach Zeitplan überwacht — findest du in den Docs: [**Einen Browser-Skill-Digitalmenschen bauen →**](https://hello-halo.cc/docs/digital-humans/guide-02-build.html)
 
 ### Fernzugriff — Verwalte Deine KI-Flotte Von Überall
 
@@ -218,6 +224,10 @@ Du kannst auch Halo Browser Skills (`.js`-Skripte) schreiben, damit KI-Digitalme
 *AI Browser*
 
 https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
+
+*Produkt-Rundgang*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/) &nbsp; [![Watch the Demo](https://img.shields.io/badge/▶_Watch_the_Demo-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/)
 
 ---
 

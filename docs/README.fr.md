@@ -6,7 +6,7 @@
 
 ### Votre Station de Travail IA — Pour les Equipes et les Individus
 
-Deploiement local. Automatisation 24h/24. Les Humains Numeriques IA travaillent pendant que vous prenez les decisions.
+Deploiement local. Tout automatiser, 24h/24. Les Humains Numeriques IA travaillent pendant que vous prenez les decisions.
 
 [![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
@@ -79,6 +79,10 @@ Les Humains Numeriques IA ont exactement les memes capacites Agent que le mode c
 
 ![AI Digital Human](./assets/ai-digital-human.png)
 
+*En action — des Humains Numeriques operant Zhihu, Bilibili, Xiaohongshu et X 24h/24 (Skills prets a l'emploi dans le store) :*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/) &nbsp; [![Watch the Video](https://img.shields.io/badge/▶_Watch_the_Video-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/)
+
 ### Halo Browser Skill — L'IA Decide, les Scripts Executent
 
 C'est ce qui differencie Halo des "agents de navigateur IA" qui naviguent au hasard en cliquant n'importe ou.
@@ -125,6 +129,8 @@ L'IA l'appelle avec : `browser_run({ file: ".claude/skills/bili-get-messages/ind
 **L'IA decide. Les Skills executent. Stable, repetable, auditable.**
 
 Des Skills prets a l'emploi sont disponibles pour Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat, et plus encore. Les equipes d'entreprise peuvent ecrire des Skills prives pour les systemes internes. La communaute peut contribuer et partager les siens.
+
+Envie d'en creer un ? Un tutoriel complet — creer un **Assistant d'approbation OA** qui surveille selon un planning un systeme interne necessitant une connexion — est dans la doc : [**Creer un Humain Numerique Browser Skill →**](https://hello-halo.cc/docs/digital-humans/guide-02-build.html)
 
 ### Acces a Distance — Gerez Votre Flotte IA Depuis N'importe Ou
 
@@ -218,6 +224,10 @@ Vous pouvez egalement ecrire des Halo Browser Skills (scripts `.js`) pour que le
 *AI Browser*
 
 https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
+
+*Presentation du produit*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/) &nbsp; [![Watch the Demo](https://img.shields.io/badge/▶_Watch_the_Demo-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/)
 
 ---
 

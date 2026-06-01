@@ -6,7 +6,7 @@
 
 ### Your AI Workstation — For Teams and Individuals
 
-Deploy locally. Automate around the clock. AI Digital Humans work while you make the calls.
+Deploy locally. Automate everything, around the clock. AI Digital Humans work while you make the calls.
 
 [![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -18,7 +18,6 @@ Deploy locally. Automate around the clock. AI Digital Humans work while you make
 **[简体中文](./docs/README.zh-CN.md)** | **[繁體中文](./docs/README.zh-TW.md)** | **[Español](./docs/README.es.md)** | **[Deutsch](./docs/README.de.md)** | **[Français](./docs/README.fr.md)** | **[日本語](./docs/README.ja.md)**
 
 </div>
-
 <!-- TODO: Replace with a 30-second GIF showing: user types a sentence -> Agent automatically writes code -> files appear in Artifact Rail -> preview the result -->
 <div align="center">
 
@@ -79,6 +78,10 @@ AI Digital Humans have the exact same Agent capabilities as conversation mode �
 
 ![AI Digital Human](./docs/assets/ai-digital-human.png)
 
+*See it in action — Digital Humans operating Zhihu, Bilibili, Xiaohongshu & X 7x24 (ready-made Skills available in the store):*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/) &nbsp; [![Watch the Video](https://img.shields.io/badge/▶_Watch_the_Video-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/)
+
 ### Halo Browser Skill — AI Decides, Scripts Execute
 
 This is what separates Halo from "AI browser agents" that fumble around clicking randomly.
@@ -125,6 +128,8 @@ AI calls it with: `browser_run({ file: ".claude/skills/bili-get-messages/index.j
 **AI decides. Skills execute. Stable, repeatable, auditable.**
 
 Ready-made Skills are available for Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat, and more. Enterprise teams can write private Skills for internal systems. The community can contribute and share their own.
+
+Want to build one yourself? A full walkthrough — building an **OA Approval Assistant** that patrols a login-required internal system on a schedule — is in the docs: [**Build a Browser Skill Digital Human →**](https://hello-halo.cc/docs/digital-humans/guide-02-build.html)
 
 ### Remote Access — Manage Your AI Fleet From Anywhere
 
@@ -218,6 +223,10 @@ You can also write Halo Browser Skills (`.js` scripts) for AI Digital Humans to 
 *AI Browser*
 
 https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
+
+*Product Walkthrough*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/) &nbsp; [![Watch the Demo](https://img.shields.io/badge/▶_Watch_the_Demo-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/)
 
 ---
 
