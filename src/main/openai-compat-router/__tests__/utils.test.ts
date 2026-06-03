@@ -11,6 +11,7 @@ import {
   encodeBackendConfig,
   decodeBackendConfig,
   normalizeApiUrl,
+  isNativeAnthropicHost,
   safeJsonParse,
   deepClone,
   isNonEmptyString,
@@ -274,5 +275,27 @@ describe('mapValue', () => {
     const mapping = { a: 1 }
     expect(mapValue(null, mapping, 99)).toBe(99)
     expect(mapValue(undefined, mapping, 99)).toBe(99)
+  })
+})
+
+describe('isNativeAnthropicHost', () => {
+  it('matches the first-party Anthropic API host (API key and OAuth)', () => {
+    expect(isNativeAnthropicHost('https://api.anthropic.com/v1/messages')).toBe(true)
+    expect(isNativeAnthropicHost('https://api.anthropic.com/v1/messages?beta=true')).toBe(true)
+  })
+
+  it('rejects third-party Anthropic-compatible hosts (keep repair pipeline)', () => {
+    expect(isNativeAnthropicHost('https://open.bigmodel.cn/api/anthropic/v1/messages')).toBe(false)
+    expect(isNativeAnthropicHost('https://example.com/v1/messages')).toBe(false)
+  })
+
+  it('does not match look-alike subdomains or hosts containing the name', () => {
+    expect(isNativeAnthropicHost('https://api.anthropic.com.evil.test/v1/messages')).toBe(false)
+    expect(isNativeAnthropicHost('https://proxy.api.anthropic.com/v1/messages')).toBe(false)
+  })
+
+  it('treats unparseable URLs as non-native (safe default)', () => {
+    expect(isNativeAnthropicHost('not a url')).toBe(false)
+    expect(isNativeAnthropicHost('')).toBe(false)
   })
 })

@@ -468,6 +468,14 @@ Location: `src/main/openai-compat-router/`
                 └── <id>.thoughts.json  # Separated thoughts data (lazy-loaded)
 ```
 
+**Credential master key (enterprise builds only):** when `security.credentialAtRestSafe`
+is enabled, a random 32-byte key is persisted at `<userData>/cred.key` (Electron
+`app.getPath('userData')`, e.g. `~/Library/Application Support/<App>/cred.key` on
+macOS — separate from `~/.halo`). It is the KEK for at-rest credential encryption
+(`src/main/http/auth/envelope.ts`). Generated once on first run, never rotated
+automatically, and never regenerated if present (regenerating would orphan all
+stored ciphertext). Absent/no-op on open-source builds.
+
 ### Space Path Architecture
 
 Spaces have two distinct paths:

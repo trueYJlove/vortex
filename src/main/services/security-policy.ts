@@ -51,13 +51,26 @@ export interface SecurityPolicy {
   remoteMcpSafe?: boolean
 
   /**
-   * Encrypts the persisted remote-access credential at rest with
-   * SM4-CBC + HMAC-SM3 (encrypt-then-MAC; GM/T 0002 + GM/T 0091) under a
-   * machine-bound KEK. Off by default — open-source builds store the
-   * credential as plain text exactly as before. The plaintext is held in
-   * memory in both modes so the UI can keep displaying the current PIN
-   * and validation runs `crypto.timingSafeEqual` against the in-memory
-   * value.
+   * Encrypts persisted credentials at rest (remote-access PIN, AI source API
+   * keys/tokens, MCP and notification-channel secrets) with SM4-CBC +
+   * HMAC-SM3 (encrypt-then-MAC; GM/T 0002 + GM/T 0091). The KEK is derived
+   * via HKDF-SHA-256 from a persisted random master key (userData/cred.key),
+   * which is stable across restarts, network changes, and hardware
+   * reconfiguration; ciphertext written by older machine-seed builds is still
+   * read via a legacy fallback and re-encrypted under the master key on next
+   * save. Off by default — open-source builds store credentials as plain text
+   * exactly as before. Plaintext is held in memory in both modes so the UI
+   * can keep displaying the current PIN and validation runs
+   * `crypto.timingSafeEqual` against the in-memory value.
+   *
+   * Scope of protection (do not overstate it): this is encryption-AT-REST for
+   * compliance — on-disk data is ciphertext under a recognized (GM) algorithm.
+   * It is NOT a defense against an attacker who already has local filesystem
+   * access as the user: cred.key and config.json are both readable by that
+   * user, so a compromised account can recover both. It does protect a config
+   * file copied on its own (without cred.key). Real key isolation would
+   * require an OS keychain / TPM and is out of scope. See
+   * `src/main/http/auth/envelope.ts`.
    */
   credentialAtRestSafe?: boolean
 

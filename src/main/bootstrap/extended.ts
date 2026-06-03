@@ -27,7 +27,7 @@ import { registerOnboardingHandlers } from '../ipc/onboarding'
 import { registerRemoteHandlers } from '../ipc/remote'
 import { registerSecurityHandlers } from '../ipc/security'
 import { enableRemoteAccess } from '../services/remote.service'
-import { getConfig } from '../services/config.service'
+import { getConfig, migrateCredentialEncryption } from '../services/config.service'
 import { registerBrowserHandlers } from '../ipc/browser'
 import { cleanupAIBrowser } from '../services/ai-browser'
 import { registerOverlayHandlers, cleanupOverlayHandlers } from '../ipc/overlay'
@@ -190,6 +190,19 @@ export function initializeExtendedServices(): void {
   // Security: expose renderer-safe security policy flags so the UI can
   // gate features (e.g. Tunnel section visibility under tunnelSafe).
   registerSecurityHandlers()
+
+  // Move credentials still under the legacy machine key (or plaintext) onto the
+  // persisted master key. No-op on open-source and already-migrated installs.
+  registerIdleTask('migrate-credential-encryption', async () => {
+    try {
+      migrateCredentialEncryption()
+    } catch (err) {
+      console.warn(
+        '[Bootstrap] Credential encryption migration failed:',
+        (err as Error).message,
+      )
+    }
+  })
 
   // Auto-restore so paired devices keep working without manual re-enable.
   // CF tunnel is intentionally not restored — its Quick Tunnel URL changes per
