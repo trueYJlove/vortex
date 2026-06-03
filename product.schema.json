@@ -186,7 +186,7 @@
         },
         "credentialAtRestSafe": {
           "type": "boolean",
-          "description": "When true, the stored remote-access credential is encrypted at rest with SM4-CBC plus HMAC-SM3 (encrypt-then-MAC; GM/T 0002 + GM/T 0091) under a machine-bound KEK. When omitted/false (open-source default), the credential is stored as plain text. The plaintext value is held in memory in both modes so the UI can keep displaying the current PIN; login validation uses crypto.timingSafeEqual against the in-memory value."
+          "description": "When true, the stored remote-access credential is encrypted at rest with SM4-CBC plus HMAC-SM3 (encrypt-then-MAC) under a KEK derived via HKDF-SHA-256 from a persisted random master key (userData/cred.key, generated on first run). The master key is stable across restarts, network changes, and hardware reconfiguration; a legacy hostname+MAC-derived seed is retained only to decrypt ciphertext from older builds and is migrated to the master key on next save. When omitted/false (open-source default), the credential is stored as plain text. The plaintext value is held in memory in both modes so the UI can keep displaying the current PIN; login validation uses crypto.timingSafeEqual against the in-memory value."
         },
         "tunnelSafe": {
           "type": "boolean",
