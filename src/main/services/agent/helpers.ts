@@ -15,6 +15,7 @@ import { getAppManager } from '../../apps/manager'
 import type { McpSpec } from '../../apps/spec/schema'
 import type { BackendRequestConfig, AISource } from '../../../shared/types/ai-sources'
 import { modelCapabilitiesService } from '../model-capabilities.service'
+import { isMcpCommandBlocked } from '../security-policy'
 import type { ApiCredentials, ResolvedModelCapabilities } from './types'
 
 // ============================================
@@ -432,6 +433,17 @@ export function getDbMcpServers(spaceId: string): Record<string, unknown> | null
       serverConfig.url = mcpServer.command
     } else {
       // stdio (default)
+      // Defense in depth: if the blacklist was updated after this MCP was
+      // installed, skip the entry here so the SDK never spawns the child
+      // process. The install-time check in AppManager.install() is the
+      // primary gate; this runtime filter only catches the
+      // "policy tightened post-install" case. No-op on open-source builds.
+      if (isMcpCommandBlocked(mcpServer.command)) {
+        console.warn(
+          `[Security] Skipped MCP '${app.specId}': command '${mcpServer.command}' blocked by policy`
+        )
+        continue
+      }
       serverConfig.command = mcpServer.command
       if (mcpServer.args?.length) serverConfig.args = mcpServer.args
       if (mcpServer.cwd) serverConfig.cwd = mcpServer.cwd
@@ -510,6 +522,14 @@ export function getMcpServersForRequires(
       serverConfig.url = mcpServer.command
     } else {
       // stdio (default)
+      // Defense in depth: skip blacklisted commands so the SDK never spawns
+      // the child process. Mirrors the filter in getDbMcpServers above.
+      if (isMcpCommandBlocked(mcpServer.command)) {
+        console.warn(
+          `[Security] Skipped required MCP '${app.specId}': command '${mcpServer.command}' blocked by policy`
+        )
+        continue
+      }
       serverConfig.command = mcpServer.command
       if (mcpServer.args?.length) serverConfig.args = mcpServer.args
       if (mcpServer.cwd) serverConfig.cwd = mcpServer.cwd

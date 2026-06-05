@@ -37,7 +37,8 @@
 import { ipcMain, shell } from 'electron'
 import { existsSync } from 'fs'
 import { getAppManager } from '../apps/manager'
-import { AppAlreadyInstalledError } from '../apps/manager/errors'
+import { AppAlreadyInstalledError, McpCommandBlockedError } from '../apps/manager/errors'
+import { MCP_COMMAND_BLOCKED_MESSAGE } from '../services/security-policy'
 import { getSkillDir } from '../apps/manager/skill-sync'
 import {
   getAppRuntime,
@@ -122,6 +123,13 @@ export function registerAppHandlers(): void {
         const err = error as Error
         console.error('[AppIPC] app:install error:', err.message)
         analytics.trackErrorSurface('app-install', err)
+        // Surface a stable discriminator so the renderer can render a
+        // localized, friendly message for known failure modes instead of
+        // dumping the raw English error text from the manager.
+        if (error instanceof McpCommandBlockedError) {
+          console.warn(`[AppIPC] app:install blocked by policy: command='${error.command}'`)
+          return { success: false, error: MCP_COMMAND_BLOCKED_MESSAGE, code: 'MCP_COMMAND_BLOCKED' }
+        }
         if (error instanceof AppAlreadyInstalledError) {
           return { success: false, error: err.message, code: 'ALREADY_INSTALLED' }
         }
@@ -401,6 +409,26 @@ export function registerAppHandlers(): void {
     }
   )
 
+  // ── app:inject-run ───────────────────────────────────────────────────────
+  // Inject a user supplement into a currently-running automation run
+  // (mid-run correction from the run-detail view).
+  ipcMain.handle(
+    'app:inject-run',
+    async (_event, input: { appId: string; runId: string; text: string }) => {
+      try {
+        const r = requireRuntime()
+        if (!r.success) return r
+        await r.runtime.injectIntoRun(input.appId, input.runId, input.text)
+        console.log(`[AppIPC] app:inject-run: appId=${input.appId}, runId=${input.runId}`)
+        return { success: true }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[AppIPC] app:inject-run error:', err.message)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
   // ── app:update-config ────────────────────────────────────────────────────
   ipcMain.handle(
     'app:update-config',
@@ -486,6 +514,10 @@ export function registerAppHandlers(): void {
         return { success: true }
       } catch (error: unknown) {
         const err = error as Error
+        if (error instanceof McpCommandBlockedError) {
+          console.warn(`[AppIPC] app:update-spec blocked by policy: command='${error.command}' appId=${input.appId}`)
+          return { success: false, error: MCP_COMMAND_BLOCKED_MESSAGE, code: 'MCP_COMMAND_BLOCKED' }
+        }
         console.error('[AppIPC] app:update-spec error:', err.message)
         return { success: false, error: err.message }
       }
@@ -955,5 +987,5 @@ export function registerAppHandlers(): void {
     }
   )
 
-  console.log('[AppIPC] App management handlers registered (29 channels)')
+  console.log('[AppIPC] App management handlers registered (30 channels)')
 }

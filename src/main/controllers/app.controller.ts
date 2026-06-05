@@ -7,9 +7,10 @@
 
 import { stringify as stringifyYaml } from 'yaml'
 import { getAppManager } from '../apps/manager'
-import { AppAlreadyInstalledError } from '../apps/manager/errors'
+import { AppAlreadyInstalledError, McpCommandBlockedError } from '../apps/manager/errors'
 import { getAppRuntime } from '../apps/runtime'
 import { parseAndValidateAppSpec, AppSpecValidationError } from '../apps/spec'
+import { MCP_COMMAND_BLOCKED_MESSAGE } from '../services/security-policy'
 
 // ============================================================================
 // Error Codes
@@ -23,11 +24,12 @@ import { parseAndValidateAppSpec, AppSpecValidationError } from '../apps/spec'
  * on fragile error message string matching.
  */
 export type AppErrorCode =
-  | 'NOT_INITIALIZED'    // AppManager not ready yet (→ HTTP 503)
-  | 'NOT_FOUND'          // App ID does not exist (→ HTTP 404)
-  | 'INVALID_YAML'       // YAML parse error (→ HTTP 400)
-  | 'VALIDATION_FAILED'  // Spec schema validation error (→ HTTP 422)
-  | 'ALREADY_INSTALLED'  // Same-name app already installed in target scope (→ HTTP 409)
+  | 'NOT_INITIALIZED'      // AppManager not ready yet (→ HTTP 503)
+  | 'NOT_FOUND'            // App ID does not exist (→ HTTP 404)
+  | 'INVALID_YAML'         // YAML parse error (→ HTTP 400)
+  | 'VALIDATION_FAILED'    // Spec schema validation error (→ HTTP 422)
+  | 'ALREADY_INSTALLED'    // Same-name app already installed in target scope (→ HTTP 409)
+  | 'MCP_COMMAND_BLOCKED'  // MCP stdio command matches security.mcpCommandBlacklist (→ HTTP 403)
 
 /** Controller error response with optional structured code */
 export interface AppControllerError {
@@ -146,6 +148,10 @@ export async function importSpec(
     return { success: true, data: { appId, activationWarning } }
   } catch (error: unknown) {
     const err = error as Error
+    if (error instanceof McpCommandBlockedError) {
+      console.warn(`[AppController] importSpec: blocked MCP command '${error.command}'`)
+      return { success: false, error: MCP_COMMAND_BLOCKED_MESSAGE, code: 'MCP_COMMAND_BLOCKED' }
+    }
     if (error instanceof AppAlreadyInstalledError) {
       return { success: false, error: err.message, code: 'ALREADY_INSTALLED' }
     }

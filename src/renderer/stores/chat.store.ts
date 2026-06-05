@@ -25,6 +25,17 @@ import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thoug
 import type { SessionInitInfo } from '../types/slash-command'
 import { PULSE_READ_GRACE_PERIOD_MS } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
+import { isAppChatKey } from '../../shared/apps/im-keys'
+
+/**
+ * Virtual conversation ids never represent a real user conversation and must
+ * never appear in the sidebar or the Pulse panel: "app-chat:{appId}" and IM
+ * session keys (digital-human + IM sessions). Real conversations are UUIDs that
+ * match a ConversationMeta in spaceStates.
+ */
+function isVirtualConversationId(conversationId: string): boolean {
+  return isAppChatKey(conversationId)
+}
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -1078,8 +1089,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.currentSpaceId === spaceId &&
       currentSpaceState?.currentConversationId === conversationId
 
-    // Track unseen completion if user is not viewing this conversation
-    if (!isUserViewingThisConversation) {
+    // Track unseen completion if user is not viewing this conversation.
+    // Skip virtual sessions (digital-human chat, IM, automation runs): they are
+    // not real conversations and must never surface in Pulse or the sidebar.
+    if (!isUserViewingThisConversation && !isVirtualConversationId(conversationId)) {
       // Find the conversation title from any space state
       let title = 'Conversation'
       let metaFound = false

@@ -1733,6 +1733,13 @@ export const api = {
     return httpRequest('POST', `/api/apps/${appId}/runs/${runId}/continue`)
   },
 
+  appInjectRun: async (appId: string, runId: string, text: string): Promise<ApiResponse> => {
+    if (isElectron()) {
+      return window.halo.appInjectRun({ appId, runId, text })
+    }
+    return httpRequest('POST', `/api/apps/${appId}/runs/${runId}/inject`, { text })
+  },
+
   appUpdateConfig: async (appId: string, config: Record<string, unknown>): Promise<ApiResponse> => {
     if (isElectron()) {
       return window.halo.appUpdateConfig({ appId, config })

@@ -82,6 +82,17 @@
           "enabled": {
             "type": "boolean"
           },
+          "docs": {
+            "type": "object",
+            "description": "Optional documentation link shown on the login selector card (e.g. how to apply for an account).",
+            "required": ["url"],
+            "properties": {
+              "url": { "type": "string" },
+              "label": {
+                "description": "Localized text. Defaults to 'Learn more' / '了解更多' if absent."
+              }
+            }
+          },
           "preset": {
             "type": "object",
             "description": "Preset API configuration. When present, this provider renders as an API-key form with a fixed baseUrl. Mutually exclusive with `path` (dynamic OAuth providers).",
@@ -175,11 +186,16 @@
         },
         "credentialAtRestSafe": {
           "type": "boolean",
-          "description": "When true, the stored remote-access credential is encrypted at rest with SM4-CBC plus HMAC-SM3 (encrypt-then-MAC; GM/T 0002 + GM/T 0091) under a machine-bound KEK. When omitted/false (open-source default), the credential is stored as plain text. The plaintext value is held in memory in both modes so the UI can keep displaying the current PIN; login validation uses crypto.timingSafeEqual against the in-memory value."
+          "description": "When true, the stored remote-access credential is encrypted at rest with SM4-CBC plus HMAC-SM3 (encrypt-then-MAC) under a KEK derived via HKDF-SHA-256 from a persisted random master key (userData/cred.key, generated on first run). The master key is stable across restarts, network changes, and hardware reconfiguration; a legacy hostname+MAC-derived seed is retained only to decrypt ciphertext from older builds and is migrated to the master key on next save. When omitted/false (open-source default), the credential is stored as plain text. The plaintext value is held in memory in both modes so the UI can keep displaying the current PIN; login validation uses crypto.timingSafeEqual against the in-memory value."
         },
         "tunnelSafe": {
           "type": "boolean",
           "description": "When true, the Cloudflare Quick Tunnel feature is disabled at every layer: the service refuses to spawn cloudflared, the remote:tunnel:enable IPC short-circuits before reaching the service, and the renderer hides the 'Internet Access' subsection plus the Cloudflared row in System Diagnostics. Use this when policy forbids outbound HTTPS tunnels that bypass the corporate proxy."
+        },
+        "mcpCommandBlacklist": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Command-basename blacklist for stdio-transport MCP servers. Each entry is matched case-insensitively against the basename of mcp_server.command with any .exe suffix stripped (so 'rm' matches both '/usr/bin/rm' and 'C:\\Windows\\rm.exe'). Matching installs are rejected with HTTP 403 / IPC error code MCP_COMMAND_BLOCKED at install time and skipped at runtime if a previously installed entry becomes blacklisted later. SSE / streamable-http transports have no command field and are unaffected. Omit or set to an empty array for no enforcement (open-source default)."
         }
       },
       "additionalProperties": false

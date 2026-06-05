@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Globe, ChevronDown, ChevronRight, MessageSquare, Wrench, Key, KeyRound, Cloud, Server, Shield, Lock, Zap, LogIn, User, Github, Brain, type LucideIcon } from 'lucide-react'
+import { Globe, ChevronDown, ChevronRight, MessageSquare, Wrench, Key, KeyRound, Cloud, Server, Shield, Lock, Zap, LogIn, User, Github, Brain, ExternalLink, type LucideIcon } from 'lucide-react'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
 import { resolveLocalizedText, type LocalizedText, type AuthProviderConfig } from '../../../shared/types'
@@ -242,6 +242,29 @@ export function LoginSelector({ onSelectProvider, onSelectCustom, onSelectPreset
                         <p className="text-sm text-muted-foreground mt-0.5">
                           {getLocalizedText(provider.description)}
                         </p>
+                        {provider.docs && (
+                          <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void api.openExternal(provider.docs!.url)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                void api.openExternal(provider.docs!.url)
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1.5"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            {provider.docs.label
+                              ? getLocalizedText(provider.docs.label)
+                              : t('Learn more')}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />

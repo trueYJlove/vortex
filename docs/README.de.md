@@ -6,7 +6,7 @@
 
 ### Deine KI-Arbeitsstation — Für Teams und Einzelpersonen
 
-Lokal bereitstellen. Rund um die Uhr automatisieren. KI-Digitalmenschen arbeiten, während du die Entscheidungen triffst.
+Lokal bereitstellen. Alles automatisieren, rund um die Uhr. KI-Digitalmenschen arbeiten, während du die Entscheidungen triffst.
 
 [![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
@@ -48,7 +48,7 @@ Halo ist eine KI-Arbeitsstation, angetrieben von einem hochmodernen Agent mit ei
 
 ## KI-Digitalmenschen — Deine Autonome KI-Belegschaft
 
-Traditionelles RPA folgt starren Skripten und bricht zusammen, wenn sich etwas ändert. Halo geht einen anderen Weg: **Die KI trifft die Entscheidungen, Halo Browser Skills führen die Operationen aus.** Das Ergebnis ist Automatisierung, die den Kontext versteht, sich an Änderungen anpasst und präzise ausführt.
+Traditionelles RPA folgt starren Skripten und bricht zusammen, wenn sich etwas ändert. Halo geht einen anderen Weg: **Die KI trifft die Entscheidungen, Halo Browser Actions führen die Operationen aus.** Das Ergebnis ist Automatisierung, die den Kontext versteht, sich an Änderungen anpasst und präzise ausführt.
 
 ### Autonome Agenten im 7x24-Betrieb
 
@@ -79,11 +79,15 @@ KI-Digitalmenschen haben genau die gleichen Agent-Fähigkeiten wie der Konversat
 
 ![AI Digital Human](./assets/ai-digital-human.png)
 
-### Halo Browser Skill — KI Entscheidet, Skripte Führen Aus
+*In Aktion — Digitalmenschen bedienen Zhihu, Bilibili, Xiaohongshu & X rund um die Uhr (fertige Browser Actions im Store):*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/) &nbsp; [![Watch the Video](https://img.shields.io/badge/▶_Watch_the_Video-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/)
+
+### Halo Browser Action — KI Entscheidet, Skripte Führen Aus
 
 Das unterscheidet Halo von "KI-Browser-Agenten", die ziellos herumklicken.
 
-Halo Browser Skill nutzt den RPA-Ansatz für Zuverlässigkeit: **Vorgefertigte wiederverwendbare Skripte für gängige Operationen auf jeder Plattform**. Die KI entscheidet nur *was* zu tun ist und *wann* — das Skript weiß bereits *wie*.
+Eine Browser Action ist eine spezielle Art von Skill: ein wiederverwendbares `.js`-Skript, das eine konkrete Operation auf einer Plattform ausführt. Halo Browser Action nutzt den RPA-Ansatz für Zuverlässigkeit: **Vorgefertigte wiederverwendbare Skripte für gängige Operationen auf jeder Plattform**. Die KI entscheidet nur *was* zu tun ist und *wann* — das Skript weiß bereits *wie*.
 
 Skripte laufen direkt in einem echten Browser über Halos `browser_run` — mit vollem Zugriff auf das Seiten-DOM, Cookies und interne APIs, genau wie die Chrome DevTools Console. Das funktioniert sowohl für öffentliche Plattformen als auch für private Unternehmenssysteme.
 
@@ -111,20 +115,22 @@ Die KI ruft es auf mit: `browser_run({ file: ".claude/skills/bili-get-messages/i
 
 **Beispiel: Unternehmens-Workflow — ein Xiaohongshu Content-Operations-Digitalmensch:**
 1. Die KI entscheidet: Zeit, neue Kommentare zu den heutigen Beiträgen zu prüfen
-2. Ruft den `xhs-get-comments` Skill auf → Skript holt die Kommentarliste über die Plattform-API
+2. Ruft den `xhs-get-comments` Action auf → Skript holt die Kommentarliste über die Plattform-API
 3. Die KI bewertet: Diese 5 Kommentare brauchen Antworten, verfasst personalisierte Antworten
-4. Ruft den `xhs-reply-comment` Skill auf → Skript sendet jede Antwort
+4. Ruft den `xhs-reply-comment` Action auf → Skript sendet jede Antwort
 
 **Beispiel: Unternehmensintern — ein DevOps-Monitoring-Digitalmensch:**
 1. Die KI entscheidet: Zeit für den stündlichen Infrastruktur-Check
-2. Ruft den `check-grafana-alerts` Skill auf → Skript liest das Alert-Dashboard über die interne API
+2. Ruft den `check-grafana-alerts` Action auf → Skript liest das Alert-Dashboard über die interne API
 3. Die KI bewertet: 2 Alerts sind kritisch, erstellt eine Incident-Zusammenfassung
-4. Ruft den `create-jira-ticket` Skill auf → Skript erstellt ein P1-Ticket mit vollständigem Kontext
-5. Ruft den `notify-oncall` Skill auf → Sendet Alert an die WeCom-Bereitschaftsgruppe
+4. Ruft den `create-jira-ticket` Action auf → Skript erstellt ein P1-Ticket mit vollständigem Kontext
+5. Ruft den `notify-oncall` Action auf → Sendet Alert an die WeCom-Bereitschaftsgruppe
 
-**Die KI entscheidet. Skills führen aus. Stabil, wiederholbar, auditierbar.**
+**Die KI entscheidet. Actions führen aus. Stabil, wiederholbar, auditierbar.**
 
-Fertige Skills sind verfügbar für Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat und mehr. Unternehmensteams können private Skills für interne Systeme schreiben. Die Community kann eigene beitragen und teilen.
+Fertige Browser Actions sind verfügbar für Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat und mehr. Unternehmensteams können private Actions für interne Systeme schreiben. Die Community kann eigene beitragen und teilen.
+
+Selbst einen bauen? Eine vollständige Anleitung — ein **OA-Genehmigungsassistent**, der ein anmeldepflichtiges internes System nach Zeitplan überwacht — findest du in den Docs: [**Einen Browser-Action-Digitalmenschen bauen →**](https://hello-halo.cc/docs/digital-humans/guide-02-build.html)
 
 ### Fernzugriff — Verwalte Deine KI-Flotte Von Überall
 
@@ -191,7 +197,7 @@ npm run dev
 
 Schreibe eine `spec.yaml` und reiche einen PR beim [AI Digital Human Protocol (DHP)](https://github.com/openkursar/digital-human-protocol) ein. Nach dem Merge ist er sofort für alle Halo-Nutzer verfügbar.
 
-Du kannst auch Halo Browser Skills (`.js`-Skripte) schreiben, damit KI-Digitalmenschen Operationen auf bestimmten Plattformen präzise ausführen können.
+Du kannst auch Halo Browser Actions (`.js`-Skripte) schreiben, damit KI-Digitalmenschen Operationen auf bestimmten Plattformen präzise ausführen können.
 
 </td>
 </tr>
@@ -218,6 +224,10 @@ Du kannst auch Halo Browser Skills (`.js`-Skripte) schreiben, damit KI-Digitalme
 *AI Browser*
 
 https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
+
+*Produkt-Rundgang*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/) &nbsp; [![Watch the Demo](https://img.shields.io/badge/▶_Watch_the_Demo-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/)
 
 ---
 

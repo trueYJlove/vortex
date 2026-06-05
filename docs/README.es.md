@@ -6,7 +6,7 @@
 
 ### Tu Estación de Trabajo con IA — Para Equipos e Individuos
 
-Despliegue local. Automatización las 24 horas. Los Humanos Digitales con IA trabajan mientras tú tomas las decisiones.
+Despliegue local. Automatízalo todo, las 24 horas. Los Humanos Digitales con IA trabajan mientras tú tomas las decisiones.
 
 [![GitHub Stars](https://img.shields.io/github/stars/openkursar/hello-halo?style=social)](https://github.com/openkursar/hello-halo/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](../LICENSE)
@@ -48,7 +48,7 @@ Halo es una estación de trabajo con IA impulsada por un Agent de vanguardia con
 
 ## Humanos Digitales con IA — Tu Fuerza de Trabajo Autónoma
 
-El RPA tradicional sigue scripts rígidos y falla cuando algo cambia. Halo adopta un enfoque diferente: **la IA toma las decisiones, las Halo Browser Skills ejecutan las operaciones.** El resultado es una automatización que entiende el contexto, se adapta a los cambios y ejecuta con precisión.
+El RPA tradicional sigue scripts rígidos y falla cuando algo cambia. Halo adopta un enfoque diferente: **la IA toma las decisiones, las Halo Browser Actions ejecutan las operaciones.** El resultado es una automatización que entiende el contexto, se adapta a los cambios y ejecuta con precisión.
 
 ### Agentes Autónomos Funcionando 7x24
 
@@ -79,11 +79,15 @@ Los Humanos Digitales con IA tienen exactamente las mismas capacidades de Agent 
 
 ![AI Digital Human](./assets/ai-digital-human.png)
 
-### Halo Browser Skill — La IA Decide, los Scripts Ejecutan
+*Míralo en acción — Humanos Digitales operando Zhihu, Bilibili, Xiaohongshu y X las 24 horas (Browser Actions listas para usar en la tienda):*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/) &nbsp; [![Watch the Video](https://img.shields.io/badge/▶_Watch_the_Video-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1yfNuzaEtv/)
+
+### Halo Browser Action — La IA Decide, los Scripts Ejecutan
 
 Esto es lo que diferencia a Halo de los "agentes de navegador con IA" que navegan sin rumbo haciendo clics aleatorios.
 
-Halo Browser Skill adopta el enfoque de RPA para la fiabilidad: **pre-escribe scripts reutilizables para operaciones comunes en cada plataforma**. La IA solo decide *qué* hacer y *cuándo* — el script ya sabe *cómo*.
+Una Browser Action es un tipo especial de Skill: un script `.js` reutilizable que realiza una operación concreta en una plataforma. Halo Browser Action adopta el enfoque de RPA para la fiabilidad: **pre-escribe scripts reutilizables para operaciones comunes en cada plataforma**. La IA solo decide *qué* hacer y *cuándo* — el script ya sabe *cómo*.
 
 Los scripts se ejecutan directamente en un navegador real a través de `browser_run` de Halo — con acceso completo al DOM de la página, cookies y APIs internas, igual que la consola de Chrome DevTools. Esto funciona tanto para plataformas públicas como para sistemas empresariales privados.
 
@@ -111,20 +115,22 @@ La IA lo invoca con: `browser_run({ file: ".claude/skills/bili-get-messages/inde
 
 **Ejemplo: Flujo de trabajo empresarial — un Humano Digital para operaciones de contenido en Xiaohongshu:**
 1. La IA decide: es hora de revisar nuevos comentarios en las publicaciones de hoy
-2. Llama al Skill `xhs-get-comments` → el script obtiene la lista de comentarios a través de la API de la plataforma
+2. Llama a la Action `xhs-get-comments` → el script obtiene la lista de comentarios a través de la API de la plataforma
 3. La IA juzga: estos 5 comentarios necesitan respuesta, redacta respuestas personalizadas
-4. Llama al Skill `xhs-reply-comment` → el script envía cada respuesta
+4. Llama a la Action `xhs-reply-comment` → el script envía cada respuesta
 
 **Ejemplo: Interno empresarial — un Humano Digital de monitoreo DevOps:**
 1. La IA decide: es hora de la verificación horaria de infraestructura
-2. Llama al Skill `check-grafana-alerts` → el script lee el dashboard de alertas a través de la API interna
+2. Llama a la Action `check-grafana-alerts` → el script lee el dashboard de alertas a través de la API interna
 3. La IA juzga: 2 alertas son críticas, compone un resumen del incidente
-4. Llama al Skill `create-jira-ticket` → el script crea un ticket P1 con contexto completo
-5. Llama al Skill `notify-oncall` → envía la alerta al grupo de guardia en WeCom
+4. Llama a la Action `create-jira-ticket` → el script crea un ticket P1 con contexto completo
+5. Llama a la Action `notify-oncall` → envía la alerta al grupo de guardia en WeCom
 
-**La IA decide. Los Skills ejecutan. Estable, repetible, auditable.**
+**La IA decide. Las Actions ejecutan. Estable, repetible, auditable.**
 
-Los Skills listos para usar están disponibles para Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat y más. Los equipos empresariales pueden escribir Skills privados para sistemas internos. La comunidad puede contribuir y compartir los suyos propios.
+Las Browser Actions listas para usar están disponibles para Xiaohongshu, Bilibili, Zhihu, Twitter / X, WeChat y más. Los equipos empresariales pueden escribir Actions privadas para sistemas internos. La comunidad puede contribuir y compartir las suyas propias.
+
+¿Quieres crear uno? En la documentación hay un tutorial completo — crear un **Asistente de Aprobación OA** que revisa según un horario un sistema interno que requiere inicio de sesión: [**Crea un Humano Digital con Browser Action →**](https://hello-halo.cc/docs/digital-humans/guide-02-build.html)
 
 ### Acceso Remoto — Gestiona tu Flota de IA Desde Cualquier Lugar
 
@@ -191,7 +197,7 @@ Abre la Tienda de Humanos Digitales con IA, elige uno, completa algunos campos d
 
 Escribe un `spec.yaml` y envía un PR al [AI Digital Human Protocol (DHP)](https://github.com/openkursar/digital-human-protocol). Una vez fusionado, estará disponible inmediatamente para todos los usuarios de Halo.
 
-También puedes escribir Halo Browser Skills (scripts `.js`) para que los Humanos Digitales con IA ejecuten operaciones con precisión en plataformas específicas.
+También puedes escribir Halo Browser Actions (scripts `.js`) para que los Humanos Digitales con IA ejecuten operaciones con precisión en plataformas específicas.
 
 </td>
 </tr>
@@ -218,6 +224,10 @@ También puedes escribir Halo Browser Skills (scripts `.js`) para que los Humano
 *AI Browser*
 
 https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
+
+*Recorrido del producto*
+
+[![中文 点击播放](https://img.shields.io/badge/▶_点击播放-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/) &nbsp; [![Watch the Demo](https://img.shields.io/badge/▶_Watch_the_Demo-FB7299?style=for-the-badge&logo=bilibili&logoColor=white)](https://www.bilibili.com/video/BV1jEZYBaEcy/)
 
 ---
 

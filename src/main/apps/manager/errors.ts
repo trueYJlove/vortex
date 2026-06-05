@@ -101,3 +101,24 @@ export class BuiltinAppProtectedError extends Error {
     this.operation = operation
   }
 }
+
+/**
+ * Thrown when an MCP App install is rejected because its
+ * `mcp_server.command` matches the `security.mcpCommandBlacklist`
+ * policy declared in product.json. Carries the offending command so
+ * the transport layer can surface it in logs or telemetry, but the
+ * user-facing message stays generic to avoid leaking which exact
+ * names are on the list.
+ *
+ * Open-source builds never throw this — the predicate that produces
+ * it short-circuits when the blacklist is unset / empty.
+ */
+export class McpCommandBlockedError extends Error {
+  readonly command: string
+
+  constructor(command: string) {
+    super(`MCP server command '${command}' is blocked by security policy`)
+    this.name = 'McpCommandBlockedError'
+    this.command = command
+  }
+}
