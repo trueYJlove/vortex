@@ -32,8 +32,8 @@ export interface MessageListProps {
    * Conversation this list belongs to. Drives the streaming session subscription
    * in the footer (queued messages + per-token re-render). This is the only link
    * to chat.store — the store is the shared real-time bus, keyed by conversationId,
-   * not a "main chat" singleton. Surfaces using virtual ids (e.g. "app-chat:{appId}",
-   * IM session keys, "app-run:{runId}") pass that id here.
+   * not a "main chat" singleton. Surfaces using virtual ids (e.g. "app-chat:{appId}"
+   * or IM session keys) pass that id here.
    */
   conversationId?: string
   messages: Message[]
