@@ -396,6 +396,7 @@ export interface HaloAPI {
   appGetSession: (input: { appId: string; runId: string }) => Promise<IpcResponse>
   appRespondEscalation: (input: { appId: string; escalationId: string; response: { ts: number; choice?: string; text?: string } }) => Promise<IpcResponse>
   appContinueRun: (input: { appId: string; runId: string }) => Promise<IpcResponse>
+  appInjectRun: (input: { appId: string; runId: string; text: string }) => Promise<IpcResponse>
   appUpdateConfig: (input: { appId: string; config: Record<string, unknown> }) => Promise<IpcResponse>
   appUpdateFrequency: (input: { appId: string; subscriptionId: string; frequency: string }) => Promise<IpcResponse>
   appUpdateOverrides: (input: { appId: string; overrides: Record<string, unknown> }) => Promise<IpcResponse>
@@ -789,6 +790,7 @@ const api: HaloAPI = {
   appGetSession: (input) => ipcRenderer.invoke('app:get-session', input),
   appRespondEscalation: (input) => ipcRenderer.invoke('app:respond-escalation', input),
   appContinueRun: (input) => ipcRenderer.invoke('app:continue-run', input),
+  appInjectRun: (input) => ipcRenderer.invoke('app:inject-run', input),
   appUpdateConfig: (input) => ipcRenderer.invoke('app:update-config', input),
   appUpdateFrequency: (input) => ipcRenderer.invoke('app:update-frequency', input),
   appUpdateOverrides: (input) => ipcRenderer.invoke('app:update-overrides', input),

@@ -25,11 +25,8 @@ import type {
   SessionState
 } from './types'
 import { emitAgentEvent } from './events'
-import {
-  parseSDKMessage,
-  extractSingleUsage,
-  extractResultUsage
-} from './message-utils'
+import { parseSDKMessage } from './message-utils'
+import { extractRealAssistantUsage, buildTokenUsage } from './context-usage'
 import { broadcastMcpStatus } from './mcp-manager'
 import {
   handleSubAgentMessage,
@@ -441,7 +438,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
           capturedSessionId = sessionIdFromMsg as string
         }
         // Extract token usage
-        tokenUsage = extractResultUsage(msg, lastSingleUsage)
+        tokenUsage = buildTokenUsage(msg, lastSingleUsage, displayModel)
         console.log(`[Agent][${conversationId}] Drain complete — result consumed after ${Date.now() - drainStartTime}ms`)
         break
       }
@@ -759,9 +756,11 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
       JSON.stringify(sdkMessage, null, 2)
     )
 
-    // Extract single API call usage from assistant message (represents current context size)
+    // Capture per-call usage from real assistant messages (represents current
+    // context size). Synthetic messages (interrupt/cancel/reject) return null
+    // and are skipped so they never overwrite the last real usage.
     if (sdkMessage.type === 'assistant') {
-      const usage = extractSingleUsage(sdkMessage)
+      const usage = extractRealAssistantUsage(sdkMessage)
       if (usage) {
         lastSingleUsage = usage
         // Telemetry: emit per-call llm.invocation. modelName is sensitive —
@@ -1032,7 +1031,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
       }
 
       // Extract token usage from result message
-      tokenUsage = extractResultUsage(msg, lastSingleUsage)
+      tokenUsage = buildTokenUsage(msg, lastSingleUsage, displayModel)
       if (tokenUsage) {
         console.log(`[Agent][${conversationId}] Token usage (single API):`, tokenUsage)
       }

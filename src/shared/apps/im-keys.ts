@@ -42,8 +42,8 @@ export function buildImSessionKey(
  *
  * IM keys have the form "app-chat:{appId}:{channel}:{chatType}:{chatId}"
  * (5 segments, 4 colons).  Other key formats in the system:
- *   - Native Halo chat:  "app-chat:{appId}"          (2 segments, 1 colon)
- *   - Automation run:     "app-run-{runId}"           (0 colons)
+ *   - Native Halo chat:  "app-chat:{appId}"           (2 segments, 1 colon)
+ *   - Automation run:    "app-run:{runId}"            (virtual conversation id)
  *
  * Keeping this predicate next to buildImSessionKey ensures the detection
  * logic stays in sync with the key format (single source of truth).
@@ -51,4 +51,29 @@ export function buildImSessionKey(
 export function isImSessionKey(conversationId: string): boolean {
   // IM keys always start with "app-chat:" and have exactly 5 colon-separated segments
   return conversationId.startsWith('app-chat:') && conversationId.split(':').length === 5
+}
+
+/**
+ * Check whether a conversationId belongs to the app-chat namespace — native
+ * digital-human chat ("app-chat:{appId}") or any IM session under it. Keeps the
+ * "app-chat:" prefix knowledge here rather than inlined at call sites.
+ */
+export function isAppChatKey(conversationId: string): boolean {
+  return conversationId.startsWith('app-chat:')
+}
+
+/** Prefix for the automation-run virtual conversation id. */
+const APP_RUN_PREFIX = 'app-run:'
+
+/**
+ * Check whether a conversationId is an automation-run key ("app-run:{runId}").
+ *
+ * An automation run is a headless execution, not a real user conversation: it
+ * emits no renderer events and is observed by reading its JSONL transcript. The
+ * renderer chat store uses this predicate only to keep run keys out of the
+ * conversation sidebar and Pulse panel, and to evict any transient run session
+ * entry on completion.
+ */
+export function isAppRunKey(conversationId: string): boolean {
+  return conversationId.startsWith(APP_RUN_PREFIX)
 }

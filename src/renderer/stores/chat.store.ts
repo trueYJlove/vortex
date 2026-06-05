@@ -25,6 +25,18 @@ import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thoug
 import type { SessionInitInfo } from '../types/slash-command'
 import { PULSE_READ_GRACE_PERIOD_MS } from '../types'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
+import { isAppChatKey, isAppRunKey } from '../../shared/apps/im-keys'
+
+/**
+ * Virtual conversation ids never represent a real user conversation and must
+ * never appear in the sidebar or the Pulse panel:
+ *   - "app-chat:{appId}" / IM session keys — digital-human + IM sessions
+ *   - "app-run:{runId}"                     — automation run live stream
+ * Real conversations are UUIDs that match a ConversationMeta in spaceStates.
+ */
+function isVirtualConversationId(conversationId: string): boolean {
+  return isAppChatKey(conversationId) || isAppRunKey(conversationId)
+}
 
 // LRU cache size limit
 const CONVERSATION_CACHE_SIZE = 10
@@ -1078,8 +1090,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       state.currentSpaceId === spaceId &&
       currentSpaceState?.currentConversationId === conversationId
 
-    // Track unseen completion if user is not viewing this conversation
-    if (!isUserViewingThisConversation) {
+    // Track unseen completion if user is not viewing this conversation.
+    // Skip virtual sessions (digital-human chat, IM, automation runs): they are
+    // not real conversations and must never surface in Pulse or the sidebar.
+    if (!isUserViewingThisConversation && !isVirtualConversationId(conversationId)) {
       // Find the conversation title from any space state
       let title = 'Conversation'
       let metaFound = false
@@ -1214,18 +1228,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const newSessions = new Map(state.sessions)
           const currentSession = newSessions.get(conversationId)
           if (currentSession && currentSession.turnId === completeTurnId) {
-            newSessions.set(conversationId, {
-              ...currentSession,
-              isGenerating: false,
-              isThinking: false,
-              streamingContent: '',
-              thoughts: [],
-              compactInfo: null,
-              pendingQuestion: null,
-              queuedMessages: [],  // Clear mid-turn queued messages
-              error: currentSession.errorType === 'interrupted' ? currentSession.error : null,
-              errorType: currentSession.errorType === 'interrupted' ? currentSession.errorType : null,
-            })
+            // Automation-run sessions are keyed by a unique runId and never reused;
+            // drop the entry entirely so the sessions Map doesn't grow without bound
+            // across scheduled runs. App-chat/IM sessions are reused, so keep + clear.
+            if (isAppRunKey(conversationId)) {
+              newSessions.delete(conversationId)
+            } else {
+              newSessions.set(conversationId, {
+                ...currentSession,
+                isGenerating: false,
+                isThinking: false,
+                streamingContent: '',
+                thoughts: [],
+                compactInfo: null,
+                pendingQuestion: null,
+                queuedMessages: [],  // Clear mid-turn queued messages
+                error: currentSession.errorType === 'interrupted' ? currentSession.error : null,
+                errorType: currentSession.errorType === 'interrupted' ? currentSession.errorType : null,
+              })
+            }
           } else if (currentSession) {
             console.log(`[ChatStore] Skipping session clear for [${conversationId}]: new turn started`)
           }

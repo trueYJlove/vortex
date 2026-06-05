@@ -1653,6 +1653,29 @@ export function registerApiRoutes(app: Express): void {
     }
   })
 
+  // POST /api/apps/:appId/runs/:runId/inject — inject a user supplement into a live run
+  app.post('/api/apps/:appId/runs/:runId/inject', async (req: Request, res: Response) => {
+    try {
+      const { appId, runId } = req.params
+      const text = (req.body as { text?: string } | undefined)?.text
+      if (!appId || !runId) {
+        res.status(400).json({ success: false, error: 'Missing appId or runId' })
+        return
+      }
+      if (typeof text !== 'string' || !text.trim()) {
+        res.status(400).json({ success: false, error: 'Missing or empty text' })
+        return
+      }
+      const runtime = getRuntimeOrFail(res)
+      if (!runtime) return
+      await runtime.injectIntoRun(appId, runId, text)
+      console.log('[HTTP] POST /api/apps/%s/runs/%s/inject', appId, runId)
+      res.json({ success: true })
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
   // GET /api/apps/:appId/runs/:runId/session — get session messages for "View process"
   app.get('/api/apps/:appId/runs/:runId/session', async (req: Request, res: Response) => {
     try {

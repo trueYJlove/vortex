@@ -333,7 +333,7 @@ export function AppsPage() {
             )}
 
             {/* Detail content — app-chat manages its own scroll + flex layout */}
-            <div className={`flex-1 ${isAppChat ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+            <div className={`flex-1 ${isAppChat || isSessionDetail ? 'overflow-hidden' : 'overflow-y-auto'}`}>
               {renderDetail()}
             </div>
           </div>
@@ -384,7 +384,7 @@ export function AppsPage() {
               )}
 
               {/* Detail content */}
-              <div className={`flex-1 ${isAppChat ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+              <div className={`flex-1 ${isAppChat || isSessionDetail ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                 {renderDetail()}
               </div>
             </>

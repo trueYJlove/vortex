@@ -409,6 +409,26 @@ export function registerAppHandlers(): void {
     }
   )
 
+  // ── app:inject-run ───────────────────────────────────────────────────────
+  // Inject a user supplement into a currently-running automation run
+  // (mid-run correction from the run-detail view).
+  ipcMain.handle(
+    'app:inject-run',
+    async (_event, input: { appId: string; runId: string; text: string }) => {
+      try {
+        const r = requireRuntime()
+        if (!r.success) return r
+        await r.runtime.injectIntoRun(input.appId, input.runId, input.text)
+        console.log(`[AppIPC] app:inject-run: appId=${input.appId}, runId=${input.runId}`)
+        return { success: true }
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error('[AppIPC] app:inject-run error:', err.message)
+        return { success: false, error: err.message }
+      }
+    }
+  )
+
   // ── app:update-config ────────────────────────────────────────────────────
   ipcMain.handle(
     'app:update-config',
@@ -949,5 +969,5 @@ export function registerAppHandlers(): void {
     }
   )
 
-  console.log('[AppIPC] App management handlers registered (29 channels)')
+  console.log('[AppIPC] App management handlers registered (30 channels)')
 }
