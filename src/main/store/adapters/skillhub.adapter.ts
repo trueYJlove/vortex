@@ -116,6 +116,36 @@ function toEntry(skill: SkillHubSkill): RegistryEntry | null {
   }
 }
 
+/**
+ * Download SKILL.md for a skill: resolve the current version via the files
+ * manifest, then fetch the file from the public object-storage CDN (open CORS, no auth).
+ */
+async function downloadSkillMd(slug: string): Promise<string> {
+  const filesUrl = `${API_BASE}/api/v1/skills/${slug}/files`
+  const filesRes = await fetchWithTimeout(filesUrl, { headers: DEFAULT_HEADERS })
+  if (!filesRes.ok) {
+    throw new Error(`SkillHub files API error HTTP ${filesRes.status} for "${slug}"`)
+  }
+
+  const filesData = await filesRes.json() as SkillHubFilesResponse
+  const version = filesData.version
+  if (!version) {
+    throw new Error(`SkillHub files API returned no version for "${slug}"`)
+  }
+
+  const skillMdUrl = `${COS_BASE}/skills/${slug}/${version}/files/SKILL.md`
+  const mdRes = await fetchWithTimeout(skillMdUrl, {
+    headers: { 'User-Agent': 'Halo-Store/1.0' },
+  })
+  if (!mdRes.ok) {
+    throw new Error(
+      `SkillHub: failed to download SKILL.md for "${slug}" v${version}: HTTP ${mdRes.status}`
+    )
+  }
+
+  return await mdRes.text()
+}
+
 // ── Adapter ────────────────────────────────────────────────────────────────
 
 export class SkillHubAdapter implements RegistryAdapter {
@@ -158,36 +188,10 @@ export class SkillHubAdapter implements RegistryAdapter {
     const slug = entry.slug
     const t0 = performance.now()
 
-    // Step 1: Get the files manifest to resolve the current version
-    const filesUrl = `${API_BASE}/api/v1/skills/${slug}/files`
-    const filesRes = await fetchWithTimeout(filesUrl, { headers: DEFAULT_HEADERS })
-    if (!filesRes.ok) {
-      throw new Error(`SkillHub files API error HTTP ${filesRes.status} for "${slug}"`)
-    }
-
-    const filesData = await filesRes.json() as SkillHubFilesResponse
-    const version = filesData.version
-    if (!version) {
-      throw new Error(`SkillHub files API returned no version for "${slug}"`)
-    }
-
-    // Step 2: Download SKILL.md from Tencent COS (open CORS, no auth)
-    const skillMdPath = 'SKILL.md'
-    const skillMdUrl = `${COS_BASE}/skills/${slug}/${version}/files/${skillMdPath}`
-    const mdRes = await fetchWithTimeout(skillMdUrl, {
-      headers: { 'User-Agent': 'Halo-Store/1.0' },
-    })
-
-    if (!mdRes.ok) {
-      throw new Error(
-        `SkillHub: failed to download SKILL.md for "${slug}" v${version}: HTTP ${mdRes.status}`
-      )
-    }
-
-    const skillMdContent = await mdRes.text()
+    const skillMdContent = await downloadSkillMd(slug)
 
     const dt = performance.now() - t0
-    console.log(`[SkillHubAdapter] fetched spec for "${slug}" v${version} (${dt.toFixed(0)}ms)`)
+    console.log(`[SkillHubAdapter] fetched spec for "${slug}" (${dt.toFixed(0)}ms)`)
 
     const spec: SkillSpec = {
       spec_version: '1',
@@ -206,5 +210,14 @@ export class SkillHubAdapter implements RegistryAdapter {
     }
 
     return spec
+  }
+
+  async fetchDocument(_source: RegistrySource, entry: RegistryEntry): Promise<string | null> {
+    try {
+      return await downloadSkillMd(entry.slug)
+    } catch (err) {
+      console.log(`[SkillHubAdapter] No document for "${entry.slug}": ${(err as Error).message}`)
+      return null
+    }
   }
 }

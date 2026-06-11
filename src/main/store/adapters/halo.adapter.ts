@@ -252,6 +252,27 @@ export class HaloAdapter implements RegistryAdapter {
   }
 
   /**
+   * Skill documents live at the same artifact route fetchSpec materializes
+   * skill_files from: {url}/{entry.path}/files/SKILL.md
+   */
+  async fetchDocument(source: RegistrySource, entry: RegistryEntry): Promise<string | null> {
+    if (entry.type !== 'skill') return null
+
+    const baseUrl = source.url.replace(/\/+$/, '')
+    assertSafeRelPath(entry.path, `entry "${entry.slug}" path`)
+    const url = `${baseUrl}/${entry.path}/files/SKILL.md`
+
+    const response = await fetchWithTimeout(url, {
+      headers: { 'User-Agent': 'Halo-Store/1.0' },
+    })
+    if (!response.ok) {
+      console.log(`[HaloAdapter] No document for "${entry.slug}" (HTTP ${response.status})`)
+      return null
+    }
+    return await response.text()
+  }
+
+  /**
    * Fetch bundled skill files for skills declared with `bundled: true`.
    *
    * Each skill's `files` array lists relative paths within `skills/{id}/`.

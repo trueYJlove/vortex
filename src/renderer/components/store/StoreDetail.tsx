@@ -14,6 +14,7 @@ import { StoreInstallDialog } from './StoreInstallDialog'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
 import { resolveEntryI18n, resolveSpecI18n } from '../../utils/spec-i18n'
 import { AppTypeBadge } from './AppTypeBadge'
+import { StoreDocumentation } from './StoreDocumentation'
 
 export function StoreDetail() {
   const { t } = useTranslation()
@@ -208,7 +209,7 @@ export function StoreDetail() {
                 <span className="text-3xl flex-shrink-0">{entry.icon}</span>
               )}
               <div className="min-w-0">
-                <h1 className="text-lg font-semibold text-foreground">{resolvedEntry?.name ?? entry.name}</h1>
+                <h1 className="text-lg font-semibold text-foreground break-words">{resolvedEntry?.name ?? entry.name}</h1>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-muted-foreground">v{entry.version}</span>
                   <span className="text-xs text-muted-foreground">
@@ -343,6 +344,15 @@ export function StoreDetail() {
               {resolvedSpec?.description ?? spec.description ?? entry.description}
             </p>
           </div>
+
+          {/* Documentation (SKILL.md) — skills only, lazily fetched */}
+          {entry.type === 'skill' && (
+            <StoreDocumentation
+              slug={entry.slug}
+              version={entry.version}
+              inlineContent={spec.type === 'skill' ? spec.skill_files?.['SKILL.md'] : undefined}
+            />
+          )}
 
           {/* Config Schema Preview */}
           {(resolvedSpec?.config_schema ?? spec.config_schema) && (resolvedSpec?.config_schema ?? spec.config_schema)!.length > 0 && (

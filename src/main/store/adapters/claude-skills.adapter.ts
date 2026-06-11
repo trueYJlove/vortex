@@ -347,4 +347,28 @@ export class ClaudeSkillsAdapter implements RegistryAdapter {
     }
     return spec
   }
+
+  /**
+   * Fetch SKILL.md directly from raw.githubusercontent.com — zero GitHub API
+   * quota, unlike fetchSpec which lists the whole tree.
+   */
+  async fetchDocument(_source: RegistrySource, entry: RegistryEntry): Promise<string | null> {
+    const installPath = entry.path
+    if (!installPath) return null
+
+    const parts = installPath.match(/^([^/]+)\/([^/]+)\/(.+)$/)
+    if (!parts) return null
+    const [, owner, repo, pathInRepo] = parts
+
+    const filePath = /\/SKILL\.md$/i.test(pathInRepo) ? pathInRepo : `${pathInRepo}/SKILL.md`
+    const branch = (entry.meta?.branch as string | undefined) ?? 'main'
+    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${filePath}`
+
+    const res = await fetchWithTimeout(rawUrl, { headers: { 'User-Agent': 'Halo-Store/1.0' } })
+    if (!res.ok) {
+      console.log(`[ClaudeSkillsAdapter] No document for "${entry.slug}" (HTTP ${res.status})`)
+      return null
+    }
+    return await res.text()
+  }
 }

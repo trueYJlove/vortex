@@ -2170,6 +2170,18 @@ export function registerApiRoutes(app: Express): void {
     }
   })
 
+  // GET /api/store/app-document?slug=... — SKILL.md/README for detail page.
+  // Query param because scoped slugs ("owner/repo") contain "/".
+  app.get('/api/store/app-document', async (req: Request, res: Response) => {
+    try {
+      const slug = typeof req.query.slug === 'string' ? req.query.slug : ''
+      const result = await storeController.getStoreAppDocument(slug)
+      res.json(result)
+    } catch (error) {
+      res.json({ success: false, error: (error as Error).message })
+    }
+  })
+
   // POST /api/store/install — install an app from the store
   app.post('/api/store/install', async (req: Request, res: Response) => {
     try {
