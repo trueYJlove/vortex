@@ -15,6 +15,7 @@ import { useTranslation, getCurrentLanguage } from '../../i18n'
 import { resolveEntryI18n, resolveSpecI18n } from '../../utils/spec-i18n'
 import { AppTypeBadge } from './AppTypeBadge'
 import { StoreDocumentation } from './StoreDocumentation'
+import { api } from '../../api'
 
 export function StoreDetail() {
   const { t } = useTranslation()
@@ -26,7 +27,6 @@ export function StoreDetail() {
   const clearStoreSelection = useAppsPageStore(state => state.clearStoreSelection)
   const selectStoreApp = useAppsPageStore(state => state.selectStoreApp)
   const checkUpdates = useAppsPageStore(state => state.checkUpdates)
-  const installFromStore = useAppsPageStore(state => state.installFromStore)
   const apps = useAppsStore(state => state.apps)
 
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
@@ -96,25 +96,25 @@ export function StoreDetail() {
     console.log('[StoreDetail] App installed:', appId)
   }, [checkUpdates])
 
-  // Update in-place for MCP/Skill — reinstalls to the same scope as the existing install
+  // Upgrade in place via updateSpec — reinstalling would throw AppAlreadyInstalledError.
   const handleUpdateInPlace = useCallback(async () => {
     if (!entry || !installedApp) return
     setUpdateInstallError(null)
     setUpdateInstalling(true)
     try {
-      const appId = await installFromStore(entry.slug, installedApp.spaceId)
-      if (appId) {
+      const res = await api.storeApplyUpgrade(installedApp.id, 'force')
+      if (res.success) {
         useAppsStore.getState().loadApps()
         void checkUpdates()
       } else {
-        setUpdateInstallError(t('Installation failed. Please try again.'))
+        setUpdateInstallError(res.error ?? t('Update failed. Please try again.'))
       }
     } catch (err) {
-      setUpdateInstallError(err instanceof Error ? err.message : t('Installation failed'))
+      setUpdateInstallError(err instanceof Error ? err.message : t('Update failed'))
     } finally {
       setUpdateInstalling(false)
     }
-  }, [entry, installedApp, installFromStore, checkUpdates, t])
+  }, [entry, installedApp, checkUpdates, t])
 
   // Loading state
   if (storeDetailLoading) {

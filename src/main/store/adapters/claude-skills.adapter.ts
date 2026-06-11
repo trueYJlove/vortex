@@ -161,10 +161,8 @@ async function collectSkillFilesViaTree(
 
     const res = await fetchWithTimeout(rawUrl, { headers: { 'User-Agent': 'Halo-Store/1.0' } })
     if (!res.ok) {
-      console.warn(
-        `[ClaudeSkillsAdapter] Failed to download "${relativePath}" for "${skillSlug}": HTTP ${res.status}`
-      )
-      return
+      // A partial skill is broken at runtime — fail the install instead.
+      throw new Error(`Failed to download "${relativePath}" of "${skillSlug}": HTTP ${res.status}`)
     }
     result[relativePath] = await res.text()
     completed++
@@ -207,13 +205,12 @@ async function collectSkillFilesLegacy(
 
     if (entry.type === 'file') {
       if (!entry.download_url) {
-        console.warn(`[ClaudeSkillsAdapter] No download_url for "${relativePath}" in "${skillSlug}", skipping`)
-        return
+        throw new Error(`No download_url for "${relativePath}" of "${skillSlug}"`)
       }
       const res = await fetchWithTimeout(entry.download_url, { headers: { 'User-Agent': 'Halo-Store/1.0' } })
       if (!res.ok) {
-        console.warn(`[ClaudeSkillsAdapter] Failed to download "${relativePath}" for "${skillSlug}": HTTP ${res.status}`)
-        return
+        // A partial skill is broken at runtime — fail the install instead.
+        throw new Error(`Failed to download "${relativePath}" of "${skillSlug}": HTTP ${res.status}`)
       }
       result[relativePath] = await res.text()
 

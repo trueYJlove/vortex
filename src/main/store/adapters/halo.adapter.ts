@@ -216,21 +216,18 @@ export class HaloAdapter implements RegistryAdapter {
       )
       const filesBase = `${baseUrl}/${entry.path}/files`
       const materialized: Record<string, string> = {}
+      // Any missing file means a broken skill at runtime — fail the whole
+      // install rather than silently delivering a partial package.
       await Promise.all(fileNames.map(async (name) => {
-        try {
-          assertSafeRelPath(name, `skill file of "${entry.slug}"`)
-          const url = `${filesBase}/${name}`
-          const fileRes = await fetchWithTimeout(url, {
-            headers: { 'User-Agent': 'Halo-Store/1.0' },
-          })
-          if (!fileRes.ok) {
-            console.warn(`[HaloAdapter] Skipping "${name}" for "${entry.slug}": HTTP ${fileRes.status}`)
-            return
-          }
-          materialized[name] = await fileRes.text()
-        } catch (err) {
-          console.warn(`[HaloAdapter] Skipping "${name}" for "${entry.slug}": ${(err as Error).message}`)
+        assertSafeRelPath(name, `skill file of "${entry.slug}"`)
+        const url = `${filesBase}/${name}`
+        const fileRes = await fetchWithTimeout(url, {
+          headers: { 'User-Agent': 'Halo-Store/1.0' },
+        })
+        if (!fileRes.ok) {
+          throw new Error(`Failed to download skill file "${name}" of "${entry.slug}": HTTP ${fileRes.status}`)
         }
+        materialized[name] = await fileRes.text()
       }))
       raw.skill_files = materialized
     }
@@ -292,8 +289,9 @@ export class HaloAdapter implements RegistryAdapter {
 
     for (const skill of skills) {
       if (!skill.files || skill.files.length === 0) {
-        console.warn(`[HaloAdapter] Bundled skill "${skill.id}" has no files declared — skipping`)
-        continue
+        // Skipping would surface downstream as a misleading "no fetched
+        // content" failure — reject here with the actual cause.
+        throw new Error(`Bundled skill "${skill.id}" of "${entry.slug}" declares no files`)
       }
 
       const skill_files: Record<string, string> = {}
@@ -322,18 +320,12 @@ export class HaloAdapter implements RegistryAdapter {
             }
           }
           if (content === null) {
-            console.warn(
-              `[HaloAdapter] Failed to fetch "${filePath}" for bundled skill "${skill.id}" (tried files/skills and skills layouts)`
+            throw new Error(
+              `Failed to fetch "${filePath}" for bundled skill "${skill.id}" (tried files/skills and skills layouts)`
             )
-            return
           }
           skill_files[filePath] = content
         }))
-
-        if (Object.keys(skill_files).length === 0) {
-          console.warn(`[HaloAdapter] No files downloaded for bundled skill "${skill.id}"`)
-          continue
-        }
 
         const spec: SkillSpec = {
           spec_version: '1',
@@ -349,8 +341,11 @@ export class HaloAdapter implements RegistryAdapter {
           `(${Object.keys(skill_files).length} files: ${Object.keys(skill_files).join(', ')})`
         )
       } catch (err) {
-        console.warn(
-          `[HaloAdapter] Failed to fetch bundled skill "${skill.id}": ${(err as Error).message}`
+        // A digital human without one of its bundled skills is broken at
+        // runtime — propagate so the install fails visibly instead of
+        // silently shipping a partial package.
+        throw new Error(
+          `Failed to fetch bundled skill "${skill.id}" of "${entry.slug}": ${(err as Error).message}`
         )
       }
     }

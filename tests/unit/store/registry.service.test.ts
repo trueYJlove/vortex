@@ -345,6 +345,89 @@ store:
     })
   })
 
+  it("rolls back the installed app (deactivate → uninstall → deleteApp) when a required skill fails", async () => {
+    const index: RegistryIndex = {
+      version: 1,
+      generated_at: "2026-02-24T00:00:00.000Z",
+      source: "https://openkursar.github.io/digital-human-protocol",
+      apps: [
+        {
+          slug: "rollback-app",
+          name: "Rollback App",
+          version: "1.0.0",
+          author: "tester",
+          description: "Rollback test",
+          type: "automation",
+          format: "bundle",
+          path: "packages/digital-humans/rollback-app",
+          category: "other",
+          tags: [],
+        },
+      ],
+    }
+
+    // Declares a required skill that does not exist in any registry,
+    // forcing installRequiredSkills to fail after the app is installed.
+    const specYaml = `
+name: "Rollback App"
+version: "1.0.0"
+author: "tester"
+description: "Rollback test"
+type: automation
+system_prompt: "run"
+requires:
+  skills:
+    - missing-skill
+store:
+  slug: "rollback-app"
+  category: "other"
+`
+
+    const installSpy = vi.fn().mockResolvedValue("app-rollback-1")
+    const uninstallSpy = vi.fn().mockResolvedValue(undefined)
+    const deleteAppSpy = vi.fn().mockResolvedValue(undefined)
+    getAppManagerMock.mockReturnValue({
+      install: installSpy,
+      uninstall: uninstallSpy,
+      deleteApp: deleteAppSpy,
+    })
+
+    const activateSpy = vi.fn().mockResolvedValue(undefined)
+    const deactivateSpy = vi.fn().mockResolvedValue(undefined)
+    getAppRuntimeMock.mockReturnValue({
+      activate: activateSpy,
+      deactivate: deactivateSpy,
+    })
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input)
+      if (url === "https://openkursar.github.io/digital-human-protocol/index.json") {
+        return jsonResponse(index)
+      }
+      if (url === "https://openkursar.github.io/digital-human-protocol/packages/digital-humans/rollback-app/spec.yaml") {
+        return textResponse(specYaml)
+      }
+      return notFoundResponse()
+    })
+
+    const settled = trackSyncSettled()
+    initRegistryService({ db })
+
+    await vi.waitFor(() => expect(settled).toContain("official"))
+    await refreshIndex()
+
+    await expect(installFromStore("rollback-app", "space-1")).rejects.toThrow(
+      /Installation of "Rollback App" failed.*missing-skill/
+    )
+
+    // Rollback must observe deleteApp's precondition (status === 'uninstalled')
+    expect(deactivateSpy).toHaveBeenCalledWith("app-rollback-1")
+    expect(uninstallSpy).toHaveBeenCalledWith("app-rollback-1")
+    expect(deleteAppSpy).toHaveBeenCalledWith("app-rollback-1")
+    expect(Math.min(...uninstallSpy.mock.invocationCallOrder))
+      .toBeLessThan(Math.min(...deleteAppSpy.mock.invocationCallOrder))
+  })
+
   it("filters out legacy yaml entries from the merged index", async () => {
     // Deliberately inject legacy format data to verify runtime filtering.
     const index = {

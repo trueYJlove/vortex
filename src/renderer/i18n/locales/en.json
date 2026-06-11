@@ -1291,6 +1291,8 @@
   "Unsupported protocol. Use http://, https://": "Unsupported protocol. Use http://, https://",
   "Update": "Update",
   "Update available": "Update available",
+  "Update failed": "Update failed",
+  "Update failed. Please try again.": "Update failed. Please try again.",
   "Update to": "Update to",
   "Updated": "Updated",
   "Updating tasks...": "Updating tasks...",

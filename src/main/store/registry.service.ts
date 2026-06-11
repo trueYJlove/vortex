@@ -508,25 +508,41 @@ export async function installFromStore(
     }
   }
 
-  // Fetch bundled skill specs if the adapter supports it (e.g. HaloAdapter)
-  let bundledSkillSpecs: Map<string, SkillSpec> | undefined
-  if (specWithStore.type !== 'skill' && typeof adapter.fetchBundledSkills === 'function') {
-    const bundledDeps = (specWithStore.requires?.skills ?? [])
-      .filter((dep): dep is { id: string; bundled: true; files?: string[] } => typeof dep !== 'string' && dep.bundled === true)
-      .map(dep => ({ id: dep.id, files: dep.files }))
-
-    if (bundledDeps.length > 0) {
-      try {
-        bundledSkillSpecs = await adapter.fetchBundledSkills(registry, entry, bundledDeps)
-      } catch (err) {
-        console.warn(`[RegistryService] fetchBundledSkills failed (non-fatal): ${(err as Error).message}`)
-      }
-    }
-  }
-
-  // Auto-install required skills (non-fatal, skip for skill-type to prevent recursion)
+  // Install declared skill dependencies. Any failure rolls back the app we
+  // just installed — shipping an app without its skills is a broken install
+  // that previously surfaced only at runtime (skip for skill-type: no recursion).
   if (specWithStore.type !== 'skill') {
-    await installRequiredSkills(specWithStore, spaceId, bundledSkillSpecs)
+    try {
+      let bundledSkillSpecs: Map<string, SkillSpec> | undefined
+      if (typeof adapter.fetchBundledSkills === 'function') {
+        const bundledDeps = (specWithStore.requires?.skills ?? [])
+          .filter((dep): dep is { id: string; bundled: true; files?: string[] } => typeof dep !== 'string' && dep.bundled === true)
+          .map(dep => ({ id: dep.id, files: dep.files }))
+
+        if (bundledDeps.length > 0) {
+          bundledSkillSpecs = await adapter.fetchBundledSkills(registry, entry, bundledDeps)
+        }
+      }
+
+      await installRequiredSkills(specWithStore, spaceId, bundledSkillSpecs)
+    } catch (err) {
+      // deleteApp() only accepts 'uninstalled' apps, and the app may already
+      // be runtime-active — deactivate and soft-delete before hard-deleting.
+      try {
+        if (runtime) {
+          try {
+            await runtime.deactivate(appId)
+          } catch { /* activation above may have failed — proceed with deletion */ }
+        }
+        await manager.uninstall(appId)
+        await manager.deleteApp(appId)
+      } catch (rollbackErr) {
+        console.error(
+          `[RegistryService] Rollback of "${slug}" (${appId}) failed after dependency error: ${(rollbackErr as Error).message}`
+        )
+      }
+      throw new Error(`Installation of "${entry.name}" failed: ${(err as Error).message}`)
+    }
   }
 
   console.log(`[RegistryService] Installed "${entry.name}" (${slug}) as ${appId} in space ${spaceId}`)
@@ -549,7 +565,10 @@ export async function installFromStore(
  *
  * Design decisions:
  *   - Sequential install: avoids DB contention and keeps logs readable.
- *   - Non-fatal: a missing or already-installed skill never fails the parent install.
+ *   - Already-installed skills are skipped/re-synced, never an error. Any other
+ *     failure is collected and thrown at the end — an app without its declared
+ *     skills is broken at runtime, so partial installs must surface to the UI
+ *     (callers roll back the parent app).
  *   - No recursion: `installFromStore()` guards with `type !== 'skill'`, so skills
  *     that themselves declare `requires.skills` won't trigger another round.
  */
@@ -562,6 +581,7 @@ export async function installRequiredSkills(
   if (!skills || skills.length === 0) return
 
   const manager = getAppManager()
+  const failures: string[] = []
 
   for (const dep of skills) {
     const skillId = typeof dep === 'string' ? dep : dep.id
@@ -571,14 +591,11 @@ export async function installRequiredSkills(
       // Bundled skill: must come from the pre-fetched spec — never fall back to store
       const bundledSpec = bundledSkillSpecs?.get(skillId)
       if (!bundledSpec) {
-        console.warn(
-          `[RegistryService] Bundled skill "${skillId}" has no fetched spec — ` +
-          `ensure the registry adapter implements fetchBundledSkills()`
-        )
+        failures.push(`bundled skill "${skillId}" has no fetched content`)
         continue
       }
       if (!manager) {
-        console.warn(`[RegistryService] App Manager not available, cannot install bundled skill "${skillId}"`)
+        failures.push(`App Manager not available for bundled skill "${skillId}"`)
         continue
       }
       try {
@@ -611,7 +628,7 @@ export async function installRequiredSkills(
           }
           continue
         }
-        console.warn(`[RegistryService] Failed to install bundled skill "${skillId}": ${(err as Error).message}`)
+        failures.push(`bundled skill "${skillId}": ${(err as Error).message}`)
       }
       continue
     }
@@ -649,8 +666,12 @@ export async function installRequiredSkills(
         }
         continue
       }
-      console.warn(`[RegistryService] Failed to auto-install required skill "${skillId}": ${(err as Error).message}`)
+      failures.push(`required skill "${skillId}": ${(err as Error).message}`)
     }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(`Failed to install required skills — ${failures.join('; ')}`)
   }
 }
 
@@ -807,7 +828,7 @@ export async function applyUpgrade(
   const slug = app.spec.store?.slug
   if (!slug) throw new Error(`App ${appId} has no store.slug — cannot upgrade`)
 
-  const found = queryService.findEntry(slug)
+  const found = queryService.findEntry(slug, app.spec.store?.registry_id)
   if (!found) throw new Error(`App ${slug} not found in any registry (cannot upgrade)`)
 
   const fromVersion = app.spec.version

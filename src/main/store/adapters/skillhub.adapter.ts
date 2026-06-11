@@ -116,34 +116,58 @@ function toEntry(skill: SkillHubSkill): RegistryEntry | null {
   }
 }
 
-/**
- * Download SKILL.md for a skill: resolve the current version via the files
- * manifest, then fetch the file from the public object-storage CDN (open CORS, no auth).
- */
-async function downloadSkillMd(slug: string): Promise<string> {
+/** Resolve the current version + file list for a skill via the files manifest. */
+async function fetchFilesManifest(slug: string): Promise<SkillHubFilesResponse> {
   const filesUrl = `${API_BASE}/api/v1/skills/${slug}/files`
   const filesRes = await fetchWithTimeout(filesUrl, { headers: DEFAULT_HEADERS })
   if (!filesRes.ok) {
     throw new Error(`SkillHub files API error HTTP ${filesRes.status} for "${slug}"`)
   }
-
   const filesData = await filesRes.json() as SkillHubFilesResponse
-  const version = filesData.version
-  if (!version) {
+  if (!filesData.version) {
     throw new Error(`SkillHub files API returned no version for "${slug}"`)
   }
+  return filesData
+}
 
-  const skillMdUrl = `${COS_BASE}/skills/${slug}/${version}/files/SKILL.md`
-  const mdRes = await fetchWithTimeout(skillMdUrl, {
+async function downloadFile(slug: string, version: string, path: string): Promise<string> {
+  const res = await fetchWithTimeout(`${COS_BASE}/skills/${slug}/${version}/files/${path}`, {
     headers: { 'User-Agent': 'Halo-Store/1.0' },
   })
-  if (!mdRes.ok) {
-    throw new Error(
-      `SkillHub: failed to download SKILL.md for "${slug}" v${version}: HTTP ${mdRes.status}`
-    )
+  if (!res.ok) {
+    throw new Error(`SkillHub: failed to download "${path}" of "${slug}" v${version}: HTTP ${res.status}`)
   }
+  return await res.text()
+}
 
-  return await mdRes.text()
+/**
+ * Download every file listed in the manifest. A skill is only usable with all
+ * of its files, so any miss (or an unsafe upstream path) fails the install —
+ * previously only SKILL.md was fetched and the rest were silently dropped.
+ */
+async function downloadSkillFiles(slug: string): Promise<Record<string, string>> {
+  const manifest = await fetchFilesManifest(slug)
+  const paths = (manifest.files ?? []).map(f => f.path).filter(Boolean)
+  if (paths.length === 0) {
+    throw new Error(`SkillHub manifest lists no files for "${slug}"`)
+  }
+  const result: Record<string, string> = {}
+  await Promise.all(paths.map(async (path) => {
+    if (path.startsWith('/') || path.split('/').includes('..')) {
+      throw new Error(`SkillHub manifest for "${slug}" contains unsafe path "${path}"`)
+    }
+    result[path] = await downloadFile(slug, manifest.version, path)
+  }))
+  if (!result['SKILL.md']) {
+    throw new Error(`SkillHub skill "${slug}" has no SKILL.md`)
+  }
+  return result
+}
+
+/** Download just SKILL.md (detail-page document — no need to pull the whole skill). */
+async function downloadSkillMd(slug: string): Promise<string> {
+  const manifest = await fetchFilesManifest(slug)
+  return downloadFile(slug, manifest.version, 'SKILL.md')
 }
 
 // ── Adapter ────────────────────────────────────────────────────────────────
@@ -188,10 +212,12 @@ export class SkillHubAdapter implements RegistryAdapter {
     const slug = entry.slug
     const t0 = performance.now()
 
-    const skillMdContent = await downloadSkillMd(slug)
+    const skill_files = await downloadSkillFiles(slug)
 
     const dt = performance.now() - t0
-    console.log(`[SkillHubAdapter] fetched spec for "${slug}" (${dt.toFixed(0)}ms)`)
+    console.log(
+      `[SkillHubAdapter] fetched spec for "${slug}" (${Object.keys(skill_files).length} files, ${dt.toFixed(0)}ms)`
+    )
 
     const spec: SkillSpec = {
       spec_version: '1',
@@ -200,9 +226,7 @@ export class SkillHubAdapter implements RegistryAdapter {
       version: entry.version,
       description: entry.description,
       author: entry.author,
-      skill_files: {
-        'SKILL.md': skillMdContent,
-      },
+      skill_files,
       store: {
         slug: entry.slug,
         registry_id: _source.id,
