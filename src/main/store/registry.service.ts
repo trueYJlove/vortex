@@ -321,6 +321,17 @@ export async function listApps(query?: StoreQuery): Promise<RegistryEntry[]> {
 }
 
 /**
+ * Lightweight entry lookup by slug from the synced index — no spec fetch,
+ * no network. Returns null when the slug is unknown (e.g. first publish)
+ * or when the query layer is unavailable.
+ */
+export function findStoreEntry(slug: string): { entry: RegistryEntry; registryId: string } | null {
+  ensureInitialized()
+  if (!queryService) return null
+  return queryService.findEntry(slug) ?? null
+}
+
+/**
  * Get detailed information about a store app by slug.
  *
  * Looks up the entry in SQLite (Mirror) first, then falls back to
@@ -359,6 +370,72 @@ export async function getAppDetail(slug: string): Promise<StoreAppDetail> {
   const specWithStore = withInstallStoreMetadata(spec, entry.slug, registryId)
 
   return { entry, spec: specWithStore, registryId }
+}
+
+// ============================================
+// Detail Document (SKILL.md / README)
+// ============================================
+
+/** In-memory document cache: detail pages re-entered in one session never refetch. */
+const documentCache = new Map<string, string | null>()
+const DOCUMENT_CACHE_MAX = 50
+
+/** Cap stored document size — protects memory and IPC payloads from pathological files. */
+const DOCUMENT_MAX_BYTES = 1_000_000
+
+/**
+ * Fetch the display document (SKILL.md) for a store entry.
+ *
+ * Returns null when the source has no document for this entry — callers
+ * hide the docs section. Misses (null) are cached too, so entries without
+ * docs don't trigger a network probe on every detail visit.
+ */
+export async function getAppDocument(slug: string): Promise<{ content: string | null }> {
+  ensureInitialized()
+
+  if (!queryService) {
+    throw new Error('QueryService not available (db not provided)')
+  }
+
+  const found = queryService.findEntry(slug)
+  if (!found) {
+    throw new Error(`App not found in store: ${slug}`)
+  }
+
+  const { entry, registryId } = found
+  const cacheKey = `${registryId}:${slug}@${entry.version}`
+
+  if (documentCache.has(cacheKey)) {
+    return { content: documentCache.get(cacheKey) ?? null }
+  }
+
+  const registry = config.registries.find(r => r.id === registryId)
+  if (!registry) {
+    throw new Error(`Registry not found: ${registryId}`)
+  }
+
+  const adapter = getAdapter(registry)
+  let content: string | null = null
+  if (adapter.fetchDocument) {
+    const t0 = performance.now()
+    content = await adapter.fetchDocument(registry, entry)
+    if (content && content.length > DOCUMENT_MAX_BYTES) {
+      content = content.slice(0, DOCUMENT_MAX_BYTES)
+    }
+    console.log(
+      `[RegistryService] getAppDocument: ${slug} -> ${content ? `${content.length} chars` : 'none'} ` +
+      `(${(performance.now() - t0).toFixed(0)}ms)`
+    )
+  }
+
+  // FIFO eviction keeps the cache bounded; entries are tiny relative to specs
+  if (documentCache.size >= DOCUMENT_CACHE_MAX) {
+    const oldest = documentCache.keys().next().value
+    if (oldest !== undefined) documentCache.delete(oldest)
+  }
+  documentCache.set(cacheKey, content)
+
+  return { content }
 }
 
 // ============================================
@@ -661,7 +738,7 @@ export async function checkUpdates(
     const slug = app.spec.store?.slug
     if (!slug) continue
 
-    const found = queryService.findEntry(slug)
+    const found = queryService.findEntry(slug, app.spec.store?.registry_id)
     if (!found) continue
 
     const { entry } = found

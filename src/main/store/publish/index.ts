@@ -8,7 +8,7 @@
 import { loadProductConfig } from '../../services/ai-sources/auth-loader'
 import { getAppManager } from '../../apps/manager'
 import type { AppManagerService } from '../../apps/manager'
-import { getRegistries } from '../registry.service'
+import { getRegistries, findStoreEntry } from '../registry.service'
 import { dispatch as dispatchGithubPr } from './dispatchers/github-pr'
 import { dispatch as dispatchHttpRegistry } from './dispatchers/http-registry'
 import { dispatch as dispatchLocalDhpkg } from './dispatchers/local-dhpkg'
@@ -28,8 +28,40 @@ export function resolvePublishTarget(): { registryId: string; config: NonNullabl
   return { registryId: 'official', config: officialPublish }
 }
 
+export interface PublishPreview {
+  /** Registry slug the app would publish under (author-dependent). */
+  slug: string
+  /** Version currently in the local spec. */
+  localVersion: string
+  /** Version currently in the store index, or null when unpublished. */
+  storeVersion: string | null
+}
+
+/**
+ * Resolve what a publish of `appId` would target: the derived slug and the
+ * version currently in the store index. Slug derivation goes through the
+ * same enrichment as publish itself so the pre-check can never disagree
+ * with the actual upload. Throws on the same author/name problems publish
+ * would throw on.
+ */
+export function getPublishPreview(appId: string, authorOverride?: string): PublishPreview {
+  const manager = getAppManager()
+  if (!manager) throw new Error('App Manager is not yet initialized')
+  const app = manager.getApp(appId)
+  if (!app) throw new Error(`App not found: ${appId}`)
+
+  const spec = enrichSpecForPublish(app.spec, authorOverride)
+  const slug = spec.store!.slug!
+  const found = findStoreEntry(slug)
+  return {
+    slug,
+    localVersion: spec.version ?? '0.0.0',
+    storeVersion: found?.entry.version ?? null,
+  }
+}
+
 /** Publish an installed App through the configured dispatcher. */
-export async function publish(appId: string, authorOverride?: string): Promise<PublishResult> {
+export async function publish(appId: string, authorOverride?: string, versionOverride?: string): Promise<PublishResult> {
   const manager = getAppManager()
   if (!manager) {
     return { status: 'error', target: 'local-dhpkg', details: 'App Manager is not yet initialized' }
@@ -56,6 +88,8 @@ export async function publish(appId: string, authorOverride?: string): Promise<P
   let spec: AppSpec
   try {
     spec = enrichSpecForPublish(app.spec, authorOverride)
+    const version = versionOverride?.trim()
+    if (version) spec = { ...spec, version }
   } catch (e) {
     return {
       status: 'error',
@@ -124,7 +158,7 @@ export async function publish(appId: string, authorOverride?: string): Promise<P
  * declaration is a self-containment promise and a partial package is broken
  * for every installer.
  */
-function collectFiles(
+export function collectFiles(
   spec: AppSpec,
   manager: AppManagerService,
   spaceId: string | null,

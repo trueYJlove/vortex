@@ -7,6 +7,7 @@
  *   store:query                          Paginated query (new primary entry point)
  *   store:list-apps                      List apps from the store with optional filtering
  *   store:get-app-detail                 Get detailed info about a store app by slug
+ *   store:get-app-document               Get SKILL.md/README document for a store app
  *   store:install                        Install an app from the store into a space
  *   store:refresh                        Refresh the registry index from remote sources
  *   store:check-updates                  Check for available updates for installed apps
@@ -26,6 +27,8 @@ import {
   applyUpgrade,
   checkUpgradesNow,
   publish,
+  getPublishPreview,
+  collectFiles,
   packDhpkg,
   unpackDhpkg,
 } from '../store'
@@ -33,7 +36,6 @@ import { getAppManager } from '../apps/manager'
 import { getAppRuntime } from '../apps/runtime'
 import { sendToRenderer } from '../services/window.service'
 import type { StoreInstallProgress } from '../../shared/store/store-types'
-import type { SkillSpec } from '../apps/spec'
 
 export function registerStoreHandlers(): void {
   // ── store:query (new primary entry point) ─────────────────────────────
@@ -57,6 +59,14 @@ export function registerStoreHandlers(): void {
     'store:get-app-detail',
     async (_event, slug: string) => {
       return storeController.getStoreAppDetail(slug)
+    }
+  )
+
+  // ── store:get-app-document ─────────────────────────────────────────────
+  ipcMain.handle(
+    'store:get-app-document',
+    async (_event, slug: string) => {
+      return storeController.getStoreAppDocument(slug)
     }
   )
 
@@ -185,10 +195,21 @@ export function registerStoreHandlers(): void {
     }
   )
 
-  // ── store:publish ──────────────────────────────────────────────────────
-  ipcMain.handle('store:publish', async (_event, input: { appId: string; author?: string }) => {
+  // ── store:publish-preview ──────────────────────────────────────────────
+  ipcMain.handle('store:publish-preview', async (_event, input: { appId: string; author?: string }) => {
     try {
-      const result = await publish(input.appId, input.author)
+      return { success: true, data: getPublishPreview(input.appId, input.author) }
+    } catch (error: unknown) {
+      const err = error as Error
+      console.error('[StoreIPC] store:publish-preview error:', err.message)
+      return { success: false, error: err.message }
+    }
+  })
+
+  // ── store:publish ──────────────────────────────────────────────────────
+  ipcMain.handle('store:publish', async (_event, input: { appId: string; author?: string; version?: string }) => {
+    try {
+      const result = await publish(input.appId, input.author, input.version)
       // Always include details so production logs let us trace failures end-to-end.
       console.log(
         `[StoreIPC] store:publish: appId=${input.appId} status=${result.status} target=${result.target}` +
@@ -228,9 +249,17 @@ export function registerStoreHandlers(): void {
         return { success: false, error: 'User cancelled' }
       }
 
-      const files: Record<string, string> = app.spec.type === 'skill'
-        ? ((app.spec as SkillSpec).skill_files ?? {})
-        : {}
+      // Same file collection as publish, so exported packages are never
+      // missing bundled skill content.
+      const { files, missingSkillIds } = collectFiles(app.spec, manager, app.spaceId)
+      if (missingSkillIds.length > 0) {
+        return {
+          success: false,
+          error:
+            `Bundled skill dependencies are incomplete — exporting would produce a broken package. ` +
+            `Missing skills: ${missingSkillIds.join(', ')}. Install them first, then export again.`,
+        }
+      }
 
       const buf = await packDhpkg(app.spec, files)
       await writeFile(dialogResult.filePath, buf)
@@ -304,5 +333,5 @@ export function registerStoreHandlers(): void {
     sendToRenderer('store:upgrade-available', event)
   })
 
-  console.log('[StoreIPC] Store handlers registered (13 channels + sync push + upgrade push)')
+  console.log('[StoreIPC] Store handlers registered (18 channels + sync push + upgrade push)')
 }

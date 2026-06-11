@@ -14,8 +14,8 @@
  * we attempt a rollback uninstall so the user is not left with a stray app.
  *
  * For the per-app Share buttons on detail pages (AutomationHeader,
- * SkillInfoCard), use `ShareCurrentAppDialog` instead — that's a one-click
- * confirm flow where the type and target are already known.
+ * SkillInfoCard), use `ShareCurrentAppDialog` instead — there the app is
+ * already known, and publish/export actions live together.
  */
 
 import { useState, useMemo, useCallback, useEffect } from 'react'

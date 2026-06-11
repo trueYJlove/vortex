@@ -329,8 +329,8 @@ export function SkillInfoCard({ appId, spaceName }: SkillInfoCardProps) {
             <button
               type="button"
               onClick={() => setShowShareDialog(true)}
-              title={t('Share this to the store')}
-              aria-label={t('Share this to the store')}
+              title={t('Share')}
+              aria-label={t('Share')}
               className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-md transition-colors"
             >
               <Share2 className="w-3.5 h-3.5" />

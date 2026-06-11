@@ -1980,6 +1980,14 @@ export const api = {
     return httpRequest('GET', `/api/store/apps/${slug}`)
   },
 
+  // Query param: scoped slugs ("owner/repo") contain "/" and break path params
+  storeGetAppDocument: async (slug: string): Promise<ApiResponse<{ content: string | null }>> => {
+    if (isElectron()) {
+      return window.halo.storeGetAppDocument(slug)
+    }
+    return httpRequest('GET', `/api/store/app-document?slug=${encodeURIComponent(slug)}`)
+  },
+
   storeInstall: async (
     slug: string,
     spaceId: string | null,
@@ -2065,11 +2073,18 @@ export const api = {
     return httpRequest('POST', `/api/store/apps/${appId}/upgrade`, { mode })
   },
 
-  storePublish: async (appId: string, author?: string): Promise<ApiResponse> => {
+  storePublish: async (appId: string, author?: string, version?: string): Promise<ApiResponse> => {
     if (isElectron()) {
-      return window.halo.storePublish({ appId, author })
+      return window.halo.storePublish({ appId, author, version })
     }
-    return httpRequest('POST', `/api/store/apps/${appId}/publish`, { author })
+    return httpRequest('POST', `/api/store/apps/${appId}/publish`, { author, version })
+  },
+
+  storePublishPreview: async (appId: string, author?: string): Promise<ApiResponse<{ slug: string; localVersion: string; storeVersion: string | null }>> => {
+    if (isElectron()) {
+      return window.halo.storePublishPreview({ appId, author })
+    }
+    return httpRequest('POST', `/api/store/apps/${appId}/publish-preview`, { author })
   },
 
   storeExportDhpkg: async (appId: string): Promise<ApiResponse<{ path: string }>> => {

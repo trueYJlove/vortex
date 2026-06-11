@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle, Upload, RefreshCw, Share2, X } from 'lucide-react'
+import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle, RefreshCw, X } from 'lucide-react'
 import { stringify as stringifyYaml, parse as parseYaml } from 'yaml'
 import { useAppsStore } from '../../stores/apps.store'
 import { useAppStore } from '../../stores/app.store'
@@ -197,29 +197,24 @@ function InfoTip({ text }: { text: string }) {
 }
 
 // ============================================
-// Distribution Section
+// Upgrade Section
 //
-// Surfaces three user actions on the App detail page:
-//   1. Upgrade strategy dropdown — 'auto' | 'notify' | 'manual'
-//   2. "Publish" button — routes through product.json publish target
-//   3. "Export as .dhpkg" — local offline export
-//
-// Kept as a self-contained sub-component so the SettingsTab body stays readable.
+// Upgrade strategy dropdown + on-demand upgrade check. Publish/export live
+// in ShareCurrentAppDialog behind the detail-page Share icon.
 // ============================================
 
-interface DistributionSectionProps {
+interface UpgradeSectionProps {
   app: InstalledApp
   appId: string
   t: (s: string, opts?: Record<string, unknown>) => string
 }
 
-function DistributionSection({ app, appId, t }: DistributionSectionProps) {
+function UpgradeSection({ app, appId, t }: UpgradeSectionProps) {
   type Strategy = 'auto' | 'notify' | 'manual'
   const currentStrategy = (app.upgradeStrategy ?? 'auto') as Strategy
   const [strategy, setStrategy] = useState<Strategy>(currentStrategy)
   const [savingStrategy, setSavingStrategy] = useState(false)
-  const [publishing, setPublishing] = useState(false)
-  const [exportingDhpkg, setExportingDhpkg] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
@@ -244,49 +239,30 @@ function DistributionSection({ app, appId, t }: DistributionSectionProps) {
     }
   }
 
-  async function handlePublish() {
-    setPublishing(true)
+  async function handleCheckUpgrades() {
+    setChecking(true)
     setFeedback(null)
     try {
-      const res = await api.storePublish(appId)
+      const res = await api.storeCheckUpdatesNow()
       if (res.success) {
-        const details = (res.data as { details?: string } | undefined)?.details ?? t('Published successfully.')
-        setFeedback({ kind: 'success', text: details })
+        setFeedback({ kind: 'success', text: t('Upgrade check complete.') })
       } else {
-        setFeedback({ kind: 'error', text: res.error ?? t('Publish failed.') })
+        setFeedback({ kind: 'error', text: res.error ?? t('Check failed.') })
       }
     } catch (err) {
       setFeedback({ kind: 'error', text: (err as Error).message })
     } finally {
-      setPublishing(false)
-    }
-  }
-
-  async function handleExportDhpkg() {
-    setExportingDhpkg(true)
-    setFeedback(null)
-    try {
-      const res = await api.storeExportDhpkg(appId)
-      if (res.success && res.data?.path) {
-        setFeedback({ kind: 'success', text: t('Saved .dhpkg to {{path}}', { path: res.data.path }) })
-      } else if (res.error && res.error !== 'User cancelled') {
-        setFeedback({ kind: 'error', text: res.error })
-      }
-    } catch (err) {
-      setFeedback({ kind: 'error', text: (err as Error).message })
-    } finally {
-      setExportingDhpkg(false)
+      setChecking(false)
     }
   }
 
   return (
     <div className="space-y-2">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-        <Share2 className="w-3.5 h-3.5" />
-        {t('Distribution')}
+        <RefreshCw className="w-3.5 h-3.5" />
+        {t('Upgrades')}
       </h3>
       <div className="bg-secondary rounded-lg p-3 space-y-3">
-        {/* Upgrade Strategy */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <label htmlFor="upgrade-strategy" className="text-sm text-foreground sm:w-40 flex-shrink-0">
             {t('Upgrade strategy')}
@@ -314,43 +290,15 @@ function DistributionSection({ app, appId, t }: DistributionSectionProps) {
               : t('No automatic upgrade checks. Use Check for upgrades to update on demand.')}
         </p>
 
-        {/* Actions row */}
         <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-border">
           <button
             type="button"
-            onClick={handlePublish}
-            disabled={publishing}
-            className="flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40"
-            title={t('Submit this App to the registry')}
-          >
-            {publishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-            {t('Publish')}
-          </button>
-          <button
-            type="button"
-            onClick={handleExportDhpkg}
-            disabled={exportingDhpkg}
+            onClick={handleCheckUpgrades}
+            disabled={checking}
             className="flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors disabled:opacity-40"
-            title={t('Save a .dhpkg file you can share by hand')}
-          >
-            {exportingDhpkg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            {t('Export as .dhpkg')}
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              setFeedback(null)
-              const res = await api.storeCheckUpdatesNow()
-              if (res.success) {
-                setFeedback({ kind: 'success', text: t('Upgrade check complete.') })
-              } else {
-                setFeedback({ kind: 'error', text: res.error ?? t('Check failed.') })
-              }
-            }}
-            className="flex items-center justify-center gap-1.5 w-full sm:w-auto px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border border-border rounded-lg transition-colors"
             title={t('Run an immediate upgrade check')}
           >
-            <RefreshCw className="w-3.5 h-3.5" />
+            {checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             {t('Check for upgrades')}
           </button>
         </div>
@@ -948,9 +896,9 @@ function SettingsTab({ app, appId, spaceName, t, onRequireRestart }: SettingsTab
           </div>
         </div>
 
-        {/* ── Spec Info (read-only summary + data directory) ── */}
-        <DistributionSection app={app} appId={appId} t={t} />
+        <UpgradeSection app={app} appId={appId} t={t} />
 
+        {/* ── Spec Info (read-only summary + data directory) ── */}
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
             <FileCode className="w-3.5 h-3.5" />

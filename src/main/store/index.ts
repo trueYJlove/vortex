@@ -9,6 +9,7 @@ export {
   queryStore,
   listApps,
   getAppDetail,
+  getAppDocument,
   installFromStore,
   checkUpdates,
   applyUpgrade,
@@ -21,5 +22,5 @@ export {
 
 export { checkNow as checkUpgradesNow, startUpgradeScheduler, stopUpgradeScheduler } from './upgrade.service'
 
-export { publish } from './publish'
+export { publish, collectFiles, getPublishPreview } from './publish'
 export { pack as packDhpkg, unpack as unpackDhpkg } from './dhpkg'

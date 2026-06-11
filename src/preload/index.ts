@@ -440,6 +440,7 @@ export interface HaloAPI {
   storeQuery: (params: { search?: string; type?: string; category?: string; page?: number; pageSize?: number; locale?: string }) => Promise<IpcResponse>
   storeListApps: (query: { search?: string; locale?: string; category?: string; type?: string; tags?: string[] }) => Promise<IpcResponse>
   storeGetAppDetail: (slug: string) => Promise<IpcResponse>
+  storeGetAppDocument: (slug: string) => Promise<IpcResponse>
   storeInstall: (
     input: { slug: string; spaceId: string | null; userConfig?: Record<string, unknown> },
     onProgress?: (progress: StoreInstallProgress) => void,
@@ -453,7 +454,8 @@ export interface HaloAPI {
   storeUpdateRegistryAdapterConfig: (input: { registryId: string; adapterConfig: Record<string, unknown> }) => Promise<IpcResponse>
   storeCheckUpdatesNow: () => Promise<IpcResponse>
   storeApplyUpgrade: (input: { appId: string; mode?: 'patch_minor' | 'major' | 'force' }) => Promise<IpcResponse>
-  storePublish: (input: { appId: string; author?: string }) => Promise<IpcResponse>
+  storePublish: (input: { appId: string; author?: string; version?: string }) => Promise<IpcResponse>
+  storePublishPreview: (input: { appId: string; author?: string }) => Promise<IpcResponse<{ slug: string; localVersion: string; storeVersion: string | null }>>
   storeExportDhpkg: (input: { appId: string }) => Promise<IpcResponse<{ path: string }>>
   storeImportDhpkg: (input?: { filePath?: string; spaceId?: string | null }) => Promise<IpcResponse<{ appId: string }>>
   onStoreSyncStatusChanged: (callback: (data: { registryId: string; status: string; appCount: number; error?: string }) => void) => () => void
@@ -838,6 +840,7 @@ const api: HaloAPI = {
   storeQuery: (params) => ipcRenderer.invoke('store:query', params),
   storeListApps: (query) => ipcRenderer.invoke('store:list-apps', query),
   storeGetAppDetail: (slug) => ipcRenderer.invoke('store:get-app-detail', slug),
+  storeGetAppDocument: (slug) => ipcRenderer.invoke('store:get-app-document', slug),
   storeInstall: async (input, onProgress) => {
     if (!onProgress) {
       return ipcRenderer.invoke('store:install', input)
@@ -864,6 +867,7 @@ const api: HaloAPI = {
   storeCheckUpdatesNow: () => ipcRenderer.invoke('store:check-updates-now'),
   storeApplyUpgrade: (input) => ipcRenderer.invoke('store:apply-upgrade', input),
   storePublish: (input) => ipcRenderer.invoke('store:publish', input),
+  storePublishPreview: (input) => ipcRenderer.invoke('store:publish-preview', input),
   storeExportDhpkg: (input) => ipcRenderer.invoke('store:export-dhpkg', input),
   storeImportDhpkg: (input) => ipcRenderer.invoke('store:import-dhpkg', input ?? {}),
   onStoreSyncStatusChanged: (callback) => createEventListener('store:sync-status-changed', callback),
