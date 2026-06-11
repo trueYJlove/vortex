@@ -478,6 +478,7 @@
   "Failed to update allowlist": "更新允许列表失败",
   "Failed to update registry": "更新注册表失败",
   "Failed to update upgrade strategy: {{error}}": "更新升级策略失败：{{error}}",
+  "Featured": "精选",
   "Feedback": "反馈",
   "Fetch Models": "获取模型",
   "Fetch available models": "获取可用模型",

@@ -478,6 +478,7 @@
   "Failed to update allowlist": "Fehler beim Aktualisieren der Allowlist",
   "Failed to update registry": "Aktualisieren der Registry fehlgeschlagen",
   "Failed to update upgrade strategy: {{error}}": "Fehler beim Aktualisieren der Upgrade-Strategie: {{error}}",
+  "Featured": "Empfohlen",
   "Feedback": "Feedback",
   "Fetch Models": "Modelle abrufen",
   "Fetch available models": "Verfügbare Modelle abrufen",

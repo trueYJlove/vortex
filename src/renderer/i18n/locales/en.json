@@ -552,6 +552,7 @@
   "Failed to update allowlist": "Failed to update allowlist",
   "Failed to update registry": "Failed to update registry",
   "Failed to update upgrade strategy: {{error}}": "Failed to update upgrade strategy: {{error}}",
+  "Featured": "Featured",
   "Feedback": "Feedback",
   "Fetch available models": "Fetch available models",
   "Fetch Models": "Fetch Models",

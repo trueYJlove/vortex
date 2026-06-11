@@ -478,6 +478,7 @@
   "Failed to update allowlist": "許可リストの更新に失敗しました",
   "Failed to update registry": "レジストリの更新に失敗しました",
   "Failed to update upgrade strategy: {{error}}": "アップグレード戦略の更新に失敗しました: {{error}}",
+  "Featured": "おすすめ",
   "Feedback": "フィードバック",
   "Fetch Models": "モデルを取得",
   "Fetch available models": "利用可能なモデルを取得",

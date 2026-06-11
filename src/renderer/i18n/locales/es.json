@@ -485,6 +485,7 @@
   "Failed to update allowlist": "Error al actualizar la lista de permitidos",
   "Failed to update registry": "Error al actualizar el registro",
   "Failed to update upgrade strategy: {{error}}": "Error al actualizar la estrategia de actualización: {{error}}",
+  "Featured": "Destacado",
   "Feedback": "Comentarios",
   "Fetch Models": "Obtener modelos",
   "Fetch available models": "Obtener modelos disponibles",
