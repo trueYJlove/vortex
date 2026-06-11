@@ -46,6 +46,13 @@ const LOG_TAG = '[Dispatch]'
 const MAX_REPLY_LENGTH = 4000
 
 /**
+ * Shown when the model produced no usable answer (only the whitespace
+ * empty-response repair placeholder). A streaming IM session must still be
+ * terminated, so we finish it with this notice instead of an empty bubble.
+ */
+const EMPTY_RESPONSE_NOTICE = 'The model returned an empty response. Please send your message again.'
+
+/**
  * Commands that abort the current generation.
  * Slash-prefixed to avoid false triggers from normal conversation.
  */
@@ -778,7 +785,13 @@ export async function dispatchInboundMessage(
           specId: app.specId,
         })
 
-        const replyText = finalContent.slice(0, MAX_REPLY_LENGTH)
+        // Decouple "must terminate the stream" from "has a real answer".
+        // A whitespace-only payload is the empty-response repair placeholder:
+        // we must still finish the streaming session (the only normal-path
+        // terminator), but surface a notice rather than a blank message.
+        const replyText = finalContent.trim()
+          ? finalContent.slice(0, MAX_REPLY_LENGTH)
+          : EMPTY_RESPONSE_NOTICE
         const sendFn = reply.streaming
           ? () => reply.streaming!.finish(replyText)
           : () => reply.send(replyText)

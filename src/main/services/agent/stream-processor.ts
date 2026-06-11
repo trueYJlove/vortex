@@ -181,6 +181,11 @@ export interface StreamCallbacks {
 export interface StreamResult {
   /** Final text content (last text block or streaming fallback) */
   finalContent: string
+  /** Whether finalContent carries real text (non-whitespace). False when the
+   *  content is only the empty-response repair placeholder injected by the
+   *  openai-compat router. Consumers use this — not a raw truthiness check on
+   *  finalContent — to decide error reporting, persistence, and IM replies. */
+  hasMeaningfulContent: boolean
   /** Accumulated thoughts (thinking, tool_use, tool_result, text, error, etc.) */
   thoughts: Thought[]
   /** Token usage from the result message */
@@ -1082,6 +1087,12 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
   // Fall back to lastTextContent for interrupted streams that never reach a result thought,
   // then to currentStreamingText for streams that ended mid-block without a text_block_stop.
   const finalContent = lockedFinalContent || lastTextContent || currentStreamingText || ''
+  // Whitespace-only content is the repair placeholder injected by the
+  // openai-compat router when the provider returned an empty response. Treat
+  // it as empty for error reporting so the user still sees the empty-response
+  // notice — while the placeholder keeps the session transcript valid, so
+  // continuing the conversation works.
+  const hasMeaningfulContent = finalContent.trim().length > 0
   const wasAborted = abortController.signal.aborted
   const hasErrorThought = sessionState.thoughts.some((t: Thought) => t.type === 'error')
   // Two independent interrupt reasons: SDK reported error_during_execution, or stream ended unexpectedly
@@ -1092,8 +1103,10 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
     ? sessionState.thoughts.find((t: Thought) => t.type === 'error')
     : undefined
 
-  // Log content source for debugging
-  if (finalContent) {
+  // Log content source for debugging. Gate on meaningful content so the
+  // repair placeholder (whitespace-only) is logged as "no content", matching
+  // the error-reporting and persistence decisions below.
+  if (hasMeaningfulContent) {
     const contentSource = lockedFinalContent
       ? 'lockedFinalContent'
       : lastTextContent
@@ -1110,6 +1123,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
   // Build the result object
   const result: StreamResult = {
     finalContent,
+    hasMeaningfulContent,
     thoughts: sessionState.thoughts,
     tokenUsage,
     capturedSessionId,
@@ -1149,7 +1163,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
 
   // Determine if interrupted error should be sent
   const getInterruptedErrorMessage = (): string | null => {
-    if (finalContent) {
+    if (hasMeaningfulContent) {
       // Has content: user aborted shows friendly message, other interrupts show warning
       if (wasAborted) return 'Stopped by user.'
       return isInterrupted ? 'Model response interrupted unexpectedly.' : null
@@ -1171,7 +1185,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
       : isInterrupted
         ? (hadErrorDuringExecution ? 'error_during_execution' : 'stream interrupted')
         : 'empty response'
-    console.log(`[Agent][${conversationId}] Sending interrupted error (${reason}, content: ${finalContent ? 'yes' : 'no'})`)
+    console.log(`[Agent][${conversationId}] Sending interrupted error (${reason}, content: ${hasMeaningfulContent ? 'yes' : 'no'})`)
     emitAgentEvent('agent:error', spaceId, conversationId, {
       type: 'error',
       errorType: 'interrupted',

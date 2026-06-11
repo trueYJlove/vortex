@@ -391,14 +391,20 @@ function persistTurnResult(
   conversationId: string,
   result: StreamResult,
 ): void {
-  const { finalContent, thoughts, tokenUsage, capturedSessionId, hasErrorThought, errorThought } = result
+  const { finalContent, hasMeaningfulContent, thoughts, tokenUsage, capturedSessionId, hasErrorThought, errorThought } = result
 
   // Save session ID for future resumption
   if (capturedSessionId) {
     saveSessionId(spaceId, conversationId, capturedSessionId)
   }
 
-  if (finalContent || hasErrorThought) {
+  // Never persist the empty-response repair placeholder as message content —
+  // it would render as a blank bubble and mask the empty-response error block.
+  // Still persist when only thoughts exist (thinking-only turns) so the
+  // reasoning survives a reload.
+  const contentToStore = hasMeaningfulContent ? finalContent : ''
+
+  if (contentToStore || hasErrorThought || thoughts.length > 0) {
     // Extract file changes summary
     let metadata: { fileChanges?: FileChangesSummary } | undefined
     if (thoughts.length > 0) {
@@ -413,7 +419,7 @@ function persistTurnResult(
     }
 
     updateLastMessage(spaceId, conversationId, {
-      content: finalContent,
+      content: contentToStore,
       thoughts: thoughts.length > 0 ? [...thoughts] : undefined,
       tokenUsage: tokenUsage || undefined,
       metadata,

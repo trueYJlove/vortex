@@ -121,6 +121,7 @@ vi.mock('../../../../src/main/services/agent/session-manager', () => ({
 vi.mock('../../../../src/main/services/agent/stream-processor', () => ({
   processStream: vi.fn(async () => ({
     finalContent: '',
+    hasMeaningfulContent: false,
     thoughts: [],
     tokenUsage: null,
     capturedSessionId: undefined,

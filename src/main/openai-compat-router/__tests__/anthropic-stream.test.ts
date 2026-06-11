@@ -139,11 +139,19 @@ describe('AnthropicStreamHandler', () => {
 
     const events = parseSSEEvents(chunks)
 
-    // Should have injected an empty text block (start + stop, no delta)
+    // Should have injected a placeholder text block. The placeholder must be
+    // non-empty: empty assistant text converts to `content: null` (invalid)
+    // when the history is replayed to OpenAI-compat providers.
     const textBlockStarts = events.filter(e =>
       e.event === 'content_block_start' && e.data.content_block?.type === 'text'
     )
     expect(textBlockStarts).toHaveLength(1)
+
+    const textDeltas = events.filter(e =>
+      e.event === 'content_block_delta' && e.data.delta?.type === 'text_delta'
+    )
+    expect(textDeltas).toHaveLength(1)
+    expect(textDeltas[0].data.delta.text).toBe(' ')
 
     const msgDelta = events.find(e => e.event === 'message_delta')
     expect(msgDelta?.data.delta.stop_reason).toBe('end_turn')
@@ -193,8 +201,9 @@ describe('AnthropicStreamHandler', () => {
     expect(textBlockStarts).toHaveLength(0)
   })
 
-  it('handles thinking-only response without text block (no text block opened)', async () => {
-    // Edge case: model sends thinking but never opens a text block at all
+  it('repairs thinking-only response that never opens a text block (GLM-5.1 form)', async () => {
+    // GLM-5.1 form: only reasoning is streamed, no text block is ever opened.
+    // The repair must not depend on which blocks the provider happened to open.
     const { res, chunks } = createMockRes()
     const upstream = [
       'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[],"model":"test","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}\n\n',
@@ -209,10 +218,12 @@ describe('AnthropicStreamHandler', () => {
 
     const events = parseSSEEvents(chunks)
 
-    // thinking block is a valid terminal type per SDK, but since hasThinkingBlock
-    // is true and hasTextBlock is false, the case 2 branch won't trigger.
-    // Case 1 won't trigger either (hasThinkingBlock is true).
-    // This is correct — the SDK accepts thinking as a valid terminal block.
+    const textDeltas = events.filter(e =>
+      e.event === 'content_block_delta' && e.data.delta?.type === 'text_delta'
+    )
+    expect(textDeltas).toHaveLength(1)
+    expect(textDeltas[0].data.delta.text).toBe(' ')
+
     const msgDelta = events.find(e => e.event === 'message_delta')
     expect(msgDelta?.data.delta.stop_reason).toBe('end_turn')
   })
