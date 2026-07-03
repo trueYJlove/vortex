@@ -1,11 +1,45 @@
 /**
  * createConversationsSlice — conversations slice of the chat store.
  */
-import type { ChatSlice } from './internal'
+import type { ChatSlice, ChatState } from './internal'
 import { CONVERSATION_CACHE_SIZE, api, createEmptySessionState, createEmptySpaceState } from './internal'
 import type { Conversation, ConversationMeta, Thought } from './internal'
 
-export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConversations' | 'preloadAllSpaceConversations' | 'createConversation' | 'selectConversation' | 'deleteConversation' | 'renameConversation' | 'toggleStarConversation'> = (set, get) => ({
+function toConversationMeta(conversation: Conversation): ConversationMeta {
+  return {
+    id: conversation.id,
+    spaceId: conversation.spaceId,
+    title: conversation.title,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    messageCount: conversation.messages?.length || 0,
+    preview: undefined,
+    engineId: conversation.engineId,
+  }
+}
+
+function removeConversationRuntimeState(state: ChatState, conversationIds: Iterable<string>) {
+  const newSessions = new Map(state.sessions)
+  const newCache = new Map(state.conversationCache)
+  const newUnseenCompletions = new Map(state.unseenCompletions)
+  const newPulseReadAt = new Map(state.pulseReadAt)
+
+  for (const conversationId of conversationIds) {
+    newSessions.delete(conversationId)
+    newCache.delete(conversationId)
+    newUnseenCompletions.delete(conversationId)
+    newPulseReadAt.delete(conversationId)
+  }
+
+  return {
+    sessions: newSessions,
+    conversationCache: newCache,
+    unseenCompletions: newUnseenCompletions,
+    pulseReadAt: newPulseReadAt,
+  }
+}
+
+export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConversations' | 'preloadAllSpaceConversations' | 'createConversation' | 'selectConversation' | 'deleteConversation' | 'clearConversations' | 'renameConversation' | 'toggleStarConversation'> = (set, get) => ({
   setCurrentSpace: (spaceId: string) => {
     set({ currentSpaceId: spaceId })
   },
@@ -76,21 +110,7 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
 
       if (response.success && response.data) {
         const newConversation = response.data as Conversation
-
-        // Extract metadata for the list
-        const meta: ConversationMeta = {
-          id: newConversation.id,
-          spaceId: newConversation.spaceId,
-          title: newConversation.title,
-          createdAt: newConversation.createdAt,
-          updatedAt: newConversation.updatedAt,
-          messageCount: newConversation.messages?.length || 0,
-          preview: undefined,
-          // Carry the engine stamp so EngineBadge renders immediately on the
-          // newly created item — without this the badge only appears after
-          // a meta reload (e.g. switching away and back).
-          engineId: newConversation.engineId
-        }
+        const meta = toConversationMeta(newConversation)
 
         set((state) => {
           const newSpaceStates = new Map(state.spaceStates)
@@ -307,21 +327,7 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
 
       if (response.success) {
         set((state) => {
-          // Clean up session state
-          const newSessions = new Map(state.sessions)
-          newSessions.delete(conversationId)
-
-          // Clean up cache
-          const newCache = new Map(state.conversationCache)
-          newCache.delete(conversationId)
-
-          // Clean up unseen completions
-          const newUnseenCompletions = new Map(state.unseenCompletions)
-          newUnseenCompletions.delete(conversationId)
-
-          // Clean up pulse read-at grace period
-          const newPulseReadAt = new Map(state.pulseReadAt)
-          newPulseReadAt.delete(conversationId)
+          const runtimeState = removeConversationRuntimeState(state, [conversationId])
 
           // Update space state
           const newSpaceStates = new Map(state.spaceStates)
@@ -338,10 +344,7 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
 
           return {
             spaceStates: newSpaceStates,
-            sessions: newSessions,
-            conversationCache: newCache,
-            unseenCompletions: newUnseenCompletions,
-            pulseReadAt: newPulseReadAt
+            ...runtimeState
           }
         })
 
@@ -351,6 +354,79 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
       return false
     } catch (error) {
       console.error('Failed to delete conversation:', error)
+      return false
+    }
+  },
+
+  clearConversations: async (spaceId) => {
+    const reconcileAfterClearFailure = async (candidateDeletedIds: string[]) => {
+      await get().loadConversations(spaceId)
+
+      set((state) => {
+        const latestSpaceState = state.spaceStates.get(spaceId) || createEmptySpaceState()
+        const remainingIds = new Set(latestSpaceState.conversations.map((conversation) => conversation.id))
+        const deletedIds = candidateDeletedIds.filter((conversationId) => !remainingIds.has(conversationId))
+        const runtimeState = removeConversationRuntimeState(state, deletedIds)
+
+        const newSpaceStates = new Map(state.spaceStates)
+        newSpaceStates.set(spaceId, {
+          ...latestSpaceState,
+          currentConversationId: remainingIds.has(latestSpaceState.currentConversationId || '')
+            ? latestSpaceState.currentConversationId
+            : (latestSpaceState.conversations[0]?.id || null),
+        })
+
+        return {
+          spaceStates: newSpaceStates,
+          ...runtimeState,
+        }
+      })
+    }
+
+    let conversationIds: string[] = []
+
+    try {
+      const listResponse = await api.listConversations(spaceId)
+      if (!listResponse.success || !listResponse.data) return false
+
+      const conversations = listResponse.data as ConversationMeta[]
+      conversationIds = conversations.map((conversation) => conversation.id)
+
+      for (const conversationId of conversationIds) {
+        const response = await api.deleteConversation(spaceId, conversationId)
+        if (!response.success) {
+          await reconcileAfterClearFailure(conversationIds)
+          return false
+        }
+      }
+
+      set((state) => {
+        const runtimeState = removeConversationRuntimeState(state, conversationIds)
+
+        const newSpaceStates = new Map(state.spaceStates)
+        newSpaceStates.set(spaceId, {
+          conversations: [],
+          currentConversationId: null,
+        })
+
+        return {
+          spaceStates: newSpaceStates,
+          ...runtimeState,
+        }
+      })
+
+      const newConversation = await get().createConversation(spaceId)
+      if (!newConversation) {
+        await reconcileAfterClearFailure(conversationIds)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Failed to clear conversations:', error)
+      if (conversationIds.length > 0) {
+        await reconcileAfterClearFailure(conversationIds)
+      }
       return false
     }
   },

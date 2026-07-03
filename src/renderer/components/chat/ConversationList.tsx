@@ -13,6 +13,7 @@ import { useTranslation } from '../../i18n'
 import { useChatStore, useAllConversationStatuses } from '../../stores/chat.store'
 import { useSpaceStore } from '../../stores/space.store'
 import { useAppStore } from '../../stores/app.store'
+import { useConfirmDialog } from '../../hooks/useConfirmDialog'
 import { api } from '../../api'
 import { TaskStatusDot } from '../pulse/TaskStatusDot'
 import { PulseSidebarSection } from '../pulse/PulseSidebarSection'
@@ -37,13 +38,16 @@ interface ConversationListProps {
   onClose?: () => void
   /** Whether the sidebar is currently visible (used to skip heavy Pulse section when hidden) */
   visible?: boolean
+  side?: 'left' | 'right'
 }
 
 export const ConversationList = memo(function ConversationList({
   onClose,
   visible = true,
+  side = 'left',
 }: ConversationListProps) {
   const { t } = useTranslation()
+  const { showConfirm, DialogComponent } = useConfirmDialog()
 
   // Self-subscribe to data from stores (precise selectors)
   const conversations = useChatStore(state => {
@@ -88,8 +92,10 @@ export const ConversationList = memo(function ConversationList({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const headerMenuRef = useRef<HTMLDivElement>(null)
   const editContainerRef = useRef<HTMLDivElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
   const focusedEditingIdRef = useRef<string | null>(null)
@@ -107,7 +113,9 @@ export const ConversationList = memo(function ConversationList({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return
       const containerRect = containerRef.current.getBoundingClientRect()
-      const newWidth = e.clientX - containerRect.left
+      const newWidth = side === 'right'
+        ? containerRect.right - e.clientX
+        : e.clientX - containerRect.left
       const clampedWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth))
       setWidth(clampedWidth)
       widthRef.current = clampedWidth
@@ -132,7 +140,7 @@ export const ConversationList = memo(function ConversationList({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging])
+  }, [isDragging, side])
 
   // Handle top section vertical resize
   const handleTopSectionMouseDown = useCallback((e: React.MouseEvent) => {
@@ -184,6 +192,17 @@ export const ConversationList = memo(function ConversationList({
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
   }, [menuOpenId])
+
+  useEffect(() => {
+    if (!headerMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderMenuOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [headerMenuOpen])
 
   // Reset menu state when conversations change (e.g. space switch)
   useEffect(() => {
@@ -261,6 +280,23 @@ export const ConversationList = memo(function ConversationList({
       return
     }
     handleSaveEdit()
+  }
+
+  const handleClearConversations = async () => {
+    setHeaderMenuOpen(false)
+    const confirmed = await showConfirm({
+      title: t('Clear all conversations?'),
+      message: t('This will delete all conversations in the current space, including pinned conversations. This cannot be undone.'),
+      confirmLabel: t('Clear'),
+      cancelLabel: t('Cancel'),
+      variant: 'danger',
+    })
+    if (!confirmed) return
+
+    const spaceId = useSpaceStore.getState().currentSpace?.id
+    if (spaceId) {
+      await useChatStore.getState().clearConversations(spaceId)
+    }
   }
 
   // Render a single conversation item (used by Virtuoso)
@@ -362,21 +398,43 @@ export const ConversationList = memo(function ConversationList({
     <>
     <div
       ref={containerRef}
-      className="border-r border-border flex flex-col bg-card/50 relative"
+      className={`${side === 'right' ? 'border-l' : 'border-r'} border-border flex flex-col bg-card/50 relative`}
       style={{ width, transition: isDragging ? 'none' : 'width 0.2s ease' }}
     >
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
-            title={t('Close sidebar')}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          <div ref={headerMenuRef} className="relative flex items-center gap-1">
+            <button
+              onClick={() => setHeaderMenuOpen(value => !value)}
+              className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
+              title={t('More')}
+            >
+              <EllipsisVertical className="w-4 h-4" />
+            </button>
+            {headerMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-[9999] min-w-[180px] bg-popover border border-border rounded-lg shadow-lg py-1">
+                <button
+                  onClick={handleClearConversations}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t('Clear conversations')}</span>
+                </button>
+              </div>
+            )}
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
+              title={t('Close sidebar')}
+            >
+              <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Top section: automation badge + pinned conversations (resizable) */}
@@ -421,7 +479,7 @@ export const ConversationList = memo(function ConversationList({
 
       {/* Drag handle - on right side */}
       <div
-        className={`absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-20 ${
+        className={`absolute ${side === 'right' ? 'left-0' : 'right-0'} top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-20 ${
           isDragging ? 'bg-primary/50' : ''
         }`}
         onMouseDown={handleMouseDown}
@@ -430,6 +488,7 @@ export const ConversationList = memo(function ConversationList({
     </div>
 
     {/* Dropdown menu — Portal to document.body, fully outside flex layout */}
+    {DialogComponent}
     {menuOpenId && menuPosition && (() => {
       const conv = conversations.find(c => c.id === menuOpenId)
       if (!conv) return null

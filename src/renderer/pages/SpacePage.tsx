@@ -391,14 +391,16 @@ export function SpacePage() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Conversation list sidebar - CSS hidden when collapsed or maximized, unmounted on mobile */}
+        {/* Artifact rail - desktop left side, auto-collapses when maximized via useEffect above */}
+        {/* Smart collapse: collapses when canvas is open, respects user preference */}
         {!isMobile && (
-          <div style={{ display: showConversationList && !isCanvasMaximized ? 'flex' : 'none' }}>
-            <ConversationList
-              onClose={handleToggleConversationList}
-              visible={showConversationList && !isCanvasMaximized}
-            />
-          </div>
+          <ArtifactRail
+            side="left"
+            externalExpanded={effectiveRailExpanded}
+            onExpandedChange={setRailExpanded}
+            initialWidth={artifactRailWidthConfig}
+            onWidthChange={handleArtifactRailWidthChange}
+          />
         )}
 
         {/* Desktop Layout */}
@@ -423,7 +425,7 @@ export function SpacePage() {
 
                 {/* Floating sidebar toggle - shows when sidebar is closed */}
                 {!showConversationList && (
-                  <div className="absolute top-2 left-0 z-10">
+                  <div className="absolute top-2 right-0 z-10">
                     <SidebarToggle
                       isOpen={false}
                       onToggle={handleToggleConversationList}
@@ -460,22 +462,22 @@ export function SpacePage() {
           </>
         )}
 
+        {/* Conversation list sidebar - desktop right side, CSS hidden when collapsed or maximized, unmounted on mobile */}
+        {!isMobile && (
+          <div style={{ display: showConversationList && !isCanvasMaximized ? 'flex' : 'none' }}>
+            <ConversationList
+              side="right"
+              onClose={handleToggleConversationList}
+              visible={showConversationList && !isCanvasMaximized}
+            />
+          </div>
+        )}
+
         {/* Mobile Layout */}
         {isMobile && (
           <div className="flex-1 flex flex-col min-w-0">
             <ChatView isCompact={false} />
           </div>
-        )}
-
-        {/* Artifact rail - auto-collapses when maximized via useEffect above */}
-        {/* Smart collapse: collapses when canvas is open, respects user preference */}
-        {!isMobile && (
-          <ArtifactRail
-            externalExpanded={effectiveRailExpanded}
-            onExpandedChange={setRailExpanded}
-            initialWidth={artifactRailWidthConfig}
-            onWidthChange={handleArtifactRailWidthChange}
-          />
         )}
       </div>
 

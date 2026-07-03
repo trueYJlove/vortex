@@ -106,11 +106,11 @@ Halo is a local-first Electron AI product with:
 
 ## 4) Interface Layout
 
-- **Left sidebar**: Conversation list + Space selector (collapsible)
-- **Center**: Chat Stream (conversation flow)
-- **Right**: Content Canvas (content preview) + Artifact Rail (file list)
-- **No Canvas open**: Chat takes full width
-- **Canvas open**: Chat narrows + Canvas + ArtifactRail
+- **Left rail**: Artifact Rail (file list, collapsible on desktop; floating overlay on mobile)
+- **Center**: Chat Stream (conversation flow) + Content Canvas when open
+- **Right sidebar**: Conversation list (collapsible on desktop; history panel on mobile)
+- **No Canvas open**: Chat takes remaining width between rails
+- **Canvas open**: Chat narrows + Canvas expands in the center area
 
 This layout applies to both desktop and remote web.
 

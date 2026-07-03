@@ -374,14 +374,14 @@ ContentCanvas.tsx          # Main container + tab switching
 
 ### Layout Modes
 
-- **No Canvas**: Full-width chat
-- **With Canvas**: Narrow chat (user-configurable, stored in space preferences) + Canvas + ArtifactRail
+- **No Canvas**: Chat fills the remaining center area between the left ArtifactRail and optional right ConversationList
+- **With Canvas**: Narrow chat (user-configurable, stored in space preferences) + Content Canvas in the center area
 
 ### Interface Layout
 
-- **Left sidebar**: Conversation list (collapsible)
-- **Center**: Chat Stream (conversation flow)
-- **Right**: Content Canvas (content preview) + Artifact Rail (file list)
+- **Left rail**: Artifact Rail (file list; collapsible desktop rail, floating mobile overlay)
+- **Center**: Chat Stream (conversation flow) + Content Canvas (content preview) when open
+- **Right sidebar**: Conversation list (collapsible desktop sidebar, mobile history panel)
 
 ### Technical Decisions
 
