@@ -699,12 +699,15 @@ export async function ensureSessionWarm(
 
       // Extract command names (no need to parse skills here, frontend will handle it)
       const slashCommands = commands.map((cmd: any) => cmd.name)
+      const skills = commands
+        .filter((cmd: any) => cmd.type === 'skill')
+        .map((cmd: any) => cmd.name)
 
       // Send session-info to renderer (same format as system:init message)
       emitAgentEvent('agent:session-info', spaceId, conversationId, {
         slashCommands,
-        skills: [],  // Let frontend/later logic handle classification
-        agents: []   // Not available from supportedCommands
+        skills,
+        agents: []
       })
     } catch (error) {
       console.error(`[Agent] Failed to fetch supported commands:`, error)
