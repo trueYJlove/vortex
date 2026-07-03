@@ -2,7 +2,7 @@
  * EngineBadge
  *
  * Subtle inline marker that tells the user which agent engine
- * ("Claude Code", "Halo SDK", "Codex") owns a conversation.
+ * ("Claude Code", "Halo SDK", "Codex", "MiMo Code") owns a conversation.
  *
  * Visual treatment is intentionally low-key — light/translucent colored text,
  * no fill, no border — so the badge informs without competing with the
@@ -15,7 +15,7 @@
  *
  * Renders nothing for the default ('anthropic') engine to avoid badge
  * clutter on existing CC users — the UX promise is zero disruption for them.
- * Codex / Halo SDK conversations show the badge.
+ * Codex / Halo SDK / MiMo Code conversations show the badge.
  */
 
 import { useTranslation } from '../../i18n'
@@ -39,16 +39,19 @@ export function EngineBadge({ engineId, size = 'xs', className = '' }: EngineBad
   if (resolved === 'anthropic') return null
 
   const isCodex = resolved === 'codex'
+  const isMimo = resolved === 'mimo'
   // Short label kept consistent in length with "Codex" so the sidebar title
   // doesn't get pushed around. Full product name lives in the tooltip.
-  const label = isCodex ? t('Codex') : t('Halo')
-  const fullName = isCodex ? t('Codex') : t('Halo SDK')
+  const label = isCodex ? t('Codex') : isMimo ? t('MiMo') : t('Halo')
+  const fullName = isCodex ? t('Codex') : isMimo ? t('MiMo Code') : t('Halo SDK')
   // Whisper-soft tag: barely-there tinted background + dimmed semantic
   // text. Visible enough to identify the engine at a glance, quiet enough
   // that the conversation title remains the focal point.
   const tone = isCodex
     ? 'bg-violet-500/[0.05] text-violet-500/65'
-    : 'bg-cyan-500/[0.05] text-cyan-500/65'
+    : isMimo
+      ? 'bg-emerald-500/[0.05] text-emerald-500/65'
+      : 'bg-cyan-500/[0.05] text-cyan-500/65'
 
   const sizing = size === 'xs'
     ? 'px-1.5 py-0.5 text-[10px]'

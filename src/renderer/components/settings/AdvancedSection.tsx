@@ -91,11 +91,11 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
   const { showConfirm, DialogComponent: RestartDialogComponent } = useConfirmDialog()
 
   const [maxTurns, setMaxTurnsState] = useState(config?.agent?.maxTurns ?? 50)
-  const [sdkEngine, setSdkEngineState] = useState<'anthropic' | 'halo' | 'codex'>(
+  const [sdkEngine, setSdkEngineState] = useState<'anthropic' | 'halo' | 'codex' | 'mimo'>(
     config?.agent?.sdkEngine ?? 'anthropic'
   )
   // Track whether the SDK engine was changed from the initial value (needs restart)
-  const [sdkEngineInitial] = useState<'anthropic' | 'halo' | 'codex'>(
+  const [sdkEngineInitial] = useState<'anthropic' | 'halo' | 'codex' | 'mimo'>(
     config?.agent?.sdkEngine ?? 'anthropic'
   )
   const [disabledTools, setDisabledToolsState] = useState<string[]>(
@@ -137,7 +137,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
 
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleSdkEngineChange = async (engine: 'anthropic' | 'halo' | 'codex') => {
+  const handleSdkEngineChange = async (engine: 'anthropic' | 'halo' | 'codex' | 'mimo') => {
     if (engine === sdkEngine) return
     setSdkEngineState(engine)
     try {
@@ -296,6 +296,22 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
               <div>
                 <p className="font-medium text-sm">{t('Codex SDK')}</p>
                 <p className="text-xs text-muted-foreground">{t('Powered by the official OpenAI Codex SDK. Better suited for GPT-family models. Experimental.')}</p>
+              </div>
+            </label>
+
+            {/* MiMo Code */}
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+              <input
+                type="radio"
+                name="sdkEngine"
+                value="mimo"
+                checked={sdkEngine === 'mimo'}
+                onChange={() => handleSdkEngineChange('mimo')}
+                className="mt-0.5 accent-primary"
+              />
+              <div>
+                <p className="font-medium text-sm">{t('MiMo Code')}</p>
+                <p className="text-xs text-muted-foreground">{t('Powered by MiMo Code engine. Supports long-horizon tasks with checkpoint/rebuild memory. Requires opencode CLI installed. Experimental.')}</p>
               </div>
             </label>
           </div>
