@@ -20,9 +20,12 @@ test.describe('Home Page', () => {
     const appsText = await window.$('text=/^Studio$|^工坊$|^Apps$/i')
     expect(appsText).toBeTruthy()
 
-    // "Dedicated Spaces" section should be visible (supports EN/CN)
+    // Dedicated spaces heading is hidden; the New button starts the section.
     const spacesSection = await window.$('text=/Dedicated Spaces|专属空间/i')
-    expect(spacesSection).toBeTruthy()
+    expect(spacesSection).toBeFalsy()
+
+    const newButton = await window.$('button:has-text("New Workspace"), button:has-text("新建工作空间")')
+    expect(newButton).toBeTruthy()
 
     await window.screenshot({ path: 'tests/e2e/results/nav-home-page.png' })
   })

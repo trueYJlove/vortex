@@ -188,7 +188,7 @@ export function CreateSpaceForm({ onCreated, onCancel, compact = false }: Create
 
       {/* Space name */}
       <div>
-        <label className={labelClass}>{t('Name this space')}</label>
+        <label className={labelClass}>{t('Name this workspace')}</label>
         <input
           ref={nameInputRef}
           type="text"

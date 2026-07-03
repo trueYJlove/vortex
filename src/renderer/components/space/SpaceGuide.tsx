@@ -56,7 +56,7 @@ export function SpaceGuide() {
             <HelpCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-primary" />
           </div>
           <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-            {t('Learn what spaces are')}
+            {t('Learn what workspaces are')}
           </span>
         </div>
         <ChevronDown
@@ -91,10 +91,10 @@ export function SpaceGuide() {
                 <Folder className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium mb-1 sm:mb-1.5">{t('What is a space?')}</h4>
+                <h4 className="text-sm font-medium mb-1 sm:mb-1.5">{t('What is a workspace?')}</h4>
                 <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed space-y-0.5 sm:space-y-1">
                   <p>{t('AI-generated files (we call them "artifacts") need a place to be stored')}</p>
-                  <p>{t('A space is their home, an independent folder')}</p>
+                  <p>{t('A workspace is their home, an independent folder')}</p>
                 </div>
               </div>
             </div>
@@ -110,12 +110,12 @@ export function SpaceGuide() {
                   <p>
                     <span className="text-foreground/80">{t('Casual chat, asking questions')}</span>
                     <span className="mx-1 sm:mx-1.5">→</span>
-                    {t('Use Halo space')}
+                    {t('Use Halo workspace')}
                   </p>
                   <p>
                     <span className="text-foreground/80">{t('Projects, long-term tasks')}</span>
                     <span className="mx-1 sm:mx-1.5">→</span>
-                    {t('Recommend creating a dedicated space')}
+                    {t('Recommend creating a dedicated workspace')}
                   </p>
                   <p className="mt-1">{t('Keep files from different projects organized')}</p>
                 </div>
