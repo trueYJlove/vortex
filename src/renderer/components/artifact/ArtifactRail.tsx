@@ -46,6 +46,7 @@ interface ArtifactRailProps {
   // Width persistence
   initialWidth?: number             // Persisted width from config
   onWidthChange?: (width: number) => void  // Callback when user finishes resizing
+  side?: 'left' | 'right'
 }
 
 // Load initial view mode from storage
@@ -94,7 +95,8 @@ export function ArtifactRail({
   externalExpanded,
   onExpandedChange,
   initialWidth,
-  onWidthChange
+  onWidthChange,
+  side = 'right'
 }: ArtifactRailProps) {
   const { t } = useTranslation()
 
@@ -210,7 +212,6 @@ export function ArtifactRail({
 
   // Handle expand/collapse toggle
   const handleToggleExpanded = useCallback(() => {
-    console.log('[ArtifactRail] 🔴 Click! isExpanded:', isExpanded, 'time:', Date.now())
     const newExpanded = !isExpanded
 
     // UI-first optimization: When Canvas is open, directly update DOM
@@ -218,7 +219,6 @@ export function ArtifactRail({
     if (isCanvasOpen && railRef.current) {
       const targetWidth = newExpanded ? width : COLLAPSED_WIDTH
       railRef.current.style.width = `${targetWidth}px`
-      console.log('[ArtifactRail] 🚀 Direct DOM update:', targetWidth, 'time:', Date.now())
     }
 
     // Then update React state (will re-render but width is already correct)
@@ -228,11 +228,6 @@ export function ArtifactRail({
       setInternalExpanded(newExpanded)
     }
   }, [isExpanded, isControlled, onExpandedChange, isCanvasOpen, width])
-
-  // Debug: log when isExpanded changes
-  useEffect(() => {
-    console.log('[ArtifactRail] 🟢 isExpanded changed to:', isExpanded, 'time:', Date.now())
-  }, [isExpanded])
 
   // Check if we're in onboarding view-artifact step
   const isOnboardingViewStep = isOnboarding && currentStep === 'view-artifact'
@@ -270,7 +265,10 @@ export function ArtifactRail({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!railRef.current) return
-      const newWidth = window.innerWidth - e.clientX
+      const rect = railRef.current.getBoundingClientRect()
+      const newWidth = side === 'left'
+        ? e.clientX - rect.left
+        : rect.right - e.clientX
       const clampedWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth))
       setWidth(clampedWidth)
       widthRef.current = clampedWidth
@@ -288,7 +286,7 @@ export function ArtifactRail({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDragging, isMobile])
+  }, [isDragging, isMobile, side])
 
   // Close mobile overlay when switching to desktop
   useEffect(() => {
@@ -464,15 +462,6 @@ export function ArtifactRail({
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          {/* Open folder button */}
-          <button
-            onClick={handleOpenFolder}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
-            title={t('Open folder (⌘⇧F)')}
-          >
-            <FolderOpen className="w-4 h-4 text-amber-500" />
-            <span>{t('Open folder')}</span>
-          </button>
           {/* Open browser button */}
           <button
             onClick={handleOpenBrowser}
@@ -481,6 +470,15 @@ export function ArtifactRail({
           >
             <Globe className="w-4 h-4 text-blue-500" />
             <span>{t('Open browser')}</span>
+          </button>
+          {/* Open folder button */}
+          <button
+            onClick={handleOpenFolder}
+            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
+            title={t('Open folder (⌘⇧F)')}
+          >
+            <FolderOpen className="w-4 h-4 text-amber-500" />
+            <span>{t('Open folder')}</span>
           </button>
         </div>
       )}
@@ -582,7 +580,7 @@ export function ArtifactRail({
   return (
     <div
       ref={railRef}
-      className="h-full flex-shrink-0 border-l border-border bg-card/30 flex flex-col relative"
+      className={`h-full flex-shrink-0 ${side === 'left' ? 'border-r' : 'border-l'} border-border bg-card/30 flex flex-col relative`}
       style={{
         width: displayWidth,
         // Disable transition when: dragging OR Canvas is open (prevent layout flicker)
@@ -592,7 +590,7 @@ export function ArtifactRail({
       {/* Drag handle - only show when expanded */}
       {isExpanded && (
         <div
-          className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-20 ${
+          className={`absolute ${side === 'left' ? 'right-0' : 'left-0'} top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/50 transition-colors z-20 ${
             isDragging ? 'bg-primary/50' : ''
           }`}
           onMouseDown={handleMouseDown}
@@ -626,7 +624,11 @@ export function ArtifactRail({
           onClick={handleToggleExpanded}
           className="p-1 hover:bg-secondary rounded transition-colors"
         >
-          <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? '' : 'rotate-180'}`} />
+          <ChevronRight className={`w-4 h-4 transition-transform ${
+            side === 'left'
+              ? (isExpanded ? 'rotate-180' : '')
+              : (isExpanded ? '' : 'rotate-180')
+          }`} />
         </button>
       </div>
 
@@ -649,18 +651,18 @@ export function ArtifactRail({
           ) : (
             <>
               <button
-                onClick={handleOpenFolder}
-                className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                title={t('Open folder')}
-              >
-                <FolderOpen className="w-5 h-5 text-amber-500" />
-              </button>
-              <button
                 onClick={handleOpenBrowser}
                 className="p-2 hover:bg-secondary rounded-lg transition-colors"
                 title={t('Open browser')}
               >
                 <Globe className="w-5 h-5 text-blue-500" />
+              </button>
+              <button
+                onClick={handleOpenFolder}
+                className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                title={t('Open folder')}
+              >
+                <FolderOpen className="w-5 h-5 text-amber-500" />
               </button>
             </>
           )}

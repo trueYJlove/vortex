@@ -75,8 +75,8 @@ export function HomePage() {
     const isProjectSpace = !!space.workingDir || !isCentralizedSpace
 
     const message = isProjectSpace
-      ? t('Are you sure you want to delete this space?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.')
-      : t('Are you sure you want to delete this space?\n\nAll conversations and files in the space will be deleted.')
+      ? t('Are you sure you want to delete this workspace?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.')
+      : t('Are you sure you want to delete this workspace?\n\nAll conversations and files in the workspace will be deleted.')
 
     if (confirm(message)) {
       await deleteSpace(spaceId)
@@ -213,14 +213,13 @@ export function HomePage() {
         </div>
 
         {/* Spaces Section */}
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-medium text-muted-foreground">{t('Dedicated Spaces')}</h3>
+        <div className="mb-4 flex items-center">
           <button
             onClick={() => setShowCreateDialog(true)}
             className="flex items-center gap-1 px-3 py-1 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            {t('New')}
+            {t('New Workspace')}
           </button>
         </div>
 
@@ -229,7 +228,7 @@ export function HomePage() {
 
         {spaces.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">{t('No dedicated spaces yet')}</p>
+            <p className="text-sm">{t('No workspaces yet')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4">
@@ -256,14 +255,14 @@ export function HomePage() {
                     <button
                       onClick={(e) => handleEditSpace(e, space)}
                       className="p-1 hover:bg-secondary rounded transition-all"
-                      title={t('Edit Space')}
+                      title={t('Edit Workspace')}
                     >
                       <Pencil className="w-4 h-4 text-muted-foreground" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteSpace(e, space.id)}
                       className="p-1 hover:bg-destructive/20 rounded transition-all"
-                      title={t('Delete space')}
+                      title={t('Delete workspace')}
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </button>
@@ -271,7 +270,7 @@ export function HomePage() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   {space.isMissing
-                    ? t('Path unavailable. Reconnect the drive to open this space.')
+                    ? t('Path unavailable. Reconnect the drive to open this workspace.')
                     : `${formatTimeAgo(space.lastActiveAt || space.updatedAt)}${t('active')}`}
                 </p>
               </div>
@@ -291,11 +290,11 @@ export function HomePage() {
       {editingSpace && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in">
-            <h2 className="text-lg font-medium mb-4">{t('Edit Space')}</h2>
+            <h2 className="text-lg font-medium mb-4">{t('Edit Workspace')}</h2>
 
             {/* Space name */}
             <div className="mb-4">
-              <label className="block text-sm text-muted-foreground mb-2">{t('Space Name')}</label>
+              <label className="block text-sm text-muted-foreground mb-2">{t('Workspace Name')}</label>
               <input
                 type="text"
                 value={editSpaceName}

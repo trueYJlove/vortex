@@ -28,7 +28,7 @@ export function CreateSpaceDialog({ onClose, onCreated }: CreateSpaceDialogProps
         className="bg-card border border-border rounded-xl p-6 w-full max-w-md animate-fade-in"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-medium mb-4">{t('Create Dedicated Space')}</h2>
+        <h2 className="text-lg font-medium mb-4">{t('Create Workspace')}</h2>
         <CreateSpaceForm onCreated={onCreated} onCancel={onClose} />
       </div>
     </div>

@@ -16,14 +16,14 @@ test.describe('Space Management', () => {
 
     // Click "New" button to create space (supports EN/CN)
     const newButton = await window.waitForSelector(
-      'button:has-text("New"), button:has-text("新建")',
+      'button:has-text("New Workspace"), button:has-text("新建工作空间")',
       { timeout: 5000 }
     )
     await newButton.click()
 
     // Dialog should appear
     const dialog = await window.waitForSelector(
-      'text=/Create Dedicated Space|创建专属空间/i',
+      'text=/Create Workspace|创建工作空间/i',
       { timeout: 5000 }
     )
     expect(dialog).toBeTruthy()
@@ -60,7 +60,7 @@ test.describe('Space Management', () => {
 
     // First create a space
     const newButton = await window.waitForSelector(
-      'button:has-text("New"), button:has-text("新建")',
+      'button:has-text("New Workspace"), button:has-text("新建工作空间")',
       { timeout: 5000 }
     )
     await newButton.click()
@@ -128,14 +128,14 @@ test.describe('Space Management', () => {
 
     // Open create dialog
     const newButton = await window.waitForSelector(
-      'button:has-text("New"), button:has-text("新建")',
+      'button:has-text("New Workspace"), button:has-text("新建工作空间")',
       { timeout: 5000 }
     )
     await newButton.click()
 
     // Dialog should appear
     await window.waitForSelector(
-      'text=/Create Dedicated Space|创建专属空间/i',
+      'text=/Create Workspace|创建工作空间/i',
       { timeout: 5000 }
     )
 

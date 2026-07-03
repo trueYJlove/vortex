@@ -131,6 +131,7 @@ export interface ChatState {
   createConversation: (spaceId: string) => Promise<Conversation | null>
   selectConversation: (conversationId: string) => void
   deleteConversation: (spaceId: string, conversationId: string) => Promise<boolean>
+  clearConversations: (spaceId: string) => Promise<boolean>
   renameConversation: (spaceId: string, conversationId: string, newTitle: string) => Promise<boolean>
   toggleStarConversation: (spaceId: string, conversationId: string, starred: boolean) => Promise<boolean>
 
