@@ -9,6 +9,7 @@ import type { HaloConfig, ThemeMode, SendKeyMode } from '../../types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
 import { getThemesByType } from '../../themes/registry'
+import { getAllIconThemes, type IconThemeId } from '../../themes/file-icons'
 
 interface AppearanceSectionProps {
   config: HaloConfig | null
@@ -23,6 +24,9 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
 
   // Send key mode state
   const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(config?.chat?.sendKeyMode || 'enter')
+
+  // Icon theme state
+  const [iconTheme, setIconTheme] = useState<IconThemeId>(config?.appearance?.iconTheme || 'material-icon-theme')
 
   // Auto-save helper for appearance settings
   const autoSave = useCallback(async (partialConfig: Partial<HaloConfig>) => {
@@ -45,7 +49,15 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
       localStorage.setItem('halo-theme', value)
     } catch (e) { /* ignore */ }
     await autoSave({
-      appearance: { theme: value }
+      appearance: { theme: value, iconTheme }
+    })
+  }
+
+  // Handle icon theme change with auto-save
+  const handleIconThemeChange = async (value: IconThemeId) => {
+    setIconTheme(value)
+    await autoSave({
+      appearance: { theme, iconTheme: value }
     })
   }
 
@@ -142,6 +154,28 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Icon Theme */}
+        <div>
+          <label className="block text-sm text-muted-foreground mb-2">{t('Icon Theme')}</label>
+          <div className="grid grid-cols-2 gap-3">
+            {getAllIconThemes().map((themeDef) => (
+              <button
+                key={themeDef.id}
+                onClick={() => handleIconThemeChange(themeDef.id as IconThemeId)}
+                className={`flex flex-col items-start gap-1 p-3 rounded-lg border transition-colors text-left ${
+                  iconTheme === themeDef.id
+                    ? 'bg-primary/15 border-primary text-primary'
+                    : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                }`}
+                aria-pressed={iconTheme === themeDef.id}
+              >
+                <span className="text-sm font-medium">{themeDef.name}</span>
+                <span className="text-xs opacity-70">{themeDef.description}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Send Key */}

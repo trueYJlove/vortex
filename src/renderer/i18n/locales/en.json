@@ -1236,6 +1236,7 @@
   "The store already has this version or a newer one. Increase the version number and try again.": "The store already has this version or a newer one. Increase the version number and try again.",
   "The workspace folder where the digital human saves code files, task outputs, and work artifacts.": "The workspace folder where the digital human saves code files, task outputs, and work artifacts.",
   "Theme": "Theme",
+  "Icon Theme": "Icon Theme",
   "Dark Themes": "Dark Themes",
   "Light Themes": "Light Themes",
   "These sessions are available as contacts for the digital human's IM push capability.": "These sessions are available as contacts for the digital human's IM push capability.",

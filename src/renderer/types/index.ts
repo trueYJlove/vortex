@@ -10,6 +10,7 @@ import {
   hasAnyAISource
 } from '../../shared/types/ai-sources';
 import type { BuiltInThemeId } from '../themes/registry';
+import type { IconThemeId } from '../themes/file-icons';
 import { NotificationChannelsConfig }  from '../../shared/types/notification-channels';
 // Re-export them
 export { DEFAULT_MODEL, getCurrentModelName, hasAnyAISource };
@@ -107,6 +108,7 @@ export interface PermissionConfig {
 
 export interface AppearanceConfig {
   theme: ThemeMode;
+  iconTheme?: IconThemeId;
 }
 
 // Send key mode: 'enter' = Enter to send, 'ctrl-enter' = Ctrl+Enter to send
@@ -781,7 +783,8 @@ export const DEFAULT_CONFIG: HaloConfig = {
     trustMode: false
   },
   appearance: {
-    theme: 'system'
+    theme: 'system',
+    iconTheme: 'material-icon-theme'
   },
   system: {
     autoLaunch: false
