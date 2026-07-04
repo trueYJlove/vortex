@@ -23,6 +23,7 @@ import type { ServerEntry } from './stores/server.store'
 import { clearPendingServerUrl, setAuthToken } from './api/transport'
 import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
+import { StatusBar } from './components/layout/StatusBar'
 import { OnboardingOverlay } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
 import { NotificationToast } from './components/notification/NotificationToast'
@@ -928,6 +929,10 @@ export default function App() {
         </div>
       )}
       {renderView()}
+      {/* Bottom status bar — visible on main views */}
+      {view !== 'splash' && view !== 'setup' && view !== 'serverConnect' && view !== 'serverList' && view !== 'gitBashSetup' && (
+        <StatusBar />
+      )}
       {/* Search panel - full screen edit mode */}
       <SearchPanel isOpen={isSearchOpen} onClose={closeSearch} />
       {/* Search highlight bar - floating navigation mode */}
