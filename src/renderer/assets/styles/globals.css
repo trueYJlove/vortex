@@ -385,6 +385,19 @@ body {
   animation: slide-in-right-full 0.25s ease-out;
 }
 
+@keyframes slide-in-left-full {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-left-full {
+  animation: slide-in-left-full 0.25s ease-out;
+}
+
 @keyframes slide-down {
   from {
     opacity: 0;
