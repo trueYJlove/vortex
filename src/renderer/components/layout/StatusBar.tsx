@@ -1,62 +1,126 @@
 /**
  * StatusBar — Compact bottom bar showing contextual information.
  *
- * Displays:
- * - Left: Current AI model name
- * - Right: Theme name, platform indicator
+ * Left: Context — total tokens, usage %, streaming speed (t/s)
+ * Right: System resources — CPU %, Memory usage
  *
  * Uses theme tokens only, no hardcoded colors.
  * Height: 24px (compact, VSCode-style).
  */
 
+import { useMemo } from 'react'
 import { useTranslation } from '../../i18n'
-import { useAppStore } from '../../stores/app.store'
-import { getCurrentModelName } from '../../types'
-import { getTheme, resolveSystemTheme } from '../../themes/registry'
-import { isElectron, isCapacitor } from '../../api/transport'
+import { useChatStore } from '../../stores/chat.store'
+import { usePerfStore } from '../../stores/perf.store'
+import type { Message } from '../../types'
+
+/** Format token count: 1234 → "1,234", 12345 → "12.3K" */
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}K`
+  return n.toLocaleString()
+}
+
+/** Format bytes to human-readable: bytes → "1.2 GB" / "340 MB" */
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  return `${(bytes / 1024 ** 2).toFixed(0)} MB`
+}
+
+/** Get the last assistant message with tokenUsage from a conversation */
+function getLastTokenUsage(messages: Message[]): Message['tokenUsage'] | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role === 'assistant' && msg.tokenUsage) return msg.tokenUsage
+  }
+  return null
+}
 
 export function StatusBar() {
   const { t } = useTranslation()
-  const config = useAppStore(s => s.config)
 
-  const aiSources = config?.aiSources
-  const currentModel = aiSources ? getCurrentModelName(aiSources) : null
+  // --- Context (left side) ---
+  const currentConversation = useChatStore(s => s.getCurrentConversation())
+  const tokenUsage = useMemo(() => {
+    if (!currentConversation?.messages) return null
+    return getLastTokenUsage(currentConversation.messages)
+  }, [currentConversation?.messages])
 
-  const themeId = config?.appearance?.theme || 'dark'
-  const resolvedId = themeId === 'system' ? resolveSystemTheme() : themeId
-  const theme = getTheme(resolvedId)
+  const contextInfo = useMemo(() => {
+    if (!tokenUsage) return null
 
-  const platformLabel = isElectron()
-    ? window.platform?.isMac ? 'macOS' : window.platform?.isWindows ? 'Windows' : 'Linux'
-    : isCapacitor()
-      ? 'Mobile'
-      : 'Web'
+    const contextUsed = tokenUsage.inputTokens + tokenUsage.cacheReadTokens + tokenUsage.cacheCreationTokens
+    const contextWindow = tokenUsage.contextWindow > 0 ? tokenUsage.contextWindow : 200_000
+    const usagePercent = Math.round((contextUsed / contextWindow) * 100)
+
+    // Speed: outputTokens / duration — only available from last complete turn
+    // tokenUsage doesn't carry duration, so derive from message timestamps
+    let tokensPerSec: number | null = null
+    const messages = currentConversation?.messages
+    if (messages && tokenUsage.outputTokens > 0) {
+      const lastAssistIdx = messages.findLastIndex(m => m.role === 'assistant' && m.tokenUsage)
+      if (lastAssistIdx >= 0) {
+        // Find the preceding user message to measure wall-clock span
+        const prevUserIdx = findPrecedingUserMessage(messages, lastAssistIdx)
+        if (prevUserIdx >= 0) {
+          const start = new Date(messages[prevUserIdx].timestamp).getTime()
+          const end = new Date(messages[lastAssistIdx].timestamp).getTime()
+          const durSec = (end - start) / 1000
+          if (durSec > 0) tokensPerSec = Math.round(tokenUsage.outputTokens / durSec)
+        }
+      }
+    }
+
+    return { contextUsed, contextWindow, usagePercent, tokensPerSec }
+  }, [tokenUsage, currentConversation?.messages])
+
+  // --- System resources (right side) ---
+  const snapshot = usePerfStore(s => s.latestSnapshot)
+  const cpuPercent = snapshot?.cpu?.percentCPU ?? null
+  const memoryBytes = snapshot?.memory?.rss ?? null
 
   return (
     <div
       className="fixed bottom-0 inset-x-0 h-6 flex items-center justify-between px-3 border-t border-border bg-background text-[11px] text-muted-foreground select-none z-40 safe-area-bottom"
       style={{ paddingBottom: 'max(0px, var(--sab))' }}
     >
-      {/* Left: Model info */}
-      <div className="flex items-center gap-2 min-w-0">
-        {currentModel && (
-          <span className="truncate max-w-[180px] sm:max-w-none" title={currentModel}>
-            {currentModel}
-          </span>
+      {/* Left: Context */}
+      <div className="flex items-center gap-3 min-w-0">
+        {contextInfo ? (
+          <>
+            <span className="font-medium text-foreground/80">{t('Context')}</span>
+            <span>{formatTokenCount(contextInfo.contextUsed)} tokens</span>
+            <span>{contextInfo.usagePercent}% {t('used')}</span>
+            {contextInfo.tokensPerSec !== null && (
+              <span>{contextInfo.tokensPerSec} t/s</span>
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground/50">{t('Context')}</span>
         )}
       </div>
 
-      {/* Right: Theme + Platform */}
+      {/* Right: Resources */}
       <div className="flex items-center gap-3 flex-shrink-0">
-        {theme && (
+        {cpuPercent !== null && (
           <span className="hidden sm:inline">
-            {t(theme.name)}
+            CPU {Math.round(cpuPercent)}%
           </span>
         )}
-        <span className="text-muted-foreground/70">
-          {platformLabel}
-        </span>
+        {memoryBytes !== null && (
+          <span className="hidden sm:inline">
+            {t('Memory')} {formatBytes(memoryBytes)}
+          </span>
+        )}
       </div>
     </div>
   )
+}
+
+/** Find the index of the nearest preceding user message before `endIdx` */
+function findPrecedingUserMessage(messages: Message[], endIdx: number): number {
+  for (let i = endIdx - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') return i
+  }
+  return -1
 }
