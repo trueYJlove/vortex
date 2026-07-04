@@ -236,7 +236,7 @@ const fileIconColors: Record<string, string> = {
 export const vscodeIconsTheme: IconThemeDefinition = {
   id: 'vscode-icons',
   name: 'VS Code Icons',
-  description: 'Popular VS Code Icons extension theme',
+  description: 'Colorful file icons with rich categories',
   fileIconMap,
   fileIconColors,
   folderIcon: VscFolder as unknown as LucideIcon,

@@ -239,7 +239,7 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
                   aria-pressed={isSelected}
                 >
                   <span className="text-xs sm:text-sm font-medium">{themeDef.name}</span>
-                  <span className="text-[10px] sm:text-xs opacity-70">{themeDef.description}</span>
+                  <span className="text-[10px] sm:text-xs opacity-70">{t(themeDef.description)}</span>
                 </button>
               )
             })}

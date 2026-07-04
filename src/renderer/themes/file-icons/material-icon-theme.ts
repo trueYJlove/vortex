@@ -282,7 +282,7 @@ const fileIconColors: Record<string, string> = {
 export const materialIconTheme: IconThemeDefinition = {
   id: 'material-icon-theme',
   name: 'Material Icon Theme',
-  description: 'VS Code popular icon theme with Material Design style',
+  description: 'Material Design style file icons',
   fileIconMap,
   fileIconColors,
   folderIcon: MdFolder as unknown as LucideIcon,

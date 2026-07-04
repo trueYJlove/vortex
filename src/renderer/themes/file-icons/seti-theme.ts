@@ -235,7 +235,7 @@ const fileIconColors: Record<string, string> = {
 export const setiTheme: IconThemeDefinition = {
   id: 'seti',
   name: 'Seti',
-  description: 'VS Code default file icon theme',
+  description: 'Clean monochrome file icons',
   fileIconMap,
   fileIconColors,
   folderIcon: VscFolder as unknown as LucideIcon,

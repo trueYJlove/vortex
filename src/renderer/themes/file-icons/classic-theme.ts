@@ -230,7 +230,7 @@ const fileIconColors: Record<string, string> = {
 export const classicTheme: IconThemeDefinition = {
   id: 'classic',
   name: 'Classic',
-  description: 'Simple Lucide icons, no external dependencies',
+  description: 'Simple icons with no external dependencies',
   fileIconMap,
   fileIconColors,
   folderIcon: Folder,

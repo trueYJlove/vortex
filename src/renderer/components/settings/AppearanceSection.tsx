@@ -172,7 +172,7 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
                 aria-pressed={iconTheme === themeDef.id}
               >
                 <span className="text-sm font-medium">{themeDef.name}</span>
-                <span className="text-xs opacity-70">{themeDef.description}</span>
+                <span className="text-xs opacity-70">{t(themeDef.description)}</span>
               </button>
             ))}
           </div>
