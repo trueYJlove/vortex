@@ -636,7 +636,7 @@ export function ArtifactTree({ spaceId }: ArtifactTreeProps) {
           {/* Header with toolbar */}
           <div className="flex-shrink-0 bg-card px-2 py-1.5 border-b border-border/50">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground/80 [[data-theme='light']_&]:text-muted-foreground truncate" title={workspaceRootRef.current}>
+              <span className="text-sm font-semibold text-foreground truncate" title={workspaceRootRef.current}>
                 {folderName || t('Files')}
               </span>
               <div className="flex gap-1">
