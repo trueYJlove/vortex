@@ -15,8 +15,11 @@ import { oneDarkProTheme } from './builtins/one-dark-pro'
 import { nordTheme } from './builtins/nord'
 import { catppuccinMochaTheme } from './builtins/catppuccin-mocha'
 import { intellijLightTheme } from './builtins/intellij-light'
-import { darculaTheme } from './builtins/darcula'
+import { intellijDarkTheme } from './builtins/darcula'
 import { githubDarkTheme } from './builtins/github-dark'
+import { monokaiTheme } from './builtins/monokai'
+import { gruvboxTheme } from './builtins/gruvbox'
+import { solarizedDarkTheme } from './builtins/solarized-dark'
 
 // ============================================
 // Types
@@ -78,8 +81,11 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   nordTheme,
   catppuccinMochaTheme,
   intellijLightTheme,
-  darculaTheme,
+  intellijDarkTheme,
   githubDarkTheme,
+  monokaiTheme,
+  gruvboxTheme,
+  solarizedDarkTheme,
 ]
 
 /** Auto-derived union type from BUILTIN_THEMES — no manual maintenance needed. */

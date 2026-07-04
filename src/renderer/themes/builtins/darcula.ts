@@ -1,12 +1,12 @@
 import type { ThemeDefinition, ThemeColors } from '../registry'
 
 /**
- * Darcula theme — based on the classic IntelliJ IDEA Darcula color scheme.
+ * IntelliJ Dark theme — based on the classic IntelliJ IDEA Darcula color scheme.
  * The iconic dark theme used across all JetBrains IDEs.
  */
-export const darculaTheme: ThemeDefinition = {
-  id: 'darcula',
-  name: 'Darcula',
+export const intellijDarkTheme: ThemeDefinition = {
+  id: 'intellij-dark',
+  name: 'IntelliJ Dark',
   type: 'dark',
   colors: {
     background:             '224 12% 17%',  // #2b2b2b — classic Darcula background
