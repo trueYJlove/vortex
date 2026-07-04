@@ -1,45 +1,45 @@
-# MiMo Code Engine Protocol Hardening Implementation Plan
+# MiMo Code 引擎协议加固实现方案
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **给自动化工作者：** 必须使用子技能：superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans 逐任务实施本方案。步骤使用复选框（`- [ ]`）语法进行追踪。
 
-**Goal:** Align the MiMo Code engine adapter with Halo's Claude Code-compatible agent protocol so thinking, tool calls, tool results, and failures stream correctly without regressing existing engines.
+**目标：** 使 MiMo Code 引擎适配器与 Halo 的 Claude Code 兼容代理协议对齐，确保思考、工具调用、工具结果和失败能够正确流式传输，同时不影响现有引擎。
 
-**Architecture:** MiMo-specific event normalization stays under `src/main/services/agent/mimo/`. Shared agent consumers remain engine-agnostic; engine-specific command and skill handling is normalized before reaching `session-consumer.ts` or `stream-processor.ts`.
+**架构：** MiMo 特定的事件规范化保留在 `src/main/services/agent/mimo/` 下。共享的代理消费者保持引擎无关；引擎特定的命令和技能处理在到达 `session-consumer.ts` 或 `stream-processor.ts` 之前进行规范化。
 
-**Tech Stack:** Electron main process, TypeScript, Vitest, Halo agent service, MiMo SDK v2 SSE stream.
-
----
-
-## File Structure
-
-- Modify: `src/main/services/agent/mimo/event-normalizer.ts`
-  - Owns MiMo native event to Halo/Claude stream frame translation.
-  - Must emit `input_json_delta` for tool input and assistant aggregate frames before tool results.
-- Modify: `src/main/services/agent/mimo/session-adapter.ts`
-  - Owns MiMo session lifecycle, SSE subscription, HTTP prompt fallback, and error result emission.
-  - Must not rely on shared `sdk-config.ts` for MiMo-private skill content.
-- Create: `src/main/services/agent/mimo/skill-context.ts`
-  - Owns MiMo-only skill discovery and skill file loading.
-- Modify: `src/main/services/agent/sdk-config.ts`
-  - Remove MiMo-only `_installedSkills` injection and exported MiMo skill reader.
-- Modify: `src/main/services/agent/session-manager.ts`
-  - Stop treating all supported commands as skills in the shared warm-up path.
-- Create: `tests/unit/services/agent/mimo/event-normalizer.test.ts`
-  - Protocol-level tests for thinking, text, tool input, assistant aggregate, tool result ordering.
-- Modify: `tests/unit/services/agent/mimo/session-adapter-fallback.test.ts`
-  - Add prompt failure test and update mocks to use MiMo-local skill context.
+**技术栈：** Electron 主进程、TypeScript、Vitest、Halo 代理服务、MiMo SDK v2 SSE 流。
 
 ---
 
-## Task 1: Add MiMo normalizer protocol tests
+## 文件结构
 
-**Files:**
-- Create: `tests/unit/services/agent/mimo/event-normalizer.test.ts`
-- Test target: `src/main/services/agent/mimo/event-normalizer.ts`
+- 修改：`src/main/services/agent/mimo/event-normalizer.ts`
+  - 负责 MiMo 原生事件到 Halo/Claude 流帧的转换。
+  - 必须为工具输入发出 `input_json_delta`，并在工具结果之前发出助手聚合帧。
+- 修改：`src/main/services/agent/mimo/session-adapter.ts`
+  - 负责 MiMo 会话生命周期、SSE 订阅、HTTP 提示回退和错误结果发出。
+  - 不得依赖共享的 `sdk-config.ts` 来处理 MiMo 私有技能内容。
+- 创建：`src/main/services/agent/mimo/skill-context.ts`
+  - 负责 MiMo 专属的技能发现和技能文件加载。
+- 修改：`src/main/services/agent/sdk-config.ts`
+  - 移除 MiMo 专属的 `_installedSkills` 注入和导出的 MiMo 技能读取器。
+- 修改：`src/main/services/agent/session-manager.ts`
+  - 停止在共享预热路径中将所有支持的命令视为技能。
+- 创建：`tests/unit/services/agent/mimo/event-normalizer.test.ts`
+  - 针对思考、文本、工具输入、助手聚合、工具结果排序的协议级测试。
+- 修改：`tests/unit/services/agent/mimo/session-adapter-fallback.test.ts`
+  - 添加提示失败测试并更新 mock 以使用 MiMo 本地技能上下文。
 
-- [ ] **Step 1: Write failing tests**
+---
 
-Add tests that assert:
+## 任务 1：添加 MiMo 规范化器协议测试
+
+**文件：**
+- 创建：`tests/unit/services/agent/mimo/event-normalizer.test.ts`
+- 测试目标：`src/main/services/agent/mimo/event-normalizer.ts`
+
+- [ ] **步骤 1：编写失败测试**
+
+添加以下断言测试：
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -142,31 +142,31 @@ describe('MimoEventNormalizer', () => {
 })
 ```
 
-- [ ] **Step 2: Verify RED**
+- [ ] **步骤 2：验证 RED**
 
-Run:
+运行：
 
 ```bash
 npm run test:unit -- tests/unit/services/agent/mimo/event-normalizer.test.ts
 ```
 
-Expected: fails because tool input delta and assistant aggregate are missing.
+预期：失败，因为工具输入 delta 和助手聚合缺失。
 
 ---
 
-## Task 2: Fix MiMo tool protocol frames
+## 任务 2：修复 MiMo 工具协议帧
 
-**Files:**
-- Modify: `src/main/services/agent/mimo/event-normalizer.ts`
-- Test: `tests/unit/services/agent/mimo/event-normalizer.test.ts`
+**文件：**
+- 修改：`src/main/services/agent/mimo/event-normalizer.ts`
+- 测试：`tests/unit/services/agent/mimo/event-normalizer.test.ts`
 
-- [ ] **Step 1: Emit tool input via `input_json_delta`**
+- [ ] **步骤 1：通过 `input_json_delta` 发出工具输入**
 
-When a tool part starts, emit block start with empty `input: {}`. Then emit an `input_json_delta` frame when input is available and different from the input already emitted.
+当工具部分开始时，发出带有空 `input: {}` 的块开始。然后当输入可用且与已发出的输入不同时，发出 `input_json_delta` 帧。
 
-- [ ] **Step 2: Emit assistant aggregate before tool result**
+- [ ] **步骤 2：在工具结果之前发出助手聚合**
 
-When a tool part completes or errors, emit:
+当工具部分完成或出错时，在匹配的 `user.tool_result` 之前发出：
 
 ```ts
 {
@@ -180,29 +180,27 @@ When a tool part completes or errors, emit:
 }
 ```
 
-before the matching `user.tool_result`.
+- [ ] **步骤 3：验证 GREEN**
 
-- [ ] **Step 3: Verify GREEN**
-
-Run:
+运行：
 
 ```bash
 npm run test:unit -- tests/unit/services/agent/mimo/event-normalizer.test.ts
 ```
 
-Expected: all tests pass.
+预期：所有测试通过。
 
 ---
 
-## Task 3: Add prompt failure test
+## 任务 3：添加提示失败测试
 
-**Files:**
-- Modify: `tests/unit/services/agent/mimo/session-adapter-fallback.test.ts`
-- Test target: `src/main/services/agent/mimo/session-adapter.ts`
+**文件：**
+- 修改：`tests/unit/services/agent/mimo/session-adapter-fallback.test.ts`
+- 测试目标：`src/main/services/agent/mimo/session-adapter.ts`
 
-- [ ] **Step 1: Write failing test**
+- [ ] **步骤 1：编写失败测试**
 
-Add a test that mocks `fetch` returning 502 and asserts the final frame is an error result:
+添加一个测试，mock `fetch` 返回 502 并断言最终帧是错误结果：
 
 ```ts
 it('emits an error result when the prompt endpoint fails', async () => {
@@ -233,161 +231,161 @@ it('emits an error result when the prompt endpoint fails', async () => {
 })
 ```
 
-- [ ] **Step 2: Verify RED**
+- [ ] **步骤 2：验证 RED**
 
-Run:
-
-```bash
-npm run test:unit -- tests/unit/services/agent/mimo/session-adapter-fallback.test.ts
-```
-
-Expected: fails because prompt errors currently finish as success.
-
----
-
-## Task 4: Fix prompt error result handling
-
-**Files:**
-- Modify: `src/main/services/agent/mimo/session-adapter.ts`
-- Modify: `src/main/services/agent/mimo/event-normalizer.ts` only if result shape needs adjustment
-- Test: `tests/unit/services/agent/mimo/session-adapter-fallback.test.ts`
-
-- [ ] **Step 1: Add explicit finish status**
-
-Change `finishTurn()` to accept an optional error message and call `normalizer.createResult(true, message)` for failure.
-
-- [ ] **Step 2: Use error finish from prompt failure path**
-
-In `send()` catch handler, call the error finish path instead of the success finish path.
-
-- [ ] **Step 3: Keep SSE failure non-fatal**
-
-SSE subscription failure should log and allow HTTP fallback. Only prompt failure should produce a failed turn.
-
-- [ ] **Step 4: Verify GREEN**
-
-Run:
+运行：
 
 ```bash
 npm run test:unit -- tests/unit/services/agent/mimo/session-adapter-fallback.test.ts
 ```
 
-Expected: prompt 502 returns an error result.
+预期：失败，因为提示错误当前以成功方式结束。
 
 ---
 
-## Task 5: Isolate MiMo skill context
+## 任务 4：修复提示错误结果处理
 
-**Files:**
-- Create: `src/main/services/agent/mimo/skill-context.ts`
-- Modify: `src/main/services/agent/mimo/session-adapter.ts`
-- Modify: `src/main/services/agent/sdk-config.ts`
-- Modify tests that mock `getSkillContent`
+**文件：**
+- 修改：`src/main/services/agent/mimo/session-adapter.ts`
+- 仅在结果形状需要调整时修改：`src/main/services/agent/mimo/event-normalizer.ts`
+- 测试：`tests/unit/services/agent/mimo/session-adapter-fallback.test.ts`
 
-- [ ] **Step 1: Move skill discovery to MiMo module**
+- [ ] **步骤 1：添加显式完成状态**
 
-Create MiMo-local functions:
+修改 `finishTurn()` 接受可选的错误消息，并在失败时调用 `normalizer.createResult(true, message)`。
+
+- [ ] **步骤 2：从提示失败路径使用错误完成**
+
+在 `send()` 的 catch 处理程序中，调用错误完成路径而非成功完成路径。
+
+- [ ] **步骤 3：保持 SSE 失败为非致命**
+
+SSE 订阅失败应记录日志并允许 HTTP 回退。只有提示失败应产生失败的轮次。
+
+- [ ] **步骤 4：验证 GREEN**
+
+运行：
+
+```bash
+npm run test:unit -- tests/unit/services/agent/mimo/session-adapter-fallback.test.ts
+```
+
+预期：提示 502 返回错误结果。
+
+---
+
+## 任务 5：隔离 MiMo 技能上下文
+
+**文件：**
+- 创建：`src/main/services/agent/mimo/skill-context.ts`
+- 修改：`src/main/services/agent/mimo/session-adapter.ts`
+- 修改：`src/main/services/agent/sdk-config.ts`
+- 修改使用 `getSkillContent` mock 的测试
+
+- [ ] **步骤 1：将技能发现移至 MiMo 模块**
+
+创建 MiMo 本地函数：
 
 ```ts
 export function getMimoInstalledSkills(): string[]
 export function getMimoSkillContent(skillName: string): string | null
 ```
 
-They should use `resolveClaudeConfigDir()` and read `$CLAUDE_CONFIG_DIR/skills/<skill>/SKILL.md`.
+它们应使用 `resolveClaudeConfigDir()` 并读取 `$CLAUDE_CONFIG_DIR/skills/<skill>/SKILL.md`。
 
-- [ ] **Step 2: Use MiMo-local skill context in adapter**
+- [ ] **步骤 2：在适配器中使用 MiMo 本地技能上下文**
 
-`MimoSession` should call `getMimoInstalledSkills()` during start and `getMimoSkillContent()` for command registration and slash fallback.
+`MimoSession` 应在启动时调用 `getMimoInstalledSkills()`，在命令注册和斜杠回退时调用 `getMimoSkillContent()`。
 
-- [ ] **Step 3: Remove shared `_installedSkills` injection**
+- [ ] **步骤 3：移除共享的 `_installedSkills` 注入**
 
-Delete `sdkOptions._installedSkills = getInstalledSkills()` from `buildBaseSdkOptions()`.
+从 `buildBaseSdkOptions()` 中删除 `sdkOptions._installedSkills = getInstalledSkills()`。
 
-- [ ] **Step 4: Verify focused tests**
+- [ ] **步骤 4：验证聚焦测试**
 
-Run:
+运行：
 
 ```bash
 npm run test:unit -- tests/unit/services/agent/mimo/session-adapter-fallback.test.ts tests/unit/services/agent/sdk-config-runtime-limits.test.ts
 ```
 
-Expected: tests pass without shared MiMo private fields.
+预期：测试在没有共享 MiMo 私有字段的情况下通过。
 
 ---
 
-## Task 6: Stop shared warm-up from classifying every command as a skill
+## 任务 6：停止共享预热将每个命令分类为技能
 
-**Files:**
-- Modify: `src/main/services/agent/session-manager.ts`
+**文件：**
+- 修改：`src/main/services/agent/session-manager.ts`
 
-- [ ] **Step 1: Change shared session-info emission**
+- [ ] **步骤 1：更改共享会话信息发出**
 
-Replace:
+替换：
 
 ```ts
 skills: slashCommands
 ```
 
-with command-provided skills only when available, otherwise `[]`.
+为仅在可用时使用命令提供的技能，否则为 `[]`。
 
-- [ ] **Step 2: Preserve MiMo skills from adapter**
+- [ ] **步骤 2：保留来自适配器的 MiMo 技能**
 
-If MiMo needs skills in warm-up, return structured command objects from `MimoSession.query.supportedCommands()` with a marker field, then map only those marked entries to skills.
+如果 MiMo 需要在预热中包含技能，从 `MimoSession.query.supportedCommands()` 返回带有标记字段的结构化命令对象，然后仅将标记的条目映射为技能。
 
-- [ ] **Step 3: Verify no non-MiMo regression**
+- [ ] **步骤 3：验证无非 MiMo 回退**
 
-Run:
+运行：
 
 ```bash
 npm run test:unit -- tests/unit/services/agent/codex/session-adapter-shape.test.ts
 ```
 
-Expected: Codex supported commands behavior remains unchanged.
+预期：Codex 支持的命令行为保持不变。
 
 ---
 
-## Task 7: Final verification
+## 任务 7：最终验证
 
-**Files:**
-- All touched files
+**文件：**
+- 所有涉及的文件
 
-- [ ] **Step 1: Run MiMo focused tests**
+- [ ] **步骤 1：运行 MiMo 聚焦测试**
 
 ```bash
 npm run test:unit -- tests/unit/services/agent/mimo
 ```
 
-Expected: all MiMo tests pass.
+预期：所有 MiMo 测试通过。
 
-- [ ] **Step 2: Run agent focused tests**
+- [ ] **步骤 2：运行代理聚焦测试**
 
 ```bash
 npm run test:unit -- tests/unit/services/agent
 ```
 
-Expected: all agent tests pass or only unrelated known failures are documented.
+预期：所有代理测试通过，或仅记录已知的无关失败。
 
-- [ ] **Step 3: Run build**
+- [ ] **步骤 3：运行构建**
 
 ```bash
 npm run build
 ```
 
-Expected: build completes.
+预期：构建完成。
 
-- [ ] **Step 4: Manual verification**
+- [ ] **步骤 4：手动验证**
 
-1. Select MiMo Code engine.
-2. Send a prompt that produces reasoning.
-3. Confirm thinking appears while execution is still running.
-4. Confirm the thinking panel can be expanded during execution.
-5. Confirm completed thinking remains available after execution.
-6. Reproduce a prompt 502 and confirm UI shows a failed turn instead of an empty successful reply.
+1. 选择 MiMo Code 引擎。
+2. 发送一个产生推理的提示。
+3. 确认思考在执行过程中出现。
+4. 确认思考面板可以在执行期间展开。
+5. 确认已完成的思考在执行后仍然可用。
+6. 复现提示 502 并确认 UI 显示失败轮次而非空的成功回复。
 
 ---
 
-## Self-Review
+## 自检
 
-- Spec coverage: The plan covers protocol ordering, tool input deltas, assistant aggregate, prompt errors, skill context boundaries, supported command regression, and thinking stream verification.
-- Placeholder scan: No placeholder implementation tasks remain.
-- Type consistency: File names and method responsibilities match the current agent/MiMo module structure.
+- 规范覆盖：方案涵盖了协议排序、工具输入 delta、助手聚合、提示错误、技能上下文边界、支持的命令回退和思考流验证。
+- 占位符扫描：没有剩余的占位符实现任务。
+- 类型一致性：文件名和方法职责与当前代理/MiMo 模块结构匹配。
