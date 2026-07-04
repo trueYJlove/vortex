@@ -17,23 +17,17 @@
  */
 
 import { useState } from 'react'
-import { Globe, ChevronDown, Sun, Moon, Monitor, Loader2 } from 'lucide-react'
+import { Globe, ChevronDown, Monitor, Loader2 } from 'lucide-react'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
 import { useAppStore } from '../../stores/app.store'
+import { getAllThemes } from '../../themes/registry'
 import type { HaloConfig, ThemeMode } from '../../types'
 
 interface PreferencesStepProps {
   /** Invoked once preferences are persisted, hands off to LoginSelector. */
   onContinue: () => void
 }
-
-// Theme button option metadata, keyed for stable iteration order.
-const THEME_OPTIONS: ReadonlyArray<{ value: ThemeMode; labelKey: string; Icon: typeof Sun }> = [
-  { value: 'light',  labelKey: 'Light',         Icon: Sun },
-  { value: 'dark',   labelKey: 'Dark',          Icon: Moon },
-  { value: 'system', labelKey: 'Follow System', Icon: Monitor }
-]
 
 export function PreferencesStep({ onContinue }: PreferencesStepProps) {
   const { t } = useTranslation()
@@ -144,14 +138,30 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
           <label className="block text-sm font-medium text-foreground mb-2">
             {t('Theme')}
           </label>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {THEME_OPTIONS.map(({ value, labelKey, Icon }) => {
-              const isSelected = theme === value
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            {/* System option */}
+            <button
+              type="button"
+              onClick={() => handleThemeChange('system')}
+              className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 sm:py-4 rounded-lg border transition-colors ${
+                theme === 'system'
+                  ? 'bg-primary/15 border-primary text-primary'
+                  : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+              }`}
+              aria-pressed={theme === 'system'}
+            >
+              <Monitor className="w-5 h-5" />
+              <span className="text-xs sm:text-sm">{t('Follow System')}</span>
+            </button>
+
+            {/* Built-in themes */}
+            {getAllThemes().map((themeDef) => {
+              const isSelected = theme === themeDef.id
               return (
                 <button
-                  key={value}
+                  key={themeDef.id}
                   type="button"
-                  onClick={() => handleThemeChange(value)}
+                  onClick={() => handleThemeChange(themeDef.id)}
                   className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 sm:py-4 rounded-lg border transition-colors ${
                     isSelected
                       ? 'bg-primary/15 border-primary text-primary'
@@ -159,8 +169,12 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
                   }`}
                   aria-pressed={isSelected}
                 >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-xs sm:text-sm">{t(labelKey)}</span>
+                  <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
+                  </div>
+                  <span className="text-xs sm:text-sm">{themeDef.name}</span>
                 </button>
               )
             })}

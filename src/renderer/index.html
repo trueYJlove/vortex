@@ -9,24 +9,26 @@
     />
   <title>Halo - AI that gets things done</title>
     <style>
-      /* Anti-flash: set background before CSS loads */
-      html, body, #root { background-color: #0a0a0a; }
-      html.light, html.light body, html.light #root { background-color: #ffffff; }
+      /* Anti-flash: set background before CSS loads (default: dark) */
+      html, body, #root { background-color: #161822; }
     </style>
     <script>
-      // Anti-flash: apply theme before render (default: dark)
+      // Anti-flash: apply theme before render
       (function() {
+        // Background color map for known themes (avoids importing registry)
+        // MUST stay in sync with src/renderer/themes/builtins/*.ts preview.background values
+        var BG = { dark: '#161822', light: '#ffffff', dracula: '#282a36', 'tokyo-night': '#1a1b26', 'one-dark-pro': '#282c34', nord: '#2e3440', 'catppuccin-mocha': '#1e1e2e' };
         try {
-          var theme = localStorage.getItem('halo-theme');
-          if (theme === 'light') {
-            document.documentElement.classList.add('light');
-          } else if (theme === 'system') {
-            // system: check preference
-            if (!window.matchMedia('(prefers-color-scheme: dark)').matches) {
-              document.documentElement.classList.add('light');
-            }
+          var stored = localStorage.getItem('halo-theme');
+          var themeId = stored || 'dark';
+          if (themeId === 'system') {
+            themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
-          // default (no localStorage or 'dark'): stay dark, do nothing
+          document.documentElement.setAttribute('data-theme', themeId);
+          var bg = BG[themeId];
+          if (bg) {
+            document.documentElement.style.cssText = 'background-color:' + bg + ';color-scheme:' + (themeId === 'light' ? 'light' : 'dark');
+          }
         } catch (e) {}
         // Platform class for conditional CSS (e.g. backdrop-filter only on GPU-enabled platforms)
         if (navigator.userAgent.indexOf('Windows') !== -1) {

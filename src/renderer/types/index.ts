@@ -9,6 +9,7 @@ import {
   getCurrentModelName,
   hasAnyAISource
 } from '../../shared/types/ai-sources';
+import type { BuiltInThemeId } from '../themes/registry';
 import { NotificationChannelsConfig }  from '../../shared/types/notification-channels';
 // Re-export them
 export { DEFAULT_MODEL, getCurrentModelName, hasAnyAISource };
@@ -75,8 +76,8 @@ export { supportsVision } from '../../shared/constants/model-capabilities';
 // Permission Level
 export type PermissionLevel = 'allow' | 'ask' | 'deny';
 
-// Theme Mode
-export type ThemeMode = 'light' | 'dark' | 'system';
+// Theme Mode — 'system' resolves at runtime via resolveSystemTheme()
+export type ThemeMode = 'system' | BuiltInThemeId;
 
 // Tool Call Status
 export type ToolStatus = 'pending' | 'running' | 'success' | 'error' | 'waiting_approval';

@@ -299,7 +299,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
               </div>
             </label>
 
-            {/* MiMo Code */}
+            {/* MiMo Code SDK */}
             <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input
                 type="radio"
@@ -310,7 +310,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
                 className="mt-0.5 accent-primary"
               />
               <div>
-                <p className="font-medium text-sm">{t('MiMo Code')}</p>
+                <p className="font-medium text-sm">{t('MiMo Code SDK')}</p>
                 <p className="text-xs text-muted-foreground">{t('Powered by MiMo Code engine. Supports long-horizon tasks with checkpoint/rebuild memory. Requires opencode CLI installed. Experimental.')}</p>
               </div>
             </label>

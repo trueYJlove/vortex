@@ -15,7 +15,7 @@ import {
   ChevronDown,
   Braces,
 } from 'lucide-react'
-import { TodoCard, parseTodoInput } from '../tool/TodoCard'
+import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { TeamSnapshotPanel } from './TeamPanel'
@@ -134,7 +134,7 @@ function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?:
                 title={showResult ? t('Hide tool result') : t('Show tool result')}
               >
                 {showResult ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                {showResult ? 'Hide' : 'Result'}
+                {showResult ? t('Hide') : t('Result')}
               </button>
             )}
           </div>
@@ -204,16 +204,7 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
   const [isMaximized, setIsMaximized] = useState(defaultMaximized)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Get latest todo data (only render one TodoCard at bottom)
-  const latestTodos = useMemo(() => {
-    const todoThoughts = thoughts.filter(
-      t => t.type === 'tool_use' && t.toolName === 'TodoWrite' && t.toolInput
-    )
-    if (todoThoughts.length === 0) return null
-
-    const latest = todoThoughts[todoThoughts.length - 1]
-    return parseTodoInput(latest.toolInput!)
-  }, [thoughts])
+  const latestTodos = useMemo(() => getLatestTodosFromThoughts(thoughts), [thoughts])
 
   // Filter thoughts for display (exclude TodoWrite, results, and sub-agent thoughts)
   // Sub-agent thoughts are rendered nested inside their parent Task thought via SubAgentTimeline

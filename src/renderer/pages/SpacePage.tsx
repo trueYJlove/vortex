@@ -135,9 +135,10 @@ export function SpacePage() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!chatContainerRef.current) return
 
-      // Calculate width from left edge of chat container to mouse position
+      // Calculate width: canvas is on the left, so drag handle is on chat's left edge.
+      // Dragging right shrinks chat (smaller width), dragging left expands it.
       const containerRect = chatContainerRef.current.getBoundingClientRect()
-      const newWidth = e.clientX - containerRect.left
+      const newWidth = containerRect.right - e.clientX
 
       // Clamp to constraints
       const clampedWidth = Math.max(chatWidthMin, Math.min(chatWidthMax, newWidth))
@@ -406,13 +407,25 @@ export function SpacePage() {
         {/* Desktop Layout */}
         {!isMobile && (
           <>
+            {/* Content Canvas - main viewing area when open, full width when maximized */}
+            <div
+              className={`
+                min-w-0 overflow-hidden
+                ${isCanvasOpen || isCanvasMaximized
+                  ? 'flex-1 opacity-100'
+                  : 'w-0 flex-none opacity-0'}
+              `}
+            >
+              {(isCanvasOpen || isCanvasMaximized || isCanvasTransitioning) && <ContentCanvas />}
+            </div>
+
             {/* Chat view - hidden when maximized, adjusts width based on canvas state */}
             {!isCanvasMaximized && (
               <div
                 ref={chatContainerRef}
                 className={`
                   flex flex-col min-w-0 relative
-                  ${isCanvasOpen ? 'border-r border-border/60' : 'flex-1 border-r border-transparent'}
+                  ${isCanvasOpen ? 'border-l border-border/60' : 'flex-1 border-l border-transparent'}
                 `}
                 style={{
                   width: isCanvasOpen ? dragChatWidth : undefined,
@@ -437,7 +450,7 @@ export function SpacePage() {
                 {isCanvasOpen && (
                   <div
                     className={`
-                      absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20
+                      absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20
                       hover:bg-primary/50 transition-colors
                       ${isDraggingChat ? 'bg-primary/50' : ''}
                     `}
@@ -447,18 +460,6 @@ export function SpacePage() {
                 )}
               </div>
             )}
-
-            {/* Content Canvas - main viewing area when open, full width when maximized */}
-            <div
-              className={`
-                min-w-0 overflow-hidden
-                ${isCanvasOpen || isCanvasMaximized
-                  ? 'flex-1 opacity-100'
-                  : 'w-0 flex-none opacity-0'}
-              `}
-            >
-              {(isCanvasOpen || isCanvasMaximized || isCanvasTransitioning) && <ContentCanvas />}
-            </div>
           </>
         )}
 
@@ -483,7 +484,7 @@ export function SpacePage() {
 
       {/* Mobile Canvas Overlay */}
       {isMobile && isCanvasOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-slide-in-right-full">
+        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-slide-in-left-full">
           {/* Mobile Canvas Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card/80 backdrop-blur-sm">
             <button

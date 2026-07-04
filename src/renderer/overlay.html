@@ -14,21 +14,17 @@
         background: transparent;
         overflow: hidden;
       }
-      /* Anti-flash: apply theme before render */
-      html.light #root { /* Light theme styles if needed */ }
     </style>
     <script>
       // Apply theme from main window
       (function() {
         try {
-          var theme = localStorage.getItem('halo-theme');
-          if (theme === 'light') {
-            document.documentElement.classList.add('light');
-          } else if (theme === 'system') {
-            if (!window.matchMedia('(prefers-color-scheme: dark)').matches) {
-              document.documentElement.classList.add('light');
-            }
+          var stored = localStorage.getItem('halo-theme');
+          var themeId = stored || 'dark';
+          if (themeId === 'system') {
+            themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
+          document.documentElement.setAttribute('data-theme', themeId);
         } catch (e) {}
       })();
     </script>
