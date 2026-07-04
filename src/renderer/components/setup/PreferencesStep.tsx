@@ -21,7 +21,7 @@ import { Globe, ChevronDown, Monitor, Loader2 } from 'lucide-react'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
 import { useAppStore } from '../../stores/app.store'
-import { getAllThemes } from '../../themes/registry'
+import { getThemesByType } from '../../themes/registry'
 import type { HaloConfig, ThemeMode } from '../../types'
 
 interface PreferencesStepProps {
@@ -153,31 +153,66 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
               <Monitor className="w-5 h-5" />
               <span className="text-xs sm:text-sm">{t('Follow System')}</span>
             </button>
+          </div>
 
-            {/* Built-in themes */}
-            {getAllThemes().map((themeDef) => {
-              const isSelected = theme === themeDef.id
-              return (
-                <button
-                  key={themeDef.id}
-                  type="button"
-                  onClick={() => handleThemeChange(themeDef.id)}
-                  className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 sm:py-4 rounded-lg border transition-colors ${
-                    isSelected
-                      ? 'bg-primary/15 border-primary text-primary'
-                      : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
-                  }`}
-                  aria-pressed={isSelected}
-                >
-                  <div className="flex gap-1">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
-                  </div>
-                  <span className="text-xs sm:text-sm">{themeDef.name}</span>
-                </button>
-              )
-            })}
+          {/* Dark themes */}
+          <div className="mt-3">
+            <span className="text-xs text-muted-foreground/70 mb-1.5 block">{t('Dark Themes')}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              {getThemesByType().dark.map((themeDef) => {
+                const isSelected = theme === themeDef.id
+                return (
+                  <button
+                    key={themeDef.id}
+                    type="button"
+                    onClick={() => handleThemeChange(themeDef.id)}
+                    className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 sm:py-4 rounded-lg border transition-colors ${
+                      isSelected
+                        ? 'bg-primary/15 border-primary text-primary'
+                        : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                    }`}
+                    aria-pressed={isSelected}
+                  >
+                    <div className="flex gap-1">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
+                    </div>
+                    <span className="text-xs sm:text-sm">{themeDef.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Light themes */}
+          <div className="mt-3">
+            <span className="text-xs text-muted-foreground/70 mb-1.5 block">{t('Light Themes')}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              {getThemesByType().light.map((themeDef) => {
+                const isSelected = theme === themeDef.id
+                return (
+                  <button
+                    key={themeDef.id}
+                    type="button"
+                    onClick={() => handleThemeChange(themeDef.id)}
+                    className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 sm:py-4 rounded-lg border transition-colors ${
+                      isSelected
+                        ? 'bg-primary/15 border-primary text-primary'
+                        : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                    }`}
+                    aria-pressed={isSelected}
+                  >
+                    <div className="flex gap-1">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
+                    </div>
+                    <span className="text-xs sm:text-sm">{themeDef.name}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
 

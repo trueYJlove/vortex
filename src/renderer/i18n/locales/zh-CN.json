@@ -1236,6 +1236,8 @@
   "The store already has this version or a newer one. Increase the version number and try again.": "商店已存在此版本或更新的版本。请增加版本号后重试。",
   "The workspace folder where the digital human saves code files, task outputs, and work artifacts.": "数字人的工作目录，保存代码文件、任务产物等工作结果。",
   "Theme": "主题",
+  "Dark Themes": "深色主题",
+  "Light Themes": "浅色主题",
   "These sessions are available as contacts for the digital human's IM push capability.": "这些会话可作为数字人IM推送功能的联系人使用。",
   "Thinking": "思考中",
   "Thinking...": "思考中...",
