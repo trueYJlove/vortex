@@ -16,6 +16,7 @@ import { nordTheme } from './builtins/nord'
 import { catppuccinMochaTheme } from './builtins/catppuccin-mocha'
 import { intellijLightTheme } from './builtins/intellij-light'
 import { darculaTheme } from './builtins/darcula'
+import { githubDarkTheme } from './builtins/github-dark'
 
 // ============================================
 // Types
@@ -78,6 +79,7 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   catppuccinMochaTheme,
   intellijLightTheme,
   darculaTheme,
+  githubDarkTheme,
 ]
 
 /** Auto-derived union type from BUILTIN_THEMES — no manual maintenance needed. */
