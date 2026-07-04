@@ -16,16 +16,25 @@ import {
   ListTodo,
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
-
-// Note: Loader2 is used for in_progress task icon animation
+import type { Thought } from '../../types'
 
 // Todo item status from Claude Code SDK
-type TodoStatus = 'pending' | 'in_progress' | 'completed'
+export type TodoStatus = 'pending' | 'in_progress' | 'completed'
 
-interface TodoItem {
+export interface TodoItem {
   content: string
   status: TodoStatus
   activeForm?: string  // Present tense form for in_progress display
+}
+
+export function getTodoStats(todos: TodoItem[]) {
+  const total = todos.length
+  const completed = todos.filter(t => t.status === 'completed').length
+  const inProgress = todos.filter(t => t.status === 'in_progress').length
+  const pending = todos.filter(t => t.status === 'pending').length
+  const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+
+  return { total, completed, inProgress, pending, progress }
 }
 
 interface TodoCardProps {
@@ -99,16 +108,7 @@ function TodoItemRow({ item, index, isAgentActive = true }: { item: TodoItem; in
 
 export function TodoCard({ todos, isAgentActive = true }: TodoCardProps) {
   const { t } = useTranslation()
-  // Calculate progress stats
-  const stats = useMemo(() => {
-    const total = todos.length
-    const completed = todos.filter(t => t.status === 'completed').length
-    const inProgress = todos.filter(t => t.status === 'in_progress').length
-    const pending = todos.filter(t => t.status === 'pending').length
-    const progress = total > 0 ? Math.round((completed / total) * 100) : 0
-
-    return { total, completed, inProgress, pending, progress }
-  }, [todos])
+  const stats = useMemo(() => getTodoStats(todos), [todos])
 
   if (todos.length === 0) {
     return null
@@ -175,4 +175,14 @@ export function parseTodoInput(input: Record<string, unknown>): TodoItem[] {
     status: (t.status as TodoStatus) || 'pending',
     activeForm: t.activeForm,
   }))
+}
+
+export function getLatestTodosFromThoughts(thoughts?: Thought[] | null): TodoItem[] | null {
+  const todoThoughts = thoughts?.filter(
+    t => t.type === 'tool_use' && t.toolName === 'TodoWrite' && t.toolInput
+  )
+  if (!todoThoughts || todoThoughts.length === 0) return null
+
+  const latest = todoThoughts[todoThoughts.length - 1]
+  return parseTodoInput(latest.toolInput!)
 }
