@@ -14,6 +14,8 @@ import { tokyoNightTheme } from './builtins/tokyo-night'
 import { oneDarkProTheme } from './builtins/one-dark-pro'
 import { nordTheme } from './builtins/nord'
 import { catppuccinMochaTheme } from './builtins/catppuccin-mocha'
+import { intellijLightTheme } from './builtins/intellij-light'
+import { darculaTheme } from './builtins/darcula'
 
 // ============================================
 // Types
@@ -74,6 +76,8 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   oneDarkProTheme,
   nordTheme,
   catppuccinMochaTheme,
+  intellijLightTheme,
+  darculaTheme,
 ]
 
 /** Auto-derived union type from BUILTIN_THEMES — no manual maintenance needed. */
