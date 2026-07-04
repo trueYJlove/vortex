@@ -10,7 +10,7 @@ export const MIMO_CAPABILITIES: EngineCapabilities = {
     toolOutput: 'item',
   },
   tools: {
-    native: ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'Mcp'],
+    native: ['Bash', 'Read', 'Write', 'Edit', 'Grep', 'Glob', 'TodoWrite', 'Mcp'],
     synthetic: [],
     shellHeuristics: false,
   },

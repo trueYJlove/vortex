@@ -80,8 +80,12 @@ export class MimoSession {
           'You have access to skills invoked via slash commands (e.g., /brainstorming).',
           'When a user invokes a skill, its instructions are provided in the message.',
           'Follow those instructions carefully to complete the user\'s request.',
-          'You have access to tools: Bash, Read, Write, Edit, Grep, Glob.',
+          'You have access to tools: Bash, Read, Write, Edit, Grep, Glob, TodoWrite.',
           'Use them as instructed by the skill content.',
+          '',
+          '## Task Planning',
+          'For multi-step tasks, use the TodoWrite tool to create a task plan before starting work.',
+          'This helps the user track your progress. Update todo statuses as you complete each step.',
         ].join('\n'),
       },
     }
