@@ -918,7 +918,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-full w-full overflow-hidden bg-background">
+    <div className="h-full w-full overflow-hidden bg-background flex flex-col">
       {/* WebSocket reconnection banner */}
       {showReconnectBanner && (
         <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-center gap-2 py-1.5 bg-halo-warning/90 text-sm font-medium animate-slide-down safe-area-top"
@@ -928,7 +928,7 @@ export default function App() {
           <span className="text-foreground">{t('Reconnecting...')}</span>
         </div>
       )}
-      {renderView()}
+      <div className="flex-1 overflow-hidden pb-6">{renderView()}</div>
       {/* Bottom status bar — visible on main views */}
       {view !== 'splash' && view !== 'setup' && view !== 'serverConnect' && view !== 'serverList' && view !== 'gitBashSetup' && (
         <StatusBar />
