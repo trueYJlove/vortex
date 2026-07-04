@@ -102,9 +102,9 @@ const customStyles = {
 
 // Detect if dark mode is active
 function useIsDarkMode(): boolean {
-  // Check if html element has 'light' class (our theme system uses dark as default)
   if (typeof document !== 'undefined') {
-    return !document.documentElement.classList.contains('light')
+    const themeId = document.documentElement.getAttribute('data-theme') || 'dark'
+    return themeId !== 'light'
   }
   return true
 }

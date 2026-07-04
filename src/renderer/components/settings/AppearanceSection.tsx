@@ -4,9 +4,11 @@
  */
 
 import { useState, useCallback } from 'react'
+import { Monitor } from 'lucide-react'
 import type { HaloConfig, ThemeMode, SendKeyMode } from '../../types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
+import { getAllThemes } from '../../themes/registry'
 
 interface AppearanceSectionProps {
   config: HaloConfig | null
@@ -47,6 +49,8 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
     })
   }
 
+  const allThemes = getAllThemes()
+
   return (
     <section id="appearance" className="bg-card rounded-xl border border-border p-6">
       <h2 className="text-lg font-medium mb-4">{t('Appearance')}</h2>
@@ -55,18 +59,40 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
         {/* Theme */}
         <div>
           <label className="block text-sm text-muted-foreground mb-2">{t('Theme')}</label>
-          <div className="flex gap-4">
-            {(['light', 'dark', 'system'] as ThemeMode[]).map((themeMode) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* System option */}
+            <button
+              onClick={() => handleThemeChange('system')}
+              className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors ${
+                theme === 'system'
+                  ? 'bg-primary/15 border-primary text-primary'
+                  : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+              }`}
+            >
+              <div className="flex -space-x-1">
+                <div className="w-4 h-4 rounded-full border border-border bg-[#0a0a0a]" />
+                <div className="w-4 h-4 rounded-full border border-border bg-[#ffffff]" />
+              </div>
+              <span className="text-xs">{t('Follow System')}</span>
+            </button>
+
+            {/* Built-in themes */}
+            {allThemes.map((themeDef) => (
               <button
-                key={themeMode}
-                onClick={() => handleThemeChange(themeMode)}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  theme === themeMode
-                    ? 'bg-primary/20 text-primary border border-primary'
-                    : 'bg-secondary hover:bg-secondary/80'
+                key={themeDef.id}
+                onClick={() => handleThemeChange(themeDef.id)}
+                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors ${
+                  theme === themeDef.id
+                    ? 'bg-primary/15 border-primary text-primary'
+                    : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
                 }`}
               >
-                {themeMode === 'light' ? t('Light') : themeMode === 'dark' ? t('Dark') : t('Follow System')}
+                <div className="flex gap-1">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
+                </div>
+                <span className="text-xs">{themeDef.name}</span>
               </button>
             ))}
           </div>

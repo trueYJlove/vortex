@@ -22,80 +22,20 @@
 
 /* ============================================
    Theme System
-   - Default: dark theme
-   - Add .light class to <html> for light theme
+   - CSS color variables are injected at runtime by applyTheme()
+   - Use [data-theme="xxx"] selectors for theme-specific overrides
    ============================================ */
 
 :root {
-  /* Dark theme (default) */
-  --background: 0 0% 4%;
-  --foreground: 0 0% 98%;
-  --card: 0 0% 7%;
-  --card-foreground: 0 0% 98%;
-  --popover: 0 0% 7%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 15%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 64%;
-  --accent: 217 91% 60%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 62% 50%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 20%;
-  --input: 0 0% 15%;
-  --ring: 217 91% 60%;
   --radius: 0.75rem;
-
-  /* Halo brand colors */
-  --halo-glow: 217 91% 60%;
-  --halo-success: 142 71% 45%;
-  --halo-warning: 38 92% 50%;
-  --halo-error: 0 62% 50%;
-}
-
-/* Light theme */
-.light {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 9%;
-  --card: 0 0% 98%;
-  --card-foreground: 0 0% 9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 9%;
-  --primary: 217 91% 55%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 94%;
-  --secondary-foreground: 0 0% 20%;
-  --muted: 0 0% 94%;
-  --muted-foreground: 0 0% 45%;
-  --accent: 217 91% 55%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 90%;
-  --input: 0 0% 94%;
-  --ring: 217 91% 55%;
-
-  /* Halo brand colors (adjusted for light) */
-  --halo-glow: 217 91% 55%;
-  --halo-success: 142 71% 40%;
-  --halo-warning: 38 92% 45%;
-  --halo-error: 0 72% 51%;
+  /* Theme color variables are injected at runtime by applyTheme() */
 }
 
 * {
   border-color: hsl(var(--border));
 }
 
-html {
-  color-scheme: dark;
-}
-
-html.light {
-  color-scheme: light;
-}
+/* color-scheme is set dynamically by applyTheme() via inline style */
 
 body {
   background-color: hsl(var(--background));
@@ -266,8 +206,8 @@ body {
 
 /* Light mode: Shiki themes are ['github-dark', 'github-light'].
    Inline style `color` always uses the first (dark) theme.
-   In light mode, override with --shiki-dark which holds the light theme colors. */
-.light [data-streamdown="code-block-body"] span[style] {
+   In light themes, override with --shiki-dark which holds the light theme colors. */
+[data-theme="light"] [data-streamdown="code-block-body"] span[style] {
   color: var(--shiki-dark, inherit) !important;
 }
 
@@ -276,8 +216,8 @@ body {
   filter: saturate(0.6);
 }
 
-.light .thought-content .hljs {
-  filter: none; /* Light mode doesn't need adjustment */
+[data-theme="light"] .thought-content .hljs {
+  filter: none;
 }
 
 /* ============================================

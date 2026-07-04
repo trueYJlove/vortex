@@ -36,6 +36,8 @@ import { useTranslation } from './i18n'
 import type { AgentEventBase, Thought, ToolCall, HaloConfig, AgentErrorType, Question, McpServerStatus } from './types'
 import type { SessionInitInfo } from './types/slash-command'
 import { hasAnyAISource } from './types'
+import type { ThemeMode } from './types'
+import { getTheme, resolveSystemTheme } from './themes/registry'
 
 // Lazy load heavy page components for better initial load performance
 // These pages contain complex components (chat, markdown, code highlighting, etc.)
@@ -56,33 +58,35 @@ function PageLoader() {
   )
 }
 
-// Theme colors for titleBarOverlay
-const THEME_COLORS = {
-  light: { color: '#ffffff', symbolColor: '#1a1a1a' },
-  dark: { color: '#0a0a0a', symbolColor: '#ffffff' }
-}
-
 // Apply theme to document and sync to localStorage (for anti-flash on reload)
-function applyTheme(theme: 'light' | 'dark' | 'system') {
+function applyTheme(themeId: ThemeMode) {
   const root = document.documentElement
+  const resolvedId = themeId === 'system' ? resolveSystemTheme() : themeId
+  const theme = getTheme(resolvedId) ?? getTheme('dark')!
+  const isDark = theme.type === 'dark'
 
   // Save to localStorage for anti-flash script
   try {
-    localStorage.setItem('halo-theme', theme)
+    localStorage.setItem('halo-theme', themeId)
   } catch (e) { /* ignore */ }
 
-  let isDark: boolean
-  if (theme === 'system') {
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    root.classList.toggle('light', !isDark)
-  } else {
-    isDark = theme === 'dark'
-    root.classList.toggle('light', theme === 'light')
+  // Set data-theme attribute
+  root.setAttribute('data-theme', theme.id)
+
+  // Remove legacy .light class
+  root.classList.remove('light')
+
+  // Inject CSS variables via setProperty (preserves other inline styles like safe-area)
+  for (const [key, value] of Object.entries(theme.colors)) {
+    root.style.setProperty(`--${key}`, value)
   }
+  root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
 
   // Update titleBarOverlay colors (Windows/Linux only)
-  const colors = isDark ? THEME_COLORS.dark : THEME_COLORS.light
-  api.setTitleBarOverlay(colors).catch(() => {
+  api.setTitleBarOverlay({
+    color: theme.preview.background,
+    symbolColor: theme.preview.foreground,
+  }).catch(() => {
     // Ignore errors - may not be supported on current platform
   })
 }
@@ -214,18 +218,18 @@ export default function App() {
   // Theme switching
   useEffect(() => {
     // Default to 'dark' before config loads, then use config value
-    const theme = config?.appearance?.theme || 'dark'
-    applyTheme(theme)
+    const themeId = config?.appearance?.theme || 'dark'
+    applyTheme(themeId)
 
     // Resolve effective dark/light for the status bar.
-    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const isDark = theme === 'dark' || (theme === 'system' && systemPrefersDark)
+    const resolvedId = themeId === 'system' ? resolveSystemTheme() : themeId
+    const isDark = getTheme(resolvedId)?.type !== 'light'
 
     // Sync status bar style with theme (Capacitor mobile only). No-op elsewhere.
     void syncStatusBarStyle(isDark)
 
     // Listen for system theme changes when using 'system' mode
-    if (theme === 'system') {
+    if (themeId === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       const handleChange = () => {
         applyTheme('system')
