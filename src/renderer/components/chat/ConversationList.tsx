@@ -19,6 +19,7 @@ import { TaskStatusDot } from '../pulse/TaskStatusDot'
 import { PulseSidebarSection } from '../pulse/PulseSidebarSection'
 import { AutomationBadge } from '../apps/AutomationBadge'
 import { EngineBadge } from './EngineBadge'
+import { PersistentTaskPlanSection } from './PersistentTaskPlanSection'
 import type { ConversationMeta } from '../../types'
 
 // Width constraints (in pixels)
@@ -436,6 +437,8 @@ export const ConversationList = memo(function ConversationList({
           )}
         </div>
       </div>
+
+      <PersistentTaskPlanSection />
 
       {/* Top section: automation badge + pinned conversations (resizable) */}
       <div className="relative flex-shrink-0 flex flex-col overflow-hidden" style={{ maxHeight: topSectionHeight }}>
