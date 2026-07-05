@@ -4,7 +4,7 @@
  * Supports drag-to-resize, inline title editing, and conversation management.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Virtuoso } from 'react-virtuoso'
 import { MessageSquare, Plus, ListTodo } from '../icons/ToolIcons'
@@ -20,9 +20,8 @@ import { PulseSidebarSection } from '../pulse/PulseSidebarSection'
 import { AutomationBadge } from '../apps/AutomationBadge'
 import { EngineBadge } from './EngineBadge'
 import { PersistentTaskPlanSection } from './PersistentTaskPlanSection'
-import { PinnedItem } from './PinnedItem'
 import { SidebarSection } from '../layout/SidebarSection'
-import { usePulseItems } from '../../stores/chat.store'
+import { useTodos } from '../../hooks/useTodos'
 import type { ConversationMeta } from '../../types'
 
 // Width constraints (in pixels)
@@ -60,16 +59,9 @@ export const ConversationList = memo(function ConversationList({
   // Single batch subscription for all conversation statuses (replaces N individual hooks)
   const conversationStatuses = useAllConversationStatuses()
 
-  // Derive pinned idle item from pulse items (first starred idle conversation)
-  const pulseItems = usePulseItems()
-  const pinnedItem = useMemo(() => {
-    const pinned = pulseItems.find(item => item.starred && item.status === 'idle')
-    return pinned ? {
-      id: pinned.conversationId,
-      title: pinned.title,
-      status: pinned.status as 'idle',
-    } : null
-  }, [pulseItems])
+  // Todos for the current conversation (drives Task plan section visibility)
+  const todos = useTodos()
+  const hasTodos = todos !== null && todos.length > 0
 
   // Width state - initialized from persisted config
   const initialWidth = layoutConfig?.sidebarWidth
@@ -90,6 +82,7 @@ export const ConversationList = memo(function ConversationList({
   const [editingTitle, setEditingTitle] = useState('')
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
+  const [sessionsExpanded, setSessionsExpanded] = useState(true)
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const headerMenuRef = useRef<HTMLDivElement>(null)
@@ -363,37 +356,15 @@ export const ConversationList = memo(function ConversationList({
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
-        <div className="flex items-center gap-1">
-          <div ref={headerMenuRef} className="relative flex items-center gap-1">
-            <button
-              onClick={() => setHeaderMenuOpen(value => !value)}
-              className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
-              title={t('More')}
-            >
-              <EllipsisVertical className="w-4 h-4" />
-            </button>
-            {headerMenuOpen && (
-              <div className="absolute right-0 top-full mt-1 z-[9999] min-w-[180px] bg-popover border border-border rounded-lg shadow-lg py-1">
-                <button
-                  onClick={handleClearConversations}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{t('Clear conversations')}</span>
-                </button>
-              </div>
-            )}
-          </div>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
-              title={t('Close sidebar')}
-            >
-              <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
-            </button>
-          )}
-        </div>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
+            title={t('Close sidebar')}
+          >
+            <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
 
       {/* Top section: automation badge + pinned conversations */}
@@ -402,58 +373,74 @@ export const ConversationList = memo(function ConversationList({
         {visible && <PulseSidebarSection />}
       </div>
 
-      {/* Sessions section */}
-      <SidebarSection
-        title={t('Sessions')}
-        icon={<MessageSquare size={14} />}
-        defaultExpanded={true}
-      >
-        {/* Pinned idle item */}
-        {pinnedItem && (
-          <>
-            <PinnedItem
-              item={pinnedItem}
-              isSelected={pinnedItem.id === currentConversationId}
+      {/* Content area: Sessions + Task plan */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Sessions section */}
+        <SidebarSection
+          title={t('Sessions')}
+          icon={<MessageSquare size={14} />}
+          defaultExpanded={true}
+          className={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
+          contentClassName={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
+          onToggle={setSessionsExpanded}
+          actions={
+            <div ref={headerMenuRef} className="relative">
+              <button
+                onClick={() => setHeaderMenuOpen(value => !value)}
+                className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                title={t('More')}
+              >
+                <EllipsisVertical className="w-4 h-4" />
+              </button>
+              {headerMenuOpen && (
+                <div className="absolute right-0 top-full mt-1 z-[9999] min-w-[180px] bg-popover border border-border rounded-lg shadow-lg py-1">
+                  <button
+                    onClick={handleClearConversations}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{t('Clear session list')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          }
+        >
+          {/* Conversation list (virtualized) */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <Virtuoso
+              data={conversations}
+              overscan={200}
+              itemContent={(_index, conversation) => renderConversationItem(conversation)}
+            />
+          </div>
+
+          {/* New conversation button */}
+          <div className="border-t border-border">
+            <button
               onClick={() => {
                 const spaceId = useSpaceStore.getState().currentSpace?.id
-                if (spaceId) useChatStore.getState().selectConversation(pinnedItem.id)
+                if (spaceId) useChatStore.getState().createConversation(spaceId)
               }}
-            />
-          </>
-        )}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/50 transition-colors"
+            >
+              <Plus size={14} />
+              <span>{t('New conversation')}</span>
+            </button>
+          </div>
+        </SidebarSection>
 
-        {/* Conversation list (virtualized) */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <Virtuoso
-            data={conversations}
-            overscan={200}
-            itemContent={(_index, conversation) => renderConversationItem(conversation)}
-          />
-        </div>
-
-        {/* New conversation button */}
-        <div className="border-t border-border">
-          <button
-            onClick={() => {
-              const spaceId = useSpaceStore.getState().currentSpace?.id
-              if (spaceId) useChatStore.getState().createConversation(spaceId)
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/50 transition-colors"
-          >
-            <Plus size={14} />
-            <span>{t('New conversation')}</span>
-          </button>
-        </div>
-      </SidebarSection>
-
-      {/* Task plan section */}
-      <SidebarSection
-        title={t('Task plan')}
-        icon={<ListTodo size={14} />}
-        defaultExpanded={false}
-      >
-        <PersistentTaskPlanSection embedded />
-      </SidebarSection>
+        {/* Task plan section - pushed to bottom when Sessions is expanded */}
+        <SidebarSection
+          title={t('Task plan')}
+          icon={<ListTodo size={14} />}
+          defaultExpanded={false}
+          className={sessionsExpanded ? 'mt-auto' : ''}
+          visible={hasTodos}
+        >
+          <PersistentTaskPlanSection embedded />
+        </SidebarSection>
+      </div>
 
       {/* Drag handle - on right side */}
       <div

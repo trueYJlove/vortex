@@ -1,8 +1,7 @@
-import { useMemo } from 'react'
 import { CheckCircle2, Circle, ListTodo, Loader2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
-import { useChatStore } from '../../stores/chat.store'
-import { getLatestTodosFromThoughts, getTodoStats, type TodoItem, type TodoStatus } from '../tool/TodoCard'
+import { useTodos, useTodoStats } from '../../hooks/useTodos'
+import type { TodoItem, TodoStatus } from '../tool/TodoCard'
 
 function getTodoStatusIcon(status: TodoStatus) {
   switch (status) {
@@ -38,26 +37,8 @@ interface PersistentTaskPlanSectionProps {
 
 export function PersistentTaskPlanSection({ embedded = false }: PersistentTaskPlanSectionProps) {
   const { t } = useTranslation()
-  const todos = useChatStore(state => {
-    const spaceState = state.spaceStates.get(state.currentSpaceId ?? '')
-    const conversationId = spaceState?.currentConversationId
-    if (!conversationId) return null
-
-    const sessionTodos = getLatestTodosFromThoughts(state.sessions.get(conversationId)?.thoughts)
-    if (sessionTodos?.length) return sessionTodos
-
-    const conversation = state.conversationCache.get(conversationId)
-    if (!conversation) return null
-
-    for (let index = conversation.messages.length - 1; index >= 0; index -= 1) {
-      const messageTodos = getLatestTodosFromThoughts(conversation.messages[index].thoughts)
-      if (messageTodos?.length) return messageTodos
-    }
-
-    return null
-  })
-
-  const stats = useMemo(() => getTodoStats(todos ?? []), [todos])
+  const todos = useTodos()
+  const stats = useTodoStats()
   const hasTodos = todos && todos.length > 0
 
   if (!hasTodos) {
