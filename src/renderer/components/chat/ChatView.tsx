@@ -18,7 +18,7 @@ import { MessageList } from './MessageList'
 import type { MessageListHandle } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
-import { Sparkles } from '../icons/ToolIcons'
+import { Bot } from '../icons/ToolIcons'
 import {
   ONBOARDING_ARTIFACT_NAME,
   getOnboardingAiResponse,
@@ -464,7 +464,7 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-8">
       {/* Icon */}
-      <Sparkles className="w-12 h-12 text-primary" />
+      <Bot className="w-12 h-12 text-primary" />
 
       {/* Title - concise and warm */}
       <h2 className="mt-6 text-xl font-medium">

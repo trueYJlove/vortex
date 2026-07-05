@@ -33,6 +33,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Bot,
   Hand,
   Settings,
   Plus,
@@ -119,6 +120,7 @@ export const ThoughtIcons = {
 
 // Re-export commonly used icons for convenience
 export {
+  Bot,
   CheckCircle2,
   XCircle,
   AlertCircle,
