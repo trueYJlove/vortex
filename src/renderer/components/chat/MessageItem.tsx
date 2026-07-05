@@ -349,6 +349,27 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
         )}
       </div>
 
+      {/* Copy button for user messages */}
+      {isUser && message.content && (
+        <div className="flex justify-end mt-1.5">
+          <button
+            onClick={handleCopyMessage}
+            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground/60
+              hover:text-foreground hover:bg-white/5 rounded-md transition-all"
+            title={t('Copy message')}
+          >
+            {copied ? (
+              <>
+                <Check size={14} className="text-green-400" />
+                <span className="text-green-400">{t('Copied')}</span>
+              </>
+            ) : (
+              <Copy size={14} />
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Persisted error - shown for assistant messages that failed (e.g., 429 rate limit) */}
       {!isUser && message.error && (
         <div className="mt-2 rounded-xl px-3 py-2.5 bg-destructive/10 border border-destructive/30">
