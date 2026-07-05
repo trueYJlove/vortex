@@ -7,8 +7,9 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Virtuoso } from 'react-virtuoso'
-import { MessageSquare, Plus, ListTodo } from '../icons/ToolIcons'
-import { ChevronLeft, EllipsisVertical, Pin, Pencil, Trash2 } from 'lucide-react'
+import { Plus, ListTodo } from '../icons/ToolIcons'
+import { MessageCircle } from 'lucide-react'
+import { EllipsisVertical, Pin, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore, useAllConversationStatuses } from '../../stores/chat.store'
 import { useSpaceStore } from '../../stores/space.store'
@@ -285,7 +286,7 @@ export const ConversationList = memo(function ConversationList({
       ) : (
         <>
           <div className="flex items-center gap-2 relative">
-            <MessageSquare className="w-4 h-4 text-blue-500 flex-shrink-0" />
+            <MessageCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
             <span className="text-sm truncate flex-1">
               {conversation.title}
             </span>
@@ -353,23 +354,9 @@ export const ConversationList = memo(function ConversationList({
       className={`${side === 'right' ? 'border-l' : 'border-r'} border-border flex flex-col bg-card/50 relative`}
       style={{ width, transition: isDragging ? 'none' : 'width 0.2s ease' }}
     >
-      {/* Header */}
-      <div className="p-3 border-b border-border flex items-center justify-between">
-        <span className="text-sm font-medium text-muted-foreground">{t('Conversations')}</span>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="relative p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground before:content-[''] before:absolute before:-inset-2"
-            title={t('Close sidebar')}
-          >
-            <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
-          </button>
-        )}
-      </div>
-
-      {/* Top section: automation badge + pinned conversations */}
+      {/* Top section: close button + automation badge + pinned conversations */}
       <div className="flex flex-col">
-        <AutomationBadge />
+        <AutomationBadge onClose={onClose} side={side} />
         {visible && <PulseSidebarSection />}
       </div>
 
@@ -378,11 +365,12 @@ export const ConversationList = memo(function ConversationList({
         {/* Sessions section */}
         <SidebarSection
           title={t('Sessions')}
-          icon={<MessageSquare size={14} />}
+          icon={<MessageCircle size={14} />}
           defaultExpanded={true}
           className={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
           contentClassName={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
           onToggle={setSessionsExpanded}
+          badge={conversations.length > 0 ? conversations.length : undefined}
           actions={
             <div ref={headerMenuRef} className="relative">
               <button
