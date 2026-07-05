@@ -21,6 +21,8 @@ import {
   Copy,
   Check,
   Loader2,
+  User,
+  Bot,
 } from 'lucide-react'
 import { getToolIcon } from '../icons/ToolIcons'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
@@ -236,6 +238,24 @@ function ThoughtItem({ thought }: { thought: Thought }) {
   )
 }
 
+function MessageHeader({ isUser }: { isUser: boolean }) {
+  const { t } = useTranslation()
+  return (
+    <div className={`flex items-center gap-1.5 mb-1.5 ${
+      isUser ? 'justify-end' : 'justify-start'
+    }`}>
+      {isUser && <span className="text-xs text-primary font-medium">{t('You')}</span>}
+      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+        {isUser
+          ? <User size={12} className="text-primary" />
+          : <Bot size={12} className="text-primary" />
+        }
+      </div>
+      {!isUser && <span className="text-xs text-primary font-medium">{t('Vortex')}</span>}
+    </div>
+  )
+}
+
 export const MessageItem = memo(function MessageItem({ message, previousCost = 0, hideThoughts = false, isInContainer = false, isWorking = false, isWaitingMore = false, hideBrowserViewButton = false }: MessageItemProps) {
   const isUser = message.role === 'user'
   const isStreaming = (message as any).isStreaming
@@ -311,10 +331,13 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
     </div>
   ) : (
     <div
-      className={`rounded-2xl px-4 py-3 ${
-        isUser ? 'message-user' : 'message-assistant'
+      className={`px-4 py-3 ${
+        isUser ? 'message-user rounded-[16px_16px_16px_4px]' : 'message-assistant rounded-[16px_16px_4px_16px]'
       } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''} ${!isInContainer ? 'max-w-[85%]' : 'w-full'}`}
     >
+      {/* Avatar + Label */}
+      <MessageHeader isUser={isUser} />
+
       {/* Working indicator - shows when AI is working */}
       {isWorking && !isUser && (
         <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/30 working-indicator-fade">
