@@ -33,7 +33,7 @@ export function SplashPage() {
           animate ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
-        Halo
+        Vortex
       </h1>
 
       {/* Tagline */}

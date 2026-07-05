@@ -514,6 +514,7 @@ export function buildSdkEnv(params: SdkEnvParams): Record<string, string | numbe
   // Only inject when the user has an explicit Halo proxy AND the OS environment
   // doesn't already provide the corresponding variable — OS-level vars take priority.
   // See: https://github.com/openkursar/hello-halo/issues/69
+  // TODO: Replace with Vortex issue tracker
   const appProxy = getConfig().network?.proxy?.trim()
   if (appProxy) {
     const proxyKeys = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'] as const

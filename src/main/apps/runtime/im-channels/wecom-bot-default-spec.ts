@@ -60,7 +60,7 @@ export function buildDefaultAssistantSpec(botIdPrefix: string): AutomationSpec {
     spec_version: '1',
     name: `WeCom Assistant ${botIdPrefix}`,
     version: '1.0',
-    author: 'Halo',
+    author: 'Vortex',
     description: 'Auto-created WeCom Intelligent Bot assistant. Edit the system prompt anytime in the app detail page.',
     type: 'automation',
     system_prompt: resolveSystemPrompt(),

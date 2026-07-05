@@ -119,10 +119,10 @@ function buildNoOwnerGuideMessage(): string {
   return (
     '⚠️ This bot has no owner yet, so it cannot execute tasks.\n' +
     'Send it a direct message — the sender is bound as owner automatically. ' +
-    'Or set the owner ID in Halo Settings → Message Channels.\n' +
+    'Or set the owner ID in Vortex Settings → Message Channels.\n' +
     '⚠️ 该机器人尚未绑定主人，暂时无法执行任务。\n' +
     '请先与机器人私聊发送一条消息，发送者将自动绑定为主人；' +
-    '也可在 Halo 设置 → 消息通道中手动填写主人 ID。' +
+    '也可在 Vortex 设置 → 消息通道中手动填写主人 ID。' +
     link
   )
 }

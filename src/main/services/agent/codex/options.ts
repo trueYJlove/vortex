@@ -249,7 +249,7 @@ async function buildThreadConfig(
     config.model_provider = 'halo-router'
     config.model_providers = {
       'halo-router': {
-        name: 'Halo OpenAI compatibility router',
+        name: 'Vortex OpenAI compatibility router',
         base_url: `${router.baseUrl}/v1`,
         wire_api: 'responses',
         requires_openai_auth: false,

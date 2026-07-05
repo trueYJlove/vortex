@@ -953,7 +953,7 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
                     {/* Halo built-in MCP toggles */}
                     <div className="space-y-1.5">
                       <label className="text-xs text-muted-foreground/70">
-                        {t('Halo Capabilities')}
+                        {t('Vortex Capabilities')}
                       </label>
                       {HALO_MCP_TOGGLES.map(({ key, labelKey }) => {
                         const isOn = Boolean(guestPolicy?.[key])

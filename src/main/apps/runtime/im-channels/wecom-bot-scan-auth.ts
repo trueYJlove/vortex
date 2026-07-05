@@ -179,7 +179,7 @@ function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
         headers: {
           // The official CLI sends no special headers. We add User-Agent for
           // server-side telemetry hygiene (helps WeCom distinguish clients).
-          'User-Agent': 'Halo/1.0 (WeCom Scan Auth)',
+          'User-Agent': 'Vortex/1.0 (WeCom Scan Auth)',
           Accept: 'application/json',
         },
       },

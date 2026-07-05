@@ -142,7 +142,7 @@ export class SearchService {
       const searchRegex = new RegExp(query, 'gi')
 
       // Get space name
-      let spaceName = data.spaceId === 'halo-temp' ? 'Halo' : data.spaceId
+      let spaceName = data.spaceId === 'halo-temp' ? 'Vortex' : data.spaceId
 
       try {
         if (data.spaceId !== 'halo-temp') {

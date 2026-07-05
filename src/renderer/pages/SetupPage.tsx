@@ -271,7 +271,7 @@ export function SetupPage() {
           <div className="w-20 h-20 rounded-full border-2 border-primary/60 flex items-center justify-center halo-glow">
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
           </div>
-          <h1 className="mt-4 text-3xl font-light tracking-wide">Halo</h1>
+          <h1 className="mt-4 text-3xl font-light tracking-wide">Vortex</h1>
         </div>
 
         {/* Claude Login Card */}
@@ -430,7 +430,7 @@ export function SetupPage() {
           <div className="w-20 h-20 rounded-full border-2 border-primary/60 flex items-center justify-center halo-glow">
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
           </div>
-          <h1 className="mt-4 text-3xl font-light tracking-wide">Halo</h1>
+          <h1 className="mt-4 text-3xl font-light tracking-wide">Vortex</h1>
         </div>
 
         {/* Loading state */}

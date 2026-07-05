@@ -299,7 +299,7 @@ export default function App() {
           if (!document.hidden) return // Only notify when app is backgrounded
 
           const event = data as Record<string, unknown>
-          let title = 'Halo'
+          let title = 'Vortex'
           let body = ''
 
           if (channel === 'agent:complete') {

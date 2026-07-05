@@ -420,7 +420,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
         }}
         onStop={handleStop}
         isGenerating={isGenerating}
-        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Halo...') : t('Send a message to Vortex or type / to select a skill'))}
+        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Vortex...') : t('Send a message to Vortex or type / to select a skill'))}
         isCompact={isCompact}
         slashCommands={slashCommands}
         mentionArtifacts={mentionArtifacts}
@@ -468,7 +468,7 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
 
       {/* Title - concise and warm */}
       <h2 className="mt-6 text-xl font-medium">
-        Halo
+        Vortex
       </h2>
       <p className="mt-2 text-muted-foreground">
         {t('Not just chat, help you get things done')}

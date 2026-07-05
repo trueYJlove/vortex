@@ -366,7 +366,7 @@ export function getTelemetryConfig(): ProductConfig['telemetry'] | undefined {
  */
 function getDefaultProductConfig(): ProductConfig {
   return {
-    name: 'Halo',
+    name: 'Vortex',
     version: '1.0.0',
     authProviders: [
       {

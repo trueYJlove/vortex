@@ -24,9 +24,9 @@ const SEED_SPACE_ID = 'halo-temp'
 /** Default app spec — no subscriptions (IM / manual-trigger only) */
 const DEFAULT_APP_SPEC: AutomationSpec = {
   spec_version: '1',
-  name: 'Halo AI 数字人模板',
+  name: 'Vortex AI 数字人模板',
   version: '1.0',
-  author: 'Halo',
+  author: 'Vortex',
   description: '默认数字人，可绑定 IM 机器人或手动对话',
   type: 'automation',
   system_prompt: [

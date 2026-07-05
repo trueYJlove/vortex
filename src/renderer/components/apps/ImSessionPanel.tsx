@@ -108,7 +108,7 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{t('Halo Chat')}</div>
+              <div className="text-sm font-medium">{t('Vortex Chat')}</div>
               <div className="text-[11px] text-muted-foreground/60 mt-0.5">
                 {t('Native conversation')}
               </div>

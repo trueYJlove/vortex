@@ -53,7 +53,7 @@ export class TrayManager {
     const icon = this.createIcon()
     this.tray = new Tray(icon)
 
-    this.tray.setToolTip('Halo')
+    this.tray.setToolTip('Vortex')
 
     // On macOS, clicking the tray icon should show a menu (default behavior).
     // On Windows, clicking should show the main window.
@@ -79,7 +79,7 @@ export class TrayManager {
 
     const menuItems: Electron.MenuItemConstructorOptions[] = [
       {
-        label: 'Show Halo',
+        label: 'Show Vortex',
         click: () => this.callbacks?.onShowWindow()
       },
       { type: 'separator' },
@@ -125,7 +125,7 @@ export class TrayManager {
     menuItems.push(
       { type: 'separator' },
       {
-        label: 'Quit Halo',
+        label: 'Quit Vortex',
         click: () => this.callbacks?.onQuit()
       }
     )
@@ -135,8 +135,8 @@ export class TrayManager {
 
     // Update tooltip to show status
     const tooltip = reasons.length > 0
-      ? `Halo (${isOnline ? 'Online' : 'Offline'}) - ${reasons.length} active task(s)`
-      : `Halo (${isOnline ? 'Online' : 'Offline'})`
+      ? `Vortex (${isOnline ? 'Online' : 'Offline'}) - ${reasons.length} active task(s)`
+      : `Vortex (${isOnline ? 'Online' : 'Offline'})`
     this.tray.setToolTip(tooltip)
   }
 

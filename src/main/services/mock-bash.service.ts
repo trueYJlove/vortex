@@ -58,7 +58,7 @@ echo.
 echo China Mirror (Recommended for faster download):
 echo   https://registry.npmmirror.com/-/binary/git-for-windows/
 echo.
-echo After installation, restart Halo to enable command execution.
+echo After installation, restart Vortex to enable command execution.
 echo ============================================================
 echo.
 exit /b 0

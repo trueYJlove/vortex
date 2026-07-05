@@ -328,7 +328,8 @@ function createAppMenu(): void {
         {
           label: 'Learn More',
           click: async () => {
-            await open('https://github.com/openkursar/hello-halo')
+            // TODO: Replace with Vortex repository URL
+            // await open('https://github.com/openkursar/hello-halo')
           }
         }
       ]

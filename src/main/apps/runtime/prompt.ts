@@ -45,7 +45,7 @@ This is a headless background execution — there is no interactive user convers
 
 ### Browser session
 
-You run inside the user's own Halo browser — cookies, session, and localStorage are shared.
+You run inside the user's own Vortex browser — cookies, session, and localStorage are shared.
 If a website requires login, ask the user to log in first via escalation, then retry.
 `.trim()
 

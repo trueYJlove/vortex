@@ -92,7 +92,7 @@ export function PulseList({ maxHeight, onItemClick, compact = false }: PulseList
         const space = haloSpace?.id === item.spaceId
           ? haloSpace
           : spaces.find(s => s.id === item.spaceId)
-        return space ? { ...item, spaceName: space.isTemp ? 'Halo' : space.name } : item
+        return space ? { ...item, spaceName: space.isTemp ? 'Vortex' : space.name } : item
       })
   }, [rawItems, haloSpace, spaces, validSpaceIds])
 

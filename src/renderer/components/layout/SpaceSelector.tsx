@@ -107,8 +107,8 @@ export function SpaceSelector() {
     : (currentSpace ? [currentSpace] : [])
 
   const displayName = currentSpace
-    ? (currentSpace.isTemp ? t('Halo') : currentSpace.name)
-    : t('Halo')
+    ? (currentSpace.isTemp ? t('Vortex') : currentSpace.name)
+    : t('Vortex')
 
   const displayIcon = currentSpace?.icon || 'sparkles'
 
@@ -131,7 +131,7 @@ export function SpaceSelector() {
           )}
           {allSpaces.map(space => {
             const isActive = space.id === currentSpace?.id
-            const name = space.isTemp ? t('Halo Space') : space.name
+            const name = space.isTemp ? t('Vortex Space') : space.name
 
             return (
               <button

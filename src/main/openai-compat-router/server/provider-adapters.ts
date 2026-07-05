@@ -102,8 +102,10 @@ const openRouterAdapter: ProviderAdapter = {
 
   getExtraHeaders(): Record<string, string> {
     return {
-      'HTTP-Referer': 'https://hello-halo.cc/',
-      'X-Title': 'Halo'
+      // TODO: Replace with Vortex URL
+      // 'HTTP-Referer': 'https://hello-halo.cc/',
+      'HTTP-Referer': '',
+      'X-Title': 'Vortex'
     }
   }
 }

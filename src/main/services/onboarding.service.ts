@@ -90,7 +90,7 @@ export function saveOnboardingConversation(
     const conversation: Conversation = {
       id: conversationId,
       spaceId,
-      title: 'Welcome to Halo',
+      title: 'Welcome to Vortex',
       messages: [
         {
           id: uuidv4(),

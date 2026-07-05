@@ -395,7 +395,7 @@ function getRemoteLoginPage(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Halo Remote Access</title>
+  <title>Vortex Remote Access</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -461,7 +461,7 @@ function getRemoteLoginPage(): string {
 <body>
   <div class="container">
     <div class="logo">◯</div>
-    <h1>Halo Remote Access</h1>
+    <h1>Vortex Remote Access</h1>
 
     <p>Enter access code to connect to your desktop</p>
     <div class="input-group">

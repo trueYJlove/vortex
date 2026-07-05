@@ -76,7 +76,7 @@ export async function showRecoveryDialog(
   const strategy = getStrategy(suggestedStrategy)
 
   // Build dialog message
-  const title = 'Halo is having trouble'
+  const title = 'Vortex is having trouble'
   const message = buildDialogMessage(consecutiveFailures, errorMessage, strategy)
 
   // Build buttons based on strategy
@@ -322,7 +322,7 @@ export async function showRecoveryFailedDialog(
   await showNotificationDialog(
     'Recovery Failed',
     `${strategyName} could not be completed.\n\nError: ${errorMessage}\n\n` +
-    'You may need to restart Halo manually or contact support.',
+    'You may need to restart Vortex manually or contact support.',
     'error',
     parentWindow
   )

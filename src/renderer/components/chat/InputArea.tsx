@@ -752,7 +752,7 @@ export function InputArea({ onSend, onInject, onStop, isGenerating, placeholder,
               onPaste={handlePaste}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder={placeholder || t('Type a message, let Halo help you...')}
+              placeholder={placeholder || t('Type a message, let Vortex help you...')}
               readOnly={isOnboardingSendStep}
               rows={1}
               className={`w-full bg-transparent resize-none
