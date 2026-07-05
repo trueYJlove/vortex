@@ -336,7 +336,7 @@ export function rejectIfRemoteBrowserAllowlistForbidden(res: Response, body: unk
   console.warn('[SecurityPolicy] Blocked remote browser-allowlist write at POST /api/config')
   res.status(403).json({
     success: false,
-    error: 'Browser allowlist can only be changed from the local Halo app.',
+    error: 'Browser allowlist can only be changed from the local Vortex app.',
     code: BROWSER_ALLOWLIST_REMOTE_WRITE_FORBIDDEN,
   })
   return true
@@ -364,7 +364,7 @@ export function yamlIsMcpSpec(yamlContent: string): boolean {
 export const MCP_REMOTE_INSTALL_FORBIDDEN = 'MCP_REMOTE_INSTALL_FORBIDDEN'
 
 const MCP_REMOTE_INSTALL_FORBIDDEN_MESSAGE =
-  'Remote MCP configuration is disabled by security policy. Install MCP servers from the local Halo app.'
+  'Remote MCP configuration is disabled by security policy. Install MCP servers from the local Vortex app.'
 
 function writeMcpForbiddenResponse(res: Response, surface: string): void {
   console.warn(`[SecurityPolicy] Blocked remote MCP write at ${surface} (remoteMcpSafe=true)`)

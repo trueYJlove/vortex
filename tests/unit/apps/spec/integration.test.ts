@@ -526,7 +526,7 @@ const extensionYaml = `
 name: "Dark Theme"
 version: "1.0"
 author: "themes-community"
-description: "Dark color theme for Halo"
+description: "Dark color theme for Vortex"
 type: extension
 icon: "moon"
 `

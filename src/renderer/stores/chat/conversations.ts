@@ -358,7 +358,7 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
     }
   },
 
-  clearConversations: async (spaceId) => {
+  clearConversations: async (spaceId, excludeConversationId?) => {
     const reconcileAfterClearFailure = async (candidateDeletedIds: string[]) => {
       await get().loadConversations(spaceId)
 
@@ -390,7 +390,9 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
       if (!listResponse.success || !listResponse.data) return false
 
       const conversations = listResponse.data as ConversationMeta[]
-      conversationIds = conversations.map((conversation) => conversation.id)
+      conversationIds = conversations
+        .map((conversation) => conversation.id)
+        .filter((id) => id !== excludeConversationId)
 
       for (const conversationId of conversationIds) {
         const response = await api.deleteConversation(spaceId, conversationId)
@@ -404,9 +406,10 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         const runtimeState = removeConversationRuntimeState(state, conversationIds)
 
         const newSpaceStates = new Map(state.spaceStates)
+        const currentConversation = conversations.find((c) => c.id === excludeConversationId)
         newSpaceStates.set(spaceId, {
-          conversations: [],
-          currentConversationId: null,
+          conversations: currentConversation ? [currentConversation] : [],
+          currentConversationId: excludeConversationId || null,
         })
 
         return {
@@ -415,10 +418,12 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         }
       })
 
-      const newConversation = await get().createConversation(spaceId)
-      if (!newConversation) {
-        await reconcileAfterClearFailure(conversationIds)
-        return false
+      if (!excludeConversationId) {
+        const newConversation = await get().createConversation(spaceId)
+        if (!newConversation) {
+          await reconcileAfterClearFailure(conversationIds)
+          return false
+        }
       }
 
       return true

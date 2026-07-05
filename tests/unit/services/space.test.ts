@@ -37,7 +37,7 @@ describe('Space Service', () => {
       const haloSpace = getHaloSpace()
 
       expect(haloSpace.id).toBe('halo-temp')
-      expect(haloSpace.name).toBe('Halo')
+      expect(haloSpace.name).toBe('Vortex')
       expect(haloSpace.isTemp).toBe(true)
       expect(haloSpace.icon).toBe('sparkles')
     })
@@ -87,13 +87,13 @@ describe('Space Service', () => {
       expect(fs.existsSync(space.path)).toBe(true)
     })
 
-    it('should create .halo directory inside space', async () => {
+    it('should create .vortex directory inside space', async () => {
       const space = await createSpace({
         name: 'Test Space',
         icon: 'folder'
       })
 
-      const haloDir = path.join(space.path, '.halo')
+      const haloDir = path.join(space.path, '.vortex')
       expect(fs.existsSync(haloDir)).toBe(true)
     })
 
@@ -103,7 +103,7 @@ describe('Space Service', () => {
         icon: 'star'
       })
 
-      const metaPath = path.join(space.path, '.halo', 'meta.json')
+      const metaPath = path.join(space.path, '.vortex', 'meta.json')
       expect(fs.existsSync(metaPath)).toBe(true)
 
       const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
@@ -126,7 +126,7 @@ describe('Space Service', () => {
       // customPath is stored as workingDir (the agent's working directory), not space.path.
       expect(space.path).toContain(getSpacesDir())
       expect((space as any).workingDir).toBe(customPath)
-      expect(fs.existsSync(path.join(space.path, '.halo', 'meta.json'))).toBe(true)
+      expect(fs.existsSync(path.join(space.path, '.vortex', 'meta.json'))).toBe(true)
     })
   })
 
@@ -159,18 +159,18 @@ describe('Space Service', () => {
   })
 
   describe('deleteSpace', () => {
-    it('should delete space and its .halo directory', async () => {
+    it('should delete space and its .vortex directory', async () => {
       const space = await createSpace({
         name: 'Delete Test',
         icon: 'folder'
       })
 
-      const haloDir = path.join(space.path, '.halo')
+      const haloDir = path.join(space.path, '.vortex')
       expect(fs.existsSync(haloDir)).toBe(true)
 
       await deleteSpace(space.id)
 
-      // .halo should be deleted, but space directory may remain (for custom paths)
+      // .vortex should be deleted, but space directory may remain (for custom paths)
       expect(fs.existsSync(haloDir)).toBe(false)
     })
 

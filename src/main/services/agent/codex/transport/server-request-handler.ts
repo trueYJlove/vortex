@@ -162,7 +162,7 @@ export function registerServerRequestHandlers(
     client.onServerRequest(
       ServerRequestMethods.ItemToolCall,
       async () => {
-        const err = new Error('Halo does not register dynamic tools; rejecting item/tool/call')
+        const err = new Error('Vortex does not register dynamic tools; rejecting item/tool/call')
         ;(err as any).code = -32601
         throw err
       },
@@ -170,7 +170,7 @@ export function registerServerRequestHandlers(
     client.onServerRequest(
       ServerRequestMethods.ChatgptAuthTokensRefresh,
       async () => {
-        const err = new Error('Halo uses API-key auth; chatgpt token refresh is not supported')
+        const err = new Error('Vortex uses API-key auth; chatgpt token refresh is not supported')
         ;(err as any).code = -32601
         throw err
       },

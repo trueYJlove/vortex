@@ -2,7 +2,7 @@
  * StatusBar — Compact bottom bar showing contextual information.
  *
  * Left: Context — total tokens, usage %, streaming speed (t/s)
- * Right: System resources — CPU %, Memory usage
+ * Right: System resources — CPU %, Memory usage, Automation status
  *
  * Uses theme tokens only, no hardcoded colors.
  * Height: 24px (compact, VSCode-style).
@@ -12,6 +12,8 @@ import { useMemo } from 'react'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chat.store'
 import { usePerfStore } from '../../stores/perf.store'
+import { useAppsStore } from '../../stores/apps.store'
+import { useAppStore } from '../../stores/app.store'
 import type { Message } from '../../types'
 
 /** Format token count: 1234 → "1,234", 12345 → "12.3K" */
@@ -38,6 +40,19 @@ function getLastTokenUsage(messages: Message[]): Message['tokenUsage'] | null {
 
 export function StatusBar() {
   const { t } = useTranslation()
+  const { setView } = useAppStore()
+  const { apps } = useAppsStore()
+
+  // --- Automation status (right side) ---
+  const automationApps = useMemo(() => apps.filter(a => a.spec.type === 'automation'), [apps])
+  const runningCount = useMemo(
+    () => automationApps.filter(a => a.status === 'active' || a.status === 'error').length,
+    [automationApps]
+  )
+  const waitingApp = useMemo(
+    () => automationApps.find(a => a.status === 'waiting_user'),
+    [automationApps]
+  )
 
   // --- Context (left side) ---
   const currentConversation = useChatStore(s => s.getCurrentConversation())
@@ -100,7 +115,7 @@ export function StatusBar() {
         )}
       </div>
 
-      {/* Right: Resources */}
+      {/* Right: Resources + Automation */}
       <div className="flex items-center gap-3 flex-shrink-0">
         {cpuPercent !== null && (
           <span className="hidden sm:inline">
@@ -111,6 +126,28 @@ export function StatusBar() {
           <span className="hidden sm:inline">
             {t('Memory')} {formatBytes(memoryBytes)}
           </span>
+        )}
+        {/* Automation status */}
+        {automationApps.length > 0 && (
+          <button
+            onClick={() => setView('apps')}
+            className="flex items-center gap-1 hover:bg-secondary/50 px-1 rounded transition-colors"
+            title={waitingApp
+              ? `${waitingApp.spec.name} — ${t('needs your input')}`
+              : runningCount > 0
+                ? t('{{count}} apps running', { count: runningCount })
+                : t('Digital human')
+            }
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              waitingApp ? 'bg-orange-400' : runningCount > 0 ? 'bg-green-500/70' : 'bg-muted-foreground/30'
+            }`} />
+            {(waitingApp || runningCount > 0) && (
+              <span className="hidden sm:inline">
+                {waitingApp ? waitingApp.spec.name : runningCount}
+              </span>
+            )}
+          </button>
         )}
       </div>
     </div>

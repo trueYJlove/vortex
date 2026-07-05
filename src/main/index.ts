@@ -1,5 +1,5 @@
 /**		      	    				  	  	  	 		 		       	 	 	         	 	    					 
- * Halo - Electron Main Process
+ * Vortex - Electron Main Process
  * The main entry point for the Electron application
  */
 
@@ -8,7 +8,7 @@
 // ========================================
 // Initialize electron-log before any other code to capture all logs
 // This replaces console.log/warn/error globally with electron-log
-// Logs are written to: ~/Library/Logs/Halo/ (macOS), %USERPROFILE%\AppData\Roaming\Halo\logs (Windows)
+// Logs are written to: ~/Library/Logs/Vortex/ (macOS), %USERPROFILE%\AppData\Roaming\Vortex\logs (Windows)
 import log from 'electron-log/main.js'
 
 // Initialize for renderer process support (IPC transport)
@@ -102,7 +102,7 @@ app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled')
 
 // Per-variant data isolation: Override Electron userData path based on product.json dataFolderName.
 // Must be called before app.whenReady() and requestSingleInstanceLock() so that
-// each build variant (e.g. Halo vs Halo-Enterprise) uses its own userData directory.
+// each build variant (e.g. Vortex vs Vortex-Enterprise) uses its own userData directory.
 // This isolates cookies, sessions, localStorage, Claude SDK config, etc.
 import { getDataFolderName, DEFAULT_DATA_FOLDER_NAME } from './foundation/product-config'
 import { isHostnameTrustedForCertificates } from './services/browser-policy.service'
@@ -118,7 +118,7 @@ if (dataFolderName !== DEFAULT_DATA_FOLDER_NAME) {
 // Must be called before app.whenReady()
 // Skip in development mode and E2E tests to allow multiple instances
 const gotTheLock =
-  !app.isPackaged || process.env.HALO_E2E_TEST ? true : app.requestSingleInstanceLock()
+  !app.isPackaged || process.env.VORTEX_E2E_TEST ? true : app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
   // Another instance is already running, exit immediately
@@ -328,7 +328,8 @@ function createAppMenu(): void {
         {
           label: 'Learn More',
           click: async () => {
-            await open('https://github.com/openkursar/hello-halo')
+            // TODO: Replace with Vortex repository URL
+            // await open('https://github.com/openkursar/hello-halo')
           }
         }
       ]
@@ -343,6 +344,14 @@ function createWindow(): void {
   // Platform-specific window options
   const isMac = process.platform === 'darwin'
 
+  // Resolve icon path for the window
+  const resourcesPath = app.isPackaged ? join(app.getPath('exe'), '..', 'resources') : join(__dirname, '../..')
+  const iconPath = isMac
+    ? join(resourcesPath, 'icon.icns')
+    : process.platform === 'win32'
+      ? join(resourcesPath, 'icon.ico')
+      : join(resourcesPath, 'icon.png')
+
   // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -351,6 +360,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
+    icon: iconPath,
     // macOS: hiddenInset for traffic lights in content area
     // Windows/Linux: hidden + titleBarOverlay for native buttons overlay
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
@@ -434,7 +444,7 @@ function createWindow(): void {
   }
 
   // Open DevTools in development (skip during E2E to avoid viewport interference)
-  if (is.dev && !process.env.HALO_E2E_TEST) {
+  if (is.dev && !process.env.VORTEX_E2E_TEST) {
     mainWindow.webContents.openDevTools()
   }
 }
@@ -442,7 +452,7 @@ function createWindow(): void {
 // Initialize application
 app.whenReady().then(async () => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.halo.app')
+  electronApp.setAppUserModelId('com.vortex.app')
 
   // Register custom protocols (halo-file://, etc.)
   registerProtocols()

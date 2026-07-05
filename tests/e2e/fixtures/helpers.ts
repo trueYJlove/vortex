@@ -9,23 +9,23 @@ import type { Page } from '@playwright/test'
 
 /**
  * Wait for the app to finish loading and show the Home Page.
- * The Home Page has the Halo space card and Apps card.
+ * The Home Page has the Vortex space card and Apps card.
  */
 export async function waitForHomePage(window: Page) {
   await window.waitForSelector('#root', { timeout: 15000 })
   await window.waitForLoadState('networkidle')
-  // Wait for the Halo space card to appear (data-onboarding="halo-space")
+  // Wait for the Vortex space card to appear (data-onboarding="halo-space")
   await window.waitForSelector('[data-onboarding="halo-space"]', { timeout: 15000 })
 }
 
 /**
- * Navigate from Home Page to Chat Interface (SpacePage) by clicking the Halo space card.
+ * Navigate from Home Page to Chat Interface (SpacePage) by clicking the Vortex space card.
  * Waits for the textarea input to appear, indicating the chat is ready.
  */
 export async function navigateToChat(window: Page) {
   await waitForHomePage(window)
 
-  // Click the Halo space card
+  // Click the Vortex space card
   const haloCard = await window.waitForSelector('[data-onboarding="halo-space"]', { timeout: 10000 })
   await haloCard.click()
 
@@ -147,7 +147,7 @@ export async function waitForAIResponse(window: Page, timeout = 45000) {
 
   // Wait for AI to finish working (supports both EN and CN)
   await window.waitForSelector(
-    'text=/Halo 工作中|Halo is working/i',
+    'text=/Vortex 正在运行|Vortex is working/i',
     { state: 'hidden', timeout }
   ).catch(() => {
     // Indicator might have already disappeared

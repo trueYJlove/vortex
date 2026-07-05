@@ -61,7 +61,7 @@ type InstallMode = 'visual' | 'yaml' | 'import'
 
 const DEFAULT_YAML_TEMPLATE = `\
 # ============================================
-# Halo Digital Human Spec - Complete Example
+# Vortex Digital Human Spec - Complete Example
 # ============================================
 # This template shows ALL available fields.
 # Delete or modify sections as needed.

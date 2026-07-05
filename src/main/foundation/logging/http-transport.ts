@@ -10,8 +10,8 @@
  * setHttpLogging() and is toggled by the controller.
  *
  * Log file: same directory as main.log, filename = http-raw.log
- *   macOS:   ~/Library/Logs/Halo/http-raw.log
- *   Windows: %USERPROFILE%\AppData\Roaming\Halo\logs\http-raw.log
+ *   macOS:   ~/Library/Logs/Vortex/http-raw.log
+ *   Windows: %USERPROFILE%\AppData\Roaming\Vortex\logs\http-raw.log
  */
 
 import log from 'electron-log/main.js'

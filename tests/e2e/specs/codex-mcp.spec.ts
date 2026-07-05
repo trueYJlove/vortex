@@ -2,7 +2,7 @@
  * Codex + MCP UI E2E Test (Instrumented)
  *
  * What this test verifies (the user's stated guard):
- *   When `agent.sdkEngine = "codex"`, Halo correctly loads its built-in MCP
+ *   When `agent.sdkEngine = "codex"`, Vortex correctly loads its built-in MCP
  *   servers (e.g. `web-search`) into the Codex thread, AND the model can
  *   actually invoke those MCP tools during a turn.
  *
@@ -104,7 +104,7 @@ test.describe('Codex MCP integration (UI E2E)', () => {
   // Codex cold-start + a real model turn with a tool call needs generous time.
   test.setTimeout(240_000)
 
-  test('Codex turn invokes Halo built-in MCP tool web-search', async ({
+  test('Codex turn invokes Vortex built-in MCP tool web-search', async ({
     window,
     codexSourceId,
     electronLog,
@@ -132,7 +132,7 @@ test.describe('Codex MCP integration (UI E2E)', () => {
         // outer envelope). Earlier versions of this hook treated the callback
         // arg as the thought itself, which left every captured `type` field
         // undefined and made the test silently miss tool_use thoughts even
-        // when Halo emitted them correctly. Always extract `.thought` first
+        // when Vortex emitted them correctly. Always extract `.thought` first
         // (with a fallback so a future contract simplification still works).
         //
         // Tool name lives at `thought.toolName` (see Thought type; stream-
@@ -296,7 +296,7 @@ test.describe('Codex MCP integration (UI E2E)', () => {
           const ts: Array<{ type?: string }> = w.__codexThoughts || []
           if (ts.some((t) => t?.type === 'result' || t?.type === 'error')) return true
           const text = document.body.innerText || ''
-          return !/Halo\s*(正在工作|is working)/i.test(text) && ts.length > 1
+          return !/Vortex\s*(正在运行|is working)/i.test(text) && ts.length > 1
         },
         null,
         { timeout: 180_000, polling: 750 },
@@ -320,9 +320,9 @@ test.describe('Codex MCP integration (UI E2E)', () => {
       firstSystemInit = systemEvents[0]
     }
 
-    // Halo merges tool_use + tool_result into a SINGLE thought of type
+    // Vortex merges tool_use + tool_result into a SINGLE thought of type
     // 'tool_use' whose `output` field carries the result (see stream-processor:
-    // "Tool result merged into thought thought-tool-..."). Older Halo versions
+    // "Tool result merged into thought thought-tool-..."). Older Vortex versions
     // could also surface a separate `tool_result` thought; accept either shape.
     const toolUses = captured.filter((t) => t.type === 'tool_use')
     const toolResults = captured.filter(

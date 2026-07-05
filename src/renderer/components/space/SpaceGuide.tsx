@@ -78,7 +78,7 @@ export function SpaceGuide() {
               <div className="flex-1 min-w-0">
                 <h4 className="text-sm font-medium mb-1 sm:mb-1.5">{t('What can AI do?')}</h4>
                 <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed space-y-0.5 sm:space-y-1">
-                  <p>{t('Halo is not just chat, it can help you do things')}</p>
+                  <p>{t('Vortex is not just chat, it can help you do things')}</p>
                   <p>{t('Use natural language to have it write documents, create spreadsheets, search the web, write code...')}</p>
                   <p>{t('It can create, modify, and delete files')}</p>
                 </div>
@@ -110,7 +110,7 @@ export function SpaceGuide() {
                   <p>
                     <span className="text-foreground/80">{t('Casual chat, asking questions')}</span>
                     <span className="mx-1 sm:mx-1.5">→</span>
-                    {t('Use Halo workspace')}
+                    {t('Use Vortex workspace')}
                   </p>
                   <p>
                     <span className="text-foreground/80">{t('Projects, long-term tasks')}</span>

@@ -10,7 +10,7 @@ import { api } from '../../api'
 import type { RegistrySource } from '../../../shared/store/store-types'
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
-  'halo': 'Halo',
+  'halo': 'Vortex',
   'mcp-registry': 'MCP',
   'smithery': 'Smithery',
   'claude-skills': 'Claude Skills',

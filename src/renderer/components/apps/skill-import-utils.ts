@@ -122,7 +122,7 @@ export async function processFileListAsFolder(fileList: FileList): Promise<Parse
   let folderName = ''
 
   for (const file of Array.from(fileList)) {
-    const relPath = file.webkitRelativePath // e.g. "halo-dev/SKILL.md"
+    const relPath = file.webkitRelativePath // e.g. "vortex-dev/SKILL.md"
     const parts = relPath.split('/')
     if (parts.length < 2) continue
     if (!folderName) folderName = parts[0]
@@ -173,7 +173,7 @@ export async function processZipFile(file: File): Promise<ParsedSkill> {
     throw new Error('ZIP archive is empty.')
   }
 
-  // Detect a single common top-level folder (e.g. "halo-dev/") and strip it.
+  // Detect a single common top-level folder (e.g. "vortex-dev/") and strip it.
   const topDirs = new Set(
     Object.keys(rawFiles)
       .map(p => p.split('/')[0])

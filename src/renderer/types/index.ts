@@ -248,7 +248,6 @@ export interface NotificationConfig {
 export interface LayoutConfig {
   sidebarOpen?: boolean;                 // Whether conversation list sidebar is open
   sidebarWidth?: number;                 // Conversation list sidebar width (px)
-  sidebarTopSectionHeight?: number;      // Height of the top conversation sidebar section (px)
   artifactRailWidth?: number;            // Artifact rail panel width (px)
 }
 

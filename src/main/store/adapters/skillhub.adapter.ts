@@ -66,7 +66,7 @@ const API_BASE = 'https://api.skillhub.cn'
 const COS_BASE = 'https://skillhub-1388575217.cos.accelerate.myqcloud.com'
 const DEFAULT_HEADERS = {
   'Accept': 'application/json',
-  'User-Agent': 'Halo-Store/1.0',
+  'User-Agent': 'Vortex-Store/1.0',
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ async function fetchFilesManifest(slug: string): Promise<SkillHubFilesResponse> 
 
 async function downloadFile(slug: string, version: string, path: string): Promise<string> {
   const res = await fetchWithTimeout(`${COS_BASE}/skills/${slug}/${version}/files/${path}`, {
-    headers: { 'User-Agent': 'Halo-Store/1.0' },
+    headers: { 'User-Agent': 'Vortex-Store/1.0' },
   })
   if (!res.ok) {
     throw new Error(`SkillHub: failed to download "${path}" of "${slug}" v${version}: HTTP ${res.status}`)

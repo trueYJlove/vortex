@@ -1,7 +1,7 @@
 /**
  * apps/manager -- Default App Seed
  *
- * Seeds a "Halo AI 数字人模板" default automation app when no automation-type apps
+ * Seeds a "Vortex AI 数字人模板" default automation app when no automation-type apps
  * exist. Runs as a Tier 3 idle task so it never blocks startup. Failures
  * are logged as warnings and do not affect any functionality.
  *
@@ -11,7 +11,7 @@
  * Built-in awareness: if the build ships at least one built-in automation
  * digital human (resources/builtin-apps/, materialized by the builtin loader),
  * this seed is skipped entirely — the bundled apps already give the user a
- * useful starting point and adding "Halo 助手" on top would clutter the UI.
+ * useful starting point and adding "Vortex 助手" on top would clutter the UI.
  */
 
 import type { AppManagerService } from './types'
@@ -24,9 +24,9 @@ const SEED_SPACE_ID = 'halo-temp'
 /** Default app spec — no subscriptions (IM / manual-trigger only) */
 const DEFAULT_APP_SPEC: AutomationSpec = {
   spec_version: '1',
-  name: 'Halo AI 数字人模板',
+  name: 'Vortex AI 数字人模板',
   version: '1.0',
-  author: 'Halo',
+  author: 'Vortex',
   description: '默认数字人，可绑定 IM 机器人或手动对话',
   type: 'automation',
   system_prompt: [
@@ -62,7 +62,7 @@ export async function seedDefaultAppIfNeeded(appManager: AppManagerService): Pro
     return
   }
 
-  console.log('[Seed] No automation apps found — seeding default "Halo 助手" app')
+  console.log('[Seed] No automation apps found — seeding default "Vortex 助手" app')
 
   try {
     const appId = await appManager.install(SEED_SPACE_ID, DEFAULT_APP_SPEC)

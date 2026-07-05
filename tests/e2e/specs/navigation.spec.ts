@@ -9,10 +9,10 @@ import { test, expect } from '../fixtures/electron'
 import { waitForHomePage, navigateToChat, navigateToSettings, navigateToApps } from '../fixtures/helpers'
 
 test.describe('Home Page', () => {
-  test('renders Halo space card and Apps card', async ({ window }) => {
+  test('renders Vortex space card and Apps card', async ({ window }) => {
     await waitForHomePage(window)
 
-    // Halo space card should be visible
+    // Vortex space card should be visible
     const haloCard = await window.$('[data-onboarding="halo-space"]')
     expect(haloCard).toBeTruthy()
 
@@ -42,7 +42,7 @@ test.describe('Home Page', () => {
 test.describe('Page Navigation', () => {
   test.setTimeout(30000)
 
-  test('can navigate to Halo space and see chat', async ({ window }) => {
+  test('can navigate to Vortex space and see chat', async ({ window }) => {
     await navigateToChat(window)
 
     // Textarea should be visible (chat input)
@@ -88,7 +88,7 @@ test.describe('Page Navigation', () => {
   })
 
   test('can navigate back from Space to home', async ({ window }) => {
-    // Navigate to Halo space first
+    // Navigate to Vortex space first
     await navigateToChat(window)
 
     // Find and click the back button (chevron left SVG in header)
@@ -106,7 +106,7 @@ test.describe('Page Navigation', () => {
     if (backBtn) {
       await backBtn.click()
 
-      // Should return to Home Page - wait for Halo card
+      // Should return to Home Page - wait for Vortex card
       await window.waitForSelector('[data-onboarding="halo-space"]', { timeout: 10000 })
 
       await window.screenshot({ path: 'tests/e2e/results/nav-back-to-home.png' })

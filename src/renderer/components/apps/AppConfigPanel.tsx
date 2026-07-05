@@ -714,7 +714,7 @@ function SettingsTab({ app, appId, spaceName, t, onRequireRestart }: SettingsTab
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              {t('Click to open the website and log in via the Halo browser.')}
+              {t('Click to open the website and log in via the Vortex browser.')}
             </p>
           </div>
         )}

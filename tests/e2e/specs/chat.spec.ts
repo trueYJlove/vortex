@@ -35,9 +35,9 @@ test.describe('Chat Interface', () => {
     expect(isEnabled).toBe(true)
 
     // Should be able to type
-    await chatInput.fill('Hello, Halo!')
+    await chatInput.fill('Hello, Vortex!')
     const value = await chatInput.inputValue()
-    expect(value).toBe('Hello, Halo!')
+    expect(value).toBe('Hello, Vortex!')
   })
 
   test('send button exists and is functional', async ({ window }) => {
@@ -96,9 +96,9 @@ test.describe('Real Chat Flow', () => {
       { timeout: 30000 }
     )
 
-    // Wait for AI to finish working (wait for "Halo 工作中" to disappear)
+    // Wait for AI to finish working (wait for "Vortex 正在运行" to disappear)
     await window.waitForSelector(
-      'text="Halo 工作中"',
+      'text="Vortex 正在运行"',
       { state: 'hidden', timeout: 45000 }
     ).catch(() => {
       // Indicator might have already disappeared, continue
@@ -125,9 +125,9 @@ test.describe('Real Chat Flow', () => {
     const sendButton = await window.waitForSelector('[data-onboarding="send-button"]', { timeout: 5000 })
     await sendButton.click()
 
-    // Look for working indicator ("Halo 工作中")
+    // Look for working indicator ("Vortex 正在运行")
     const hasIndicator = await window.waitForSelector(
-      'text="Halo 工作中"',
+      'text="Vortex 正在运行"',
       { timeout: 10000 }
     ).then(() => true).catch(() => false)
 
@@ -135,7 +135,7 @@ test.describe('Real Chat Flow', () => {
     await window.waitForSelector('.message-assistant', { timeout: 30000 })
 
     // Wait for AI to finish working
-    await window.waitForSelector('text="Halo 工作中"', { state: 'hidden', timeout: 45000 }).catch(() => {})
+    await window.waitForSelector('text="Vortex 正在运行"', { state: 'hidden', timeout: 45000 }).catch(() => {})
 
     // Verify AI response contains numbers (1-5)
     const assistantMessage = await window.waitForSelector('.message-assistant', { timeout: 5000 })
@@ -175,7 +175,7 @@ test.describe('Real Chat Flow', () => {
 
     // Wait for first AI response
     await window.waitForSelector('.message-assistant', { timeout: 30000 })
-    await window.waitForSelector('text="Halo 工作中"', { state: 'hidden', timeout: 45000 }).catch(() => {})
+    await window.waitForSelector('text="Vortex 正在运行"', { state: 'hidden', timeout: 45000 }).catch(() => {})
 
     // Verify first response
     let assistantMessages = await window.$$('.message-assistant')
@@ -188,7 +188,7 @@ test.describe('Real Chat Flow', () => {
 
     // Wait for second AI response (should now have 2 assistant messages)
     await window.waitForFunction(() => document.querySelectorAll('.message-assistant').length >= 2, { timeout: 30000 })
-    await window.waitForSelector('text="Halo 工作中"', { state: 'hidden', timeout: 45000 }).catch(() => {})
+    await window.waitForSelector('text="Vortex 正在运行"', { state: 'hidden', timeout: 45000 }).catch(() => {})
 
     // Verify second response
     assistantMessages = await window.$$('.message-assistant')
@@ -208,7 +208,7 @@ test.describe('Switch Provider and Chat', () => {
 
     // Open ModelSelector dropdown
     // The model selector button shows the current model name (e.g., "DeepSeek V3.2")
-    // and is distinct from the SpaceSelector which shows "Halo ∧"
+    // and is distinct from the SpaceSelector which shows "Vortex ∧"
     // Use evaluate to find the right button by looking for the model name pattern
     await window.evaluate(() => {
       const buttons = document.querySelectorAll('button')
@@ -265,7 +265,7 @@ test.describe('Switch Provider and Chat', () => {
     await window.waitForSelector('.message-assistant', { timeout: 45000 })
 
     // Wait for AI to finish
-    await window.waitForSelector('text="Halo 工作中"', { state: 'hidden', timeout: 60000 }).catch(() => {})
+    await window.waitForSelector('text="Vortex 正在运行"', { state: 'hidden', timeout: 60000 }).catch(() => {})
 
     await window.screenshot({ path: 'tests/e2e/results/chat-tencent-glm-response.png' })
 

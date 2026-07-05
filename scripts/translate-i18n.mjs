@@ -72,7 +72,7 @@ const TRANSLATION_GUIDELINES = {
 // Product context
 const APP_CONTEXT = `
 ## Product Context
-Halo is a desktop AI assistant application (similar to Cursor/Claude Desktop).
+Vortex is a desktop AI assistant application (similar to Cursor/Claude Desktop).
 
 Key concepts:
 - "Space" = A workspace/project folder where AI can read/write files (NOT outer space)
@@ -162,7 +162,7 @@ Translate the following JSON from English to ${LANG_NAMES[targetLocale]}.
 ## Rules
 1. Keep JSON keys unchanged, only translate values
 2. Keep {{variables}} placeholders exactly as-is (e.g., {{count}}, {{name}})
-3. Keep brand name "Halo" untranslated
+3. Keep brand name "Vortex" untranslated
 4. Keep technical terms like "MCP", "API", "JSON" untranslated
 5. ${TRANSLATION_GUIDELINES[targetLocale]}
 

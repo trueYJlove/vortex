@@ -95,8 +95,8 @@ test.describe('Space Management', () => {
     await window.screenshot({ path: 'tests/e2e/results/spaces-entered.png' })
   })
 
-  test('can create new conversation in Halo space', async ({ window }) => {
-    // Navigate to Halo chat
+  test('can create new conversation in Vortex space', async ({ window }) => {
+    // Navigate to Vortex chat
     await navigateToChat(window)
 
     // Find the "New conversation" button in header (+ icon)

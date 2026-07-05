@@ -2,7 +2,7 @@
  * ImSessionPanel
  *
  * Right-side panel showing all conversations for the current digital human.
- * First item is always "Halo Chat" (native conversation), followed by
+ * First item is always "Vortex Chat" (native conversation), followed by
  * IM sessions sorted by lastActiveAt descending.
  *
  * Sessions data is managed centrally in apps-page.store (single fetch loop).
@@ -96,7 +96,7 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
 
       {/* Session list */}
       <div className="flex-1 overflow-y-auto">
-        {/* Fixed: Halo Chat (native conversation) */}
+        {/* Fixed: Vortex Chat (native conversation) */}
         <button
           onClick={handleSelectHaloChat}
           className={`w-full text-left px-3 py-2.5 transition-colors ${
@@ -108,7 +108,7 @@ export function ImSessionPanel({ appId, spaceId, onSessionCleared }: ImSessionPa
           <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{t('Halo Chat')}</div>
+              <div className="text-sm font-medium">{t('Vortex Chat')}</div>
               <div className="text-[11px] text-muted-foreground/60 mt-0.5">
                 {t('Native conversation')}
               </div>

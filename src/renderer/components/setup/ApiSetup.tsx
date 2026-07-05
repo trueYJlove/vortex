@@ -388,10 +388,10 @@ export function ApiSetup({ onBack, showBack = false, preset }: ApiSetupProps) {
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
         {/* Logo */}
-        <div className="w-16 h-16 rounded-full border-2 border-primary/60 flex items-center justify-center halo-glow">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
+        <div className="w-16 h-16 rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center halo-glow">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
         </div>
-        <h1 className="mt-4 text-2xl font-light">Halo</h1>
+        <h1 className="mt-4 text-2xl font-light">Vortex</h1>
       </div>
 
       {/* Main content */}

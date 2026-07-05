@@ -515,7 +515,7 @@ async function garbageCollectStaleBuiltins(
 /**
  * Returns the number of built-in apps currently materialized on disk (whether
  * or not they have been seeded into the App Manager yet). Used by seed.ts to
- * decide whether the "Halo 助手" placeholder should be created.
+ * decide whether the "Vortex 助手" placeholder should be created.
  */
 export function countBuiltinAppsOnDisk(): number {
   const root = getBuiltinAppsDir()

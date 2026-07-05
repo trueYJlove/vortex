@@ -46,7 +46,7 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
     setTheme(value)
     // Sync to localStorage immediately (for anti-flash on reload)
     try {
-      localStorage.setItem('halo-theme', value)
+      localStorage.setItem('vortex-theme', value)
     } catch (e) { /* ignore */ }
     await autoSave({
       appearance: { theme: value, iconTheme }

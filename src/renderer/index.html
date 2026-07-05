@@ -7,7 +7,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://hm.baidu.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: halo-file: https:; connect-src *"
     />
-  <title>Halo - AI that gets things done</title>
+  <title>Vortex - AI that gets things done</title>
     <style>
       /* Anti-flash: set background before CSS loads (default: dark) */
       html, body, #root { background-color: #161822; }
@@ -19,7 +19,7 @@
         // MUST stay in sync with src/renderer/themes/builtins/*.ts preview.background values
         var BG = { dark: '#161822', light: '#ffffff', dracula: '#282a36', 'tokyo-night': '#1a1b26', 'one-dark-pro': '#282c34', nord: '#2e3440', 'catppuccin-mocha': '#1e1e2e' };
         try {
-          var stored = localStorage.getItem('halo-theme');
+          var stored = localStorage.getItem('vortex-theme');
           var themeId = stored || 'dark';
           if (themeId === 'system') {
             themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -75,12 +75,13 @@
           width: 48px;
           height: 48px;
           border-radius: 50%;
-          border: 2px solid #6366f1;
+          border: 2px solid #8b5cf6;
           opacity: 0.6;
           margin-bottom: 24px;
+          background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(139,92,246,0.2));
         "></div>
         <h1 style="font-size: 20px; font-weight: 500; margin: 0 0 8px 0;">
-          Halo failed to start
+          Vortex failed to start
         </h1>
         <p style="color: #a1a1aa; margin: 0 0 24px 0; font-size: 14px;">
           An error occurred before the application could load. Please copy the error below and report it.
@@ -102,7 +103,8 @@
         "></pre>
         <p style="color: #71717a; margin: 16px 0 0 0; font-size: 12px;">
           Try restarting the application. If the problem persists, please report at
-          <span style="color: #6366f1;">github.com/openkursar/hello-halo/issues</span>
+          <!-- TODO: Replace with Vortex issue tracker -->
+          <!-- <span style="color: #6366f1;">github.com/openkursar/hello-halo/issues</span> -->
         </p>
       </div>
     </div>

@@ -18,7 +18,7 @@ export function SplashPage() {
 
   return (
     <div className="h-full w-full flex flex-col items-center justify-center bg-background">
-      {/* Halo Logo */}
+      {/* Vortex Logo */}
       <div
         className={`transition-all duration-1000 ${
           animate ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
@@ -33,7 +33,7 @@ export function SplashPage() {
           animate ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
         }`}
       >
-        Halo
+        Vortex
       </h1>
 
       {/* Tagline */}

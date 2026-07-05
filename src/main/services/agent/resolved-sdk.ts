@@ -118,7 +118,7 @@ async function doInitSdk(): Promise<void> {
       installSdkLogger((_sdk as any).setLogger)
     }
     const duration = (performance.now() - startTime).toFixed(1)
-    console.log(`[SDK] Active engine: Halo SDK (@hello-halo/agent-sdk) [${duration}ms]`)
+    console.log(`[SDK] Active engine: Vortex SDK (@hello-halo/agent-sdk) [${duration}ms]`)
     return
   }
 
@@ -296,7 +296,7 @@ export async function createSession(options: Record<string, any>): Promise<any> 
   if (!fn) {
     throw new Error(
       '[SDK] createSession not found in active SDK. ' +
-        'Expected createSession (Halo) or unstable_v2_createSession (CC).'
+        'Expected createSession (Vortex) or unstable_v2_createSession (CC).'
     )
   }
 

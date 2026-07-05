@@ -24,7 +24,7 @@ export const darkTheme: ThemeDefinition = {
     border:                 '225 12% 22%',   // #363950
     input:                  '224 12% 18%',
     ring:                   '217 91% 60%',
-    'halo-glow':            '217 91% 60%',
+    'halo-glow':            '262 83% 66%',
     'halo-success':         '142 71% 45%',
     'halo-warning':         '38 92% 50%',
     'halo-error':           '0 72% 51%',
@@ -32,7 +32,7 @@ export const darkTheme: ThemeDefinition = {
   preview: {
     background: '#161822',
     foreground: '#e8eaf0',
-    primary:    '#3b82f6',
-    accent:     '#3b82f6',
+    primary:    '#8b5cf6',
+    accent:     '#8b5cf6',
   },
 }

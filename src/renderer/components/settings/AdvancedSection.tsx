@@ -60,7 +60,7 @@ const CAPABILITY_GROUPS: readonly CapabilityGroup[] = [
   {
     id: 'cron',
     labelKey: 'Scheduled Tasks',
-    descKey: 'Built-in cron job scheduling. Halo has its own automation system.',
+    descKey: 'Built-in cron job scheduling. Vortex has its own automation system.',
     tools: ['CronCreate', 'CronDelete', 'CronList'],
   },
   {
@@ -150,7 +150,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
 
   const handleRelaunch = async () => {
     const confirmed = await showConfirm({
-      title: t('Restart Halo?'),
+      title: t('Restart Vortex?'),
       message: t('All active conversations and background tasks will be interrupted.'),
       confirmLabel: t('Restart'),
       cancelLabel: t('Cancel'),
@@ -267,7 +267,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
               </div>
             </label>
 
-            {/* Halo SDK */}
+            {/* Vortex SDK */}
             <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input
                 type="radio"
@@ -278,8 +278,8 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
                 className="mt-0.5 accent-primary"
               />
               <div>
-                <p className="font-medium text-sm">{t('Halo SDK')}</p>
-                <p className="text-xs text-muted-foreground">{t('The official Halo agent engine. Lightweight on resources, faster startup, optimized for open-source models. Experimental.')}</p>
+                <p className="font-medium text-sm">{t('Vortex SDK')}</p>
+                <p className="text-xs text-muted-foreground">{t('The official Vortex agent engine. Lightweight on resources, faster startup, optimized for open-source models. Experimental.')}</p>
               </div>
             </label>
 
@@ -361,7 +361,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
               <div className="border-t border-border">
                 {/* Hint */}
                 <p className="px-4 pt-3 pb-2 text-xs text-muted-foreground">
-                  {t('Extra tools consume additional tokens per message. Enable only what you need. Please start a new session or restart Halo for changes to take effect.')}
+                  {t('Extra tools consume additional tokens per message. Enable only what you need. Please start a new session or restart Vortex for changes to take effect.')}
                 </p>
 
                 {/* Capability toggles */}

@@ -9,7 +9,7 @@
  *
  * Persistence:
  *   - Language: i18n.changeLanguage + localStorage (via setLanguage())
- *   - Theme:    localStorage('halo-theme') + config.appearance.theme
+ *   - Theme:    localStorage('vortex-theme') + config.appearance.theme
  *
  * Theme is applied reactively by App.tsx via the same useEffect that
  * already watches `config?.appearance?.theme`, so writing to config is
@@ -51,7 +51,7 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
   const handleThemeChange = (value: ThemeMode) => {
     setTheme(value)
     // Anti-flash localStorage sync (mirrors AppearanceSection behavior).
-    try { localStorage.setItem('halo-theme', value) } catch { /* noop */ }
+    try { localStorage.setItem('vortex-theme', value) } catch { /* noop */ }
     // Apply immediately via store so App.tsx's theme useEffect picks it up
     // and the screen re-paints in the chosen theme before Continue.
     if (config) {
@@ -80,10 +80,10 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
     <div className="h-full w-full flex flex-col items-center justify-center bg-background p-4 sm:p-8">
       {/* Header with Logo */}
       <div className="flex flex-col items-center mb-8 sm:mb-10">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-primary/60 flex items-center justify-center halo-glow">
-          <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
+        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center halo-glow">
+          <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
         </div>
-        <h1 className="mt-4 text-2xl sm:text-3xl font-light tracking-wide">Halo</h1>
+        <h1 className="mt-4 text-2xl sm:text-3xl font-light tracking-wide">Vortex</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t("Let's set things up")}</p>
       </div>
 

@@ -30,7 +30,7 @@ interface SpacePreferences {
 
 export function registerSpaceHandlers(): void {
   registerRawRpcHandlers(spaceRpc, {
-    // Get Halo temp space
+    // Get Vortex temp space
     getHaloSpace: async () => {
       try {
         const space = getHaloSpace()

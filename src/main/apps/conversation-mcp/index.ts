@@ -102,7 +102,7 @@ function buildTools(spaceId: string) {
     '  3. User-specific values — if the task requires URLs, keywords, API endpoints, or other dynamic inputs, define them as config_schema fields so the user can fill them in, rather than hardcoding guessed values.\n' +
     'Do NOT call this tool until you have the user\'s answers to the above. Guessing these values leads to a poor experience.\n\n' +
     'CRITICAL — config_schema restrictions:\n' +
-    '  - NEVER create config fields for cookies, session tokens, or any login credentials. The App runs inside the user\'s Halo browser with shared session — authentication is automatic.\n\n' +
+    '  - NEVER create config fields for cookies, session tokens, or any login credentials. The App runs inside the user\'s Vortex browser with shared session — authentication is automatic.\n\n' +
     'spec schema (JSON object):\n' +
     '  name*: string — Short descriptive name\n' +
     '  description*: string — One sentence describing what this automation does\n' +
@@ -123,11 +123,11 @@ function buildTools(spaceId: string) {
     '  memory_schema?: Record<string, { type: string, description?: string }> — Persistent memory fields\n' +
     '  escalation?: { enabled?: boolean, timeout_hours?: number }\n' +
     '  version?: string (default "1.0")\n' +
-    '  author?: string (default "Halo")',
+    '  author?: string (default "Vortex")',
     {
       spec: z.string().describe(
         'JSON string of the App Spec object. Must include name, description, system_prompt, and subscriptions. ' +
-        'type is always "automation". version defaults to "1.0", author defaults to "Halo".'
+        'type is always "automation". version defaults to "1.0", author defaults to "Vortex".'
       )
     },
     async (args) => {
@@ -148,7 +148,7 @@ function buildTools(spaceId: string) {
         // Force automation type and apply defaults
         parsedSpec.type = 'automation'
         if (!parsedSpec.version) parsedSpec.version = '1.0'
-        if (!parsedSpec.author) parsedSpec.author = 'Halo'
+        if (!parsedSpec.author) parsedSpec.author = 'Vortex'
 
         // Validate using the canonical schema
         let validatedSpec

@@ -2,7 +2,7 @@
  * Electron App Fixture
  *
  * Provides a reusable fixture for launching and interacting with
- * the Halo Electron application in E2E tests.
+ * the Vortex Electron application in E2E tests.
  *
  * Environment Variables:
  *   HALO_TEST_API_KEY   - API key for testing (required for chat tests)
@@ -116,7 +116,7 @@ function createTestConfigDir(appPath: string): string {
   )
 
   // Create directory structure
-  const haloDir = path.join(testDir, '.halo')
+  const haloDir = path.join(testDir, '.vortex')
   const tempDir = path.join(haloDir, 'temp')
   const spacesDir = path.join(haloDir, 'spaces')
 
@@ -206,9 +206,9 @@ function createTestConfigDir(appPath: string): string {
 
   // Create headless-electron symlink for Claude Agent SDK
   // SDK uses this to spawn child processes without Dock icon on macOS
-  // Path: ~/Library/Application Support/Halo/headless-electron/electron-node
+  // Path: ~/Library/Application Support/Vortex/headless-electron/electron-node
   if (process.platform === 'darwin') {
-    const userDataDir = path.join(testDir, 'Library', 'Application Support', 'Halo')
+    const userDataDir = path.join(testDir, 'Library', 'Application Support', 'Vortex')
     const headlessDir = path.join(userDataDir, 'headless-electron')
 
     fs.mkdirSync(headlessDir, { recursive: true })
@@ -251,7 +251,7 @@ export const test = base.extend<ElectronFixtures>({
     console.log(`[E2E] Test config dir: ${testConfigDir}`)
 
     // Build a clean env without ELECTRON_RUN_AS_NODE.
-    // Halo sets ELECTRON_RUN_AS_NODE=1 for its child processes (Claude Agent SDK),
+    // Vortex sets ELECTRON_RUN_AS_NODE=1 for its child processes (Claude Agent SDK),
     // which forces Electron into plain Node.js mode. E2E tests inherit this env var,
     // but Playwright needs Electron in full app mode to connect via CDP.
     const { ELECTRON_RUN_AS_NODE: _, ...cleanEnv } = process.env
@@ -263,10 +263,10 @@ export const test = base.extend<ElectronFixtures>({
         // Use test-specific config directory
         HOME: testConfigDir,
         USERPROFILE: testConfigDir,
-        // Point app config to the test .halo dir directly.
-        // config.service.ts checks HALO_DATA_DIR first (highest priority),
-        // bypassing the .halo vs .halo-dev dev-mode logic.
-        HALO_DATA_DIR: path.join(testConfigDir, '.halo'),
+        // Point app config to the test .vortex dir directly.
+        // config.service.ts checks VORTEX_DATA_DIR first (highest priority),
+        // bypassing the .vortex vs .vortex-dev dev-mode logic.
+        VORTEX_DATA_DIR: path.join(testConfigDir, '.vortex'),
         // Disable hardware acceleration for CI
         ELECTRON_DISABLE_GPU: '1',
         // Mark as E2E test

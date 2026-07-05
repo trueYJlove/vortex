@@ -91,7 +91,7 @@ const TOKEN_REFRESH_THRESHOLD_MS = 5 * 60 * 1000  // refresh 5 min before expiry
 
 // ============================================================================
 // Persistent Identity
-// Stored in ~/.halo/config.json under copilot.identity, created once, never rotated.
+// Stored in ~/.vortex/config.json under copilot.identity, created once, never rotated.
 // Mirrors vscode-machineid (hex) and editor-device-id (UUID).
 // ============================================================================
 

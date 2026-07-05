@@ -38,7 +38,7 @@ export const SUPPORTED_LOCALES = {
 export type LocaleCode = keyof typeof SUPPORTED_LOCALES
 
 // Storage key for persisting language preference
-const LOCALE_STORAGE_KEY = 'halo-locale'
+const LOCALE_STORAGE_KEY = 'vortex-locale'
 
 /**
  * Detect system language and map to supported locale

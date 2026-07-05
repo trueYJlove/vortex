@@ -73,7 +73,7 @@ export function initBackground(): BackgroundService {
                 buttons: ['Quit', 'Cancel'],
                 defaultId: 1,
                 cancelId: 1,
-                title: 'Quit Halo',
+                title: 'Quit Vortex',
                 message: `There are ${reasons.length} active background task(s). Quitting will stop them.`,
                 detail:
                   reasons.slice(0, 5).join('\n') +

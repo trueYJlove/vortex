@@ -33,7 +33,7 @@ export { createScopedBrowserContext }
 export const AI_BROWSER_SYSTEM_PROMPT = `
 ## AI Browser
 
-You can control Halo's embedded real browser. All browser tools are prefixed with mcp__ai-browser__.
+You can control Vortex's embedded real browser. All browser tools are prefixed with mcp__ai-browser__.
 
 ### Core Workflow
 1. \`browser_navigate\` — open a URL with \`{ url: "https://..." }\`; the first page is created automatically

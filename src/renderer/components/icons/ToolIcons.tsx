@@ -33,6 +33,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Bot,
   Hand,
   Settings,
   Plus,
@@ -119,6 +120,7 @@ export const ThoughtIcons = {
 
 // Re-export commonly used icons for convenience
 export {
+  Bot,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -219,7 +221,7 @@ export const spaceIconColors: Record<string, string> = {
   lightbulb: 'text-yellow-500',    // Ideas/creativity
   rocket: 'text-rose-500',         // Launch/speed
   star: 'text-amber-400',          // Favorite/important
-  sparkles: 'text-primary',        // Halo brand color
+  sparkles: 'text-primary',        // Vortex brand color
 }
 
 // Space icon component with color

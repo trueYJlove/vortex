@@ -76,7 +76,7 @@ export type SkillDownloadProgress = (filesComplete: number, filesTotal: number, 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const GITHUB_HEADERS = {
-  'User-Agent': 'Halo-Store/1.0',
+  'User-Agent': 'Vortex-Store/1.0',
   'Accept': 'application/vnd.github.v3+json',
 }
 
@@ -159,7 +159,7 @@ async function collectSkillFilesViaTree(
     const relativePath = entry.path.slice(prefix.length)
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${entry.path}`
 
-    const res = await fetchWithTimeout(rawUrl, { headers: { 'User-Agent': 'Halo-Store/1.0' } })
+    const res = await fetchWithTimeout(rawUrl, { headers: { 'User-Agent': 'Vortex-Store/1.0' } })
     if (!res.ok) {
       // A partial skill is broken at runtime — fail the install instead.
       throw new Error(`Failed to download "${relativePath}" of "${skillSlug}": HTTP ${res.status}`)
@@ -207,7 +207,7 @@ async function collectSkillFilesLegacy(
       if (!entry.download_url) {
         throw new Error(`No download_url for "${relativePath}" of "${skillSlug}"`)
       }
-      const res = await fetchWithTimeout(entry.download_url, { headers: { 'User-Agent': 'Halo-Store/1.0' } })
+      const res = await fetchWithTimeout(entry.download_url, { headers: { 'User-Agent': 'Vortex-Store/1.0' } })
       if (!res.ok) {
         // A partial skill is broken at runtime — fail the install instead.
         throw new Error(`Failed to download "${relativePath}" of "${skillSlug}": HTTP ${res.status}`)
@@ -234,7 +234,7 @@ export class ClaudeSkillsAdapter implements RegistryAdapter {
     const t0 = performance.now()
 
     const response = await fetchWithTimeout(url, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-Store/1.0' },
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Vortex-Store/1.0' },
     })
 
     if (!response.ok) {
@@ -361,7 +361,7 @@ export class ClaudeSkillsAdapter implements RegistryAdapter {
     const branch = (entry.meta?.branch as string | undefined) ?? 'main'
     const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${filePath}`
 
-    const res = await fetchWithTimeout(rawUrl, { headers: { 'User-Agent': 'Halo-Store/1.0' } })
+    const res = await fetchWithTimeout(rawUrl, { headers: { 'User-Agent': 'Vortex-Store/1.0' } })
     if (!res.ok) {
       console.log(`[ClaudeSkillsAdapter] No document for "${entry.slug}" (HTTP ${res.status})`)
       return null

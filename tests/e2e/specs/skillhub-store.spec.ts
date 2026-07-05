@@ -188,7 +188,7 @@ test.describe('SkillHub API reachability', () => {
     const result = await window.evaluate(async () => {
       try {
         const res = await fetch('https://api.skillhub.cn/api/skills?page=1&pageSize=5', {
-          headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-E2E-Test/1.0' }
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Vortex-E2E-Test/1.0' }
         })
         if (!res.ok) return { ok: false, status: res.status }
         const data = await res.json() as Record<string, unknown>

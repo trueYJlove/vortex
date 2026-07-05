@@ -165,7 +165,7 @@ export const ANTHROPIC_CAPABILITIES: EngineCapabilities = {
 export const HALO_CAPABILITIES: EngineCapabilities = {
   ...ANTHROPIC_CAPABILITIES,
   engineId: 'halo',
-  displayName: 'Halo SDK',
+  displayName: 'Vortex SDK',
 }
 
 /**

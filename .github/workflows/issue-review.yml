@@ -138,7 +138,7 @@ jobs:
               core.info(`CLOSE (${reason}): 关闭 issue #${number}`);
               await github.rest.issues.createComment({
                 owner, repo, issue_number: number,
-                body: '本 issue 经自动化审核判定为非产品 / 非技术讨论，已自动关闭。本仓库仅受理 Halo 的产品与技术/bug 讨论。',
+                body: '本 issue 经自动化审核判定为非产品 / 非技术讨论，已自动关闭。本仓库仅受理 Vortex 的产品与技术/bug 讨论。',
               });
               await github.rest.issues.update({
                 owner, repo, issue_number: number, state: 'closed', state_reason: 'not_planned',

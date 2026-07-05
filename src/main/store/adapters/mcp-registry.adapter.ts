@@ -82,7 +82,7 @@ export class McpRegistryAdapter implements RegistryAdapter {
     }
 
     const response = await fetchWithTimeout(url, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-Store/1.0' },
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Vortex-Store/1.0' },
     })
 
     if (!response.ok) {

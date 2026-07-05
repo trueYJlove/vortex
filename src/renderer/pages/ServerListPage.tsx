@@ -256,7 +256,7 @@ export function ServerListPage({ onServerSelected, onAddServer }: ServerListPage
               {t('No devices yet')}
             </p>
             <p className="text-sm text-muted-foreground mt-1 max-w-[260px]">
-              {t('Add your first Halo desktop to get started')}
+              {t('Add your first Vortex desktop to get started')}
             </p>
           </div>
         )}

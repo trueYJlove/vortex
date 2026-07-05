@@ -74,7 +74,7 @@ export class MimoSession {
     config.agent = {
       general: {
         prompt: [
-          'You are a helpful AI coding assistant integrated into Halo.',
+          'You are a helpful AI coding assistant integrated into Vortex.',
           '',
           '## Skills',
           'You have access to skills invoked via slash commands (e.g., /brainstorming).',

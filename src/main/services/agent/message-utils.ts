@@ -31,7 +31,7 @@ export function formatCanvasContext(canvasContext?: CanvasContext): string {
     .join('\n')
 
   return `<halo_canvas>
-Content canvas currently open in Halo:
+Content canvas currently open in Vortex:
 - Total ${canvasContext.tabCount} tabs
 - Active: ${activeTab ? `${activeTab.title} (${activeTab.type})` : 'None'}
 ${activeTab?.url ? `- URL: ${activeTab.url}` : ''}${activeTab?.path ? `- File path: ${activeTab.path}` : ''}

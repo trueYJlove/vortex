@@ -10,7 +10,7 @@
  * - app-chat.ts: Interactive chat triggered by user, real-time streaming
  *
  * The V2 session is keyed by "app-chat:{appId}" for reuse across messages.
- * Messages are persisted to JSONL ({spacePath}/.halo/apps/{appId}/runs/chat.jsonl)
+ * Messages are persisted to JSONL ({spacePath}/.vortex/apps/{appId}/runs/chat.jsonl)
  * for reload recovery. Session IDs are persisted for SDK-level resume when the
  * V2 process is rebuilt (idle timeout, crash, config change).
  *
@@ -853,7 +853,7 @@ async function clearSessionByConversationId(
   const space = getSpace(spaceId)
   if (space?.path) {
     const runId = deriveRunId(conversationId, appId)
-    const filePath = join(space.path, '.halo', 'apps', appId, 'runs', `${runId}.jsonl`)
+    const filePath = join(space.path, '.vortex', 'apps', appId, 'runs', `${runId}.jsonl`)
     try {
       await writeFile(filePath, '', 'utf8')
     } catch {

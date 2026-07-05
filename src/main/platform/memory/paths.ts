@@ -7,8 +7,8 @@
  * Path conventions (from architecture doc section 3.4):
  *
  *   user-memory:   {haloDir}/user-memory.md
- *   space-memory:  {spacePath}/.halo/memory.md
- *   app-memory:    {spacePath}/.halo/apps/{appId}/memory.md
+ *   space-memory:  {spacePath}/.vortex/memory.md
+ *   app-memory:    {spacePath}/.vortex/apps/{appId}/memory.md
  *
  * Each scope also has a memory/ subdirectory for archives:
  *   {basePath}/memory/   (session summaries, compaction archives)
@@ -45,15 +45,15 @@ export function getMemoryBaseDir(caller: MemoryCallerScope, scope: MemoryScopeTy
       return getHaloDir()
 
     case 'space':
-      // Space memory lives in the space's .halo directory
-      return join(caller.spacePath, '.halo')
+      // Space memory lives in the space's .vortex directory
+      return join(caller.spacePath, '.vortex')
 
     case 'app': {
       if (!caller.appId) {
         throw new Error('Memory scope "app" requires an appId in the caller scope')
       }
-      // App memory lives in the space's .halo/apps/{appId}/ directory
-      return join(caller.spacePath, '.halo', 'apps', caller.appId)
+      // App memory lives in the space's .vortex/apps/{appId}/ directory
+      return join(caller.spacePath, '.vortex', 'apps', caller.appId)
     }
 
     default:

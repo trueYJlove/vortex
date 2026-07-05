@@ -21,9 +21,9 @@ import {
   __resetKeyCacheForTests,
 } from '../../../../src/main/foundation/crypto-envelope'
 
-// Mirrors the electron mock in tests/unit/setup.ts: userData = <testDir>/.halo
+// Mirrors the electron mock in tests/unit/setup.ts: userData = <testDir>/.vortex
 function credKeyPath(): string {
-  return join(globalThis.__HALO_TEST_DIR__, '.halo', 'cred.key')
+  return join(globalThis.__HALO_TEST_DIR__, '.vortex', 'cred.key')
 }
 
 type MockFn = ReturnType<typeof vi.fn>

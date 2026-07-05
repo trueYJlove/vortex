@@ -180,7 +180,7 @@ function buildICalEvent(uid: string, options: CreateEventOptions, organizerEmail
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//Halo//Email MCP//EN',
+    'PRODID:-//Vortex//Email MCP//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VTIMEZONE',

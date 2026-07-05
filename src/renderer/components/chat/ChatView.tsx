@@ -18,7 +18,7 @@ import { MessageList } from './MessageList'
 import type { MessageListHandle } from './MessageList'
 import { InputArea } from './InputArea'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
-import { Sparkles } from '../icons/ToolIcons'
+import { Bot } from '../icons/ToolIcons'
 import {
   ONBOARDING_ARTIFACT_NAME,
   getOnboardingAiResponse,
@@ -420,7 +420,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
         }}
         onStop={handleStop}
         isGenerating={isGenerating}
-        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Halo...') : t('Continue conversation...'))}
+        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Vortex...') : t('Send a message to Vortex or type / to select a skill'))}
         isCompact={isCompact}
         slashCommands={slashCommands}
         mentionArtifacts={mentionArtifacts}
@@ -443,7 +443,7 @@ function LoadingState() {
 // Empty state component - adapts to compact mode
 function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?: boolean }) {
   const { t } = useTranslation()
-  // Reflect the actual driving engine ("Claude Code" / "Codex" / "Halo SDK")
+  // Reflect the actual driving engine ("Claude Code" / "Codex" / "Vortex SDK")
   // so a user creating a new conversation immediately sees what's powering
   // it, rather than a hardcoded brand name.
   const capabilities = useEngineCapabilities()
@@ -464,11 +464,11 @@ function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-8">
       {/* Icon */}
-      <Sparkles className="w-12 h-12 text-primary" />
+      <Bot className="w-12 h-12 text-primary" />
 
       {/* Title - concise and warm */}
       <h2 className="mt-6 text-xl font-medium">
-        Halo
+        Vortex
       </h2>
       <p className="mt-2 text-muted-foreground">
         {t('Not just chat, help you get things done')}

@@ -75,7 +75,7 @@ export function HomePage() {
     const isProjectSpace = !!space.workingDir || !isCentralizedSpace
 
     const message = isProjectSpace
-      ? t('Are you sure you want to delete this workspace?\n\nOnly Halo data (conversation history) will be deleted, your project files will be kept.')
+      ? t('Are you sure you want to delete this workspace?\n\nOnly Vortex data (conversation history) will be deleted, your project files will be kept.')
       : t('Are you sure you want to delete this workspace?\n\nAll conversations and files in the workspace will be deleted.')
 
     if (confirm(message)) {
@@ -132,10 +132,10 @@ export function HomePage() {
       <Header
         left={
           <>
-            <div className="w-[22px] h-[22px] rounded-full border-2 border-primary/60 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
+            <div className="w-[22px] h-[22px] rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
             </div>
-            <span className="text-sm font-medium">Halo</span>
+            <span className="text-sm font-medium">Vortex</span>
           </>
         }
         right={
@@ -150,9 +150,9 @@ export function HomePage() {
 
       {/* Content */}
       <main className="flex-1 overflow-auto p-6">
-        {/* Primary entry cards: Halo Space + Apps */}
+        {/* Primary entry cards: Vortex Space + Apps */}
         <div className="grid grid-cols-2 gap-4 mb-8 animate-fade-in">
-          {/* Halo Space card */}
+          {/* Vortex Space card */}
           {haloSpace && (
             <div
               data-onboarding="halo-space"
@@ -161,7 +161,7 @@ export function HomePage() {
             >
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
-                <h2 className="text-sm font-semibold">{t('Halo')}</h2>
+                <h2 className="text-sm font-semibold">{t('Vortex')}</h2>
               </div>
               <div className="flex flex-col gap-2 px-3 pt-3 pb-2 rounded-xl bg-background/60 border border-primary/20 min-h-[72px]">
                 <span className="text-xs text-muted-foreground flex-1">

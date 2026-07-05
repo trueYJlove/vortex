@@ -90,7 +90,7 @@ export class HaloAdapter implements RegistryAdapter {
       splitFiles.map(async (file) => {
         const url = `${baseUrl}/${file}`
         const res = await fetchWithTimeout(url, {
-          headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-Store/1.0' },
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Vortex-Store/1.0' },
         })
         if (!res.ok) {
           throw new Error(`HTTP ${res.status} for ${file}`)
@@ -157,7 +157,7 @@ export class HaloAdapter implements RegistryAdapter {
   private async fetchLegacyIndex(baseUrl: string, t0: number): Promise<RegistryIndex> {
     const url = `${baseUrl}/index.json`
     const response = await fetchWithTimeout(url, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'Halo-Store/1.0' },
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Vortex-Store/1.0' },
     })
 
     if (!response.ok) {
@@ -192,7 +192,7 @@ export class HaloAdapter implements RegistryAdapter {
     const specUrl = entry.download_url || `${baseUrl}/${specPath}`
 
     const response = await fetchWithTimeout(specUrl, {
-      headers: { 'User-Agent': 'Halo-Store/1.0' },
+      headers: { 'User-Agent': 'Vortex-Store/1.0' },
     })
 
     if (!response.ok) {
@@ -222,7 +222,7 @@ export class HaloAdapter implements RegistryAdapter {
         assertSafeRelPath(name, `skill file of "${entry.slug}"`)
         const url = `${filesBase}/${name}`
         const fileRes = await fetchWithTimeout(url, {
-          headers: { 'User-Agent': 'Halo-Store/1.0' },
+          headers: { 'User-Agent': 'Vortex-Store/1.0' },
         })
         if (!fileRes.ok) {
           throw new Error(`Failed to download skill file "${name}" of "${entry.slug}": HTTP ${fileRes.status}`)
@@ -260,7 +260,7 @@ export class HaloAdapter implements RegistryAdapter {
     const url = `${baseUrl}/${entry.path}/files/SKILL.md`
 
     const response = await fetchWithTimeout(url, {
-      headers: { 'User-Agent': 'Halo-Store/1.0' },
+      headers: { 'User-Agent': 'Vortex-Store/1.0' },
     })
     if (!response.ok) {
       console.log(`[HaloAdapter] No document for "${entry.slug}" (HTTP ${response.status})`)
@@ -312,7 +312,7 @@ export class HaloAdapter implements RegistryAdapter {
           let content: string | null = null
           for (const url of candidates) {
             const res = await fetchWithTimeout(url, {
-              headers: { 'User-Agent': 'Halo-Store/1.0' },
+              headers: { 'User-Agent': 'Vortex-Store/1.0' },
             })
             if (res.ok) {
               content = await res.text()

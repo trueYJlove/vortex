@@ -32,7 +32,7 @@ import { getActiveImChannelManager } from './im-channels'
 const MAX_PUSH_LENGTH = 4000
 
 /** Marker appended when text is truncated. */
-const TRUNCATION_MARKER = '\n\n...(truncated, see Halo for full content)'
+const TRUNCATION_MARKER = '\n\n...(truncated, see Vortex for full content)'
 
 export interface AutoSyncInput {
   appId: string

@@ -709,7 +709,7 @@ const TOOL_GROUP_LABELS: Record<string, string> = {
 }
 
 /**
- * Halo MCP toggle definitions for the guest policy UI.
+ * Vortex MCP toggle definitions for the guest policy UI.
  * Replaces the old free-text mcp__ input.
  */
 const HALO_MCP_TOGGLES: { key: keyof GuestPolicy; labelKey: string }[] = [
@@ -950,10 +950,10 @@ function PermissionSection({ instance, onChange, onDebouncedChange, permissionDe
 
                   {/* MCP capabilities — replaces old free-text mcp__ input */}
                   <div className="mt-2 pt-2 border-t border-border/40 space-y-3">
-                    {/* Halo built-in MCP toggles */}
+                    {/* Vortex built-in MCP toggles */}
                     <div className="space-y-1.5">
                       <label className="text-xs text-muted-foreground/70">
-                        {t('Halo Capabilities')}
+                        {t('Vortex Capabilities')}
                       </label>
                       {HALO_MCP_TOGGLES.map(({ key, labelKey }) => {
                         const isOn = Boolean(guestPolicy?.[key])

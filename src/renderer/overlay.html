@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- CSP is relaxed for development (Vite HMR needs ws: connections) -->
     <!-- Production build will have stricter CSP -->
-    <title>Halo Overlay</title>
+    <title>Vortex Overlay</title>
     <style>
       /* Transparent background for overlay */
       html, body, #root {
@@ -19,7 +19,7 @@
       // Apply theme from main window
       (function() {
         try {
-          var stored = localStorage.getItem('halo-theme');
+          var stored = localStorage.getItem('vortex-theme');
           var themeId = stored || 'dark';
           if (themeId === 'system') {
             themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

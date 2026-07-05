@@ -9,7 +9,7 @@
       "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron-vite",
       "runtimeArgs": ["dev"],
       "env": {
-        "HALO_DATA_DIR": "~/.halo-dev"
+        "VORTEX_DATA_DIR": "~/.vortex-dev"
       },
       "console": "integratedTerminal",
       "skipFiles": [

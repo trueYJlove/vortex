@@ -50,7 +50,7 @@ export class SmitheryAdapter implements RegistryAdapter {
     const url = `${baseUrl}/servers?q=${encodeURIComponent(params.search ?? '')}&page=${params.page}&pageSize=${pageSize}`
     const headers: Record<string, string> = {
       'Accept': 'application/json',
-      'User-Agent': 'Halo-Store/1.0',
+      'User-Agent': 'Vortex-Store/1.0',
     }
     if (apiKey) {
       headers.Authorization = `Bearer ${apiKey}`

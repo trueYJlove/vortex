@@ -7,7 +7,7 @@
  * Architecture:
  *   controller.ts     — Central toggle: subscribes to config, dispatches to transports
  *   http-transport.ts — Dedicated http-raw.log for raw HTTP traffic (DevMode only)
- *   sdk-transport.ts  — Dedicated halo-sdk.log for SDK runtime events (always-on info)
+ *   sdk-transport.ts  — Dedicated vortex-sdk.log for SDK runtime events (always-on info)
  *   redact.ts         — Shared redaction utilities for log sanitization
  *
  * Contract:

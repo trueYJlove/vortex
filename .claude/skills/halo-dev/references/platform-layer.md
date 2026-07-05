@@ -106,7 +106,7 @@ Key files:
 Path model:
 
 - user memory: `{haloDir}/user-memory.md` and `{haloDir}/user-memory/`
-- space memory: `{spacePath}/.halo/memory.md` and `{spacePath}/.halo/memory/`
+- space memory: `{spacePath}/.vortex/memory.md` and `{spacePath}/.vortex/memory/`
 - app memory: `{spacePath}/apps/{appId}/memory.md` and `{spacePath}/apps/{appId}/memory/`
 
 ## 2.5 `platform/background`

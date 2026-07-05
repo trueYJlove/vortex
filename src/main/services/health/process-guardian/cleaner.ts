@@ -17,7 +17,7 @@ import {
 } from './registry'
 import { getPlatformOps } from './platform'
 
-// Command-line argument patterns for Halo-managed processes
+// Command-line argument patterns for Vortex-managed processes
 const HALO_MANAGED_FLAG = 'halo-managed'
 const HALO_INSTANCE_PREFIX = 'halo-instance='
 

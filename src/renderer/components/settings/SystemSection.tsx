@@ -224,7 +224,7 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
   // Handle restart with confirmation
   const handleRestart = async () => {
     const confirmed = await showConfirm({
-      title: t('Restart Halo?'),
+      title: t('Restart Vortex?'),
       message: t('All active conversations and background tasks will be interrupted.'),
       confirmLabel: t('Restart'),
       cancelLabel: t('Cancel'),
@@ -265,7 +265,7 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
 
         {/* Info banner */}
         <div className="bg-muted/50 rounded-lg p-3 mb-4 text-sm text-muted-foreground">
-          {t('We recommend full trust mode - use natural language to control Halo.')}
+          {t('We recommend full trust mode - use natural language to control Vortex.')}
         </div>
 
         {/* Trust Mode - always on */}
@@ -304,13 +304,13 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
                 <p className="font-medium">{t('Auto Launch on Startup')}</p>
                 <span
                   className="inline-flex items-center justify-center w-4 h-4 text-xs rounded-full bg-muted text-muted-foreground cursor-help"
-                  title={t('Automatically run Halo when system starts')}
+                  title={t('Automatically run Vortex when system starts')}
                 >
                   ?
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {t('Automatically run Halo when system starts')}
+                {t('Automatically run Vortex when system starts')}
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -429,10 +429,10 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
             </button>
           </div>
 
-          {/* Restart Halo */}
+          {/* Restart Vortex */}
           <div className="flex items-center justify-between pt-4 border-t border-border">
             <div className="flex-1">
-              <p className="font-medium">{t('Restart Halo')}</p>
+              <p className="font-medium">{t('Restart Vortex')}</p>
               <p className="text-sm text-muted-foreground">
                 {t('Restart the application to apply pending changes')}
               </p>

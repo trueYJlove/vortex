@@ -3,9 +3,9 @@
  *
  * Handles Claude CLI config directory management and migration:
  * - Get current path configuration
- * - Scan and migrate Skills from ~/.claude/skills/ to Halo
- * - Scan and migrate MCP servers from ~/.claude.json to Halo
- * - Update CLAUDE_CONFIG_DIR mode (halo default / cc default / custom)
+ * - Scan and migrate Skills from ~/.claude/skills/ to Vortex
+ * - Scan and migrate MCP servers from ~/.claude.json to Vortex
+ * - Update CLAUDE_CONFIG_DIR mode (vortex default / cc default / custom)
  *
  * Request/response channels are registered from the typed RPC contract
  * (passthrough — handler bodies and return shapes preserved verbatim).
