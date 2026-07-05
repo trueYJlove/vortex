@@ -63,7 +63,7 @@ export const ConversationList = memo(function ConversationList({
   // Derive pinned idle item from pulse items (first starred idle conversation)
   const pulseItems = usePulseItems()
   const pinnedItem = useMemo(() => {
-    const pinned = pulseItems.find(item => item.status === 'idle')
+    const pinned = pulseItems.find(item => item.starred && item.status === 'idle')
     return pinned ? {
       id: pinned.conversationId,
       title: pinned.title,
@@ -396,6 +396,12 @@ export const ConversationList = memo(function ConversationList({
         </div>
       </div>
 
+      {/* Top section: automation badge + pinned conversations */}
+      <div className="flex flex-col">
+        <AutomationBadge />
+        {visible && <PulseSidebarSection />}
+      </div>
+
       {/* Sessions section */}
       <SidebarSection
         title={t('Sessions')}
@@ -413,12 +419,11 @@ export const ConversationList = memo(function ConversationList({
                 if (spaceId) useChatStore.getState().selectConversation(pinnedItem.id)
               }}
             />
-            <div className="border-b border-border" />
           </>
         )}
 
         {/* Conversation list (virtualized) */}
-        <div style={{ height: 'calc(100vh - 140px)' }}>
+        <div className="flex-1 min-h-0 overflow-hidden">
           <Virtuoso
             data={conversations}
             overscan={200}
@@ -449,12 +454,6 @@ export const ConversationList = memo(function ConversationList({
       >
         <PersistentTaskPlanSection embedded />
       </SidebarSection>
-
-      {/* Top section: automation badge + pinned conversations */}
-      <div className="flex flex-col">
-        <AutomationBadge />
-        {visible && <PulseSidebarSection />}
-      </div>
 
       {/* Drag handle - on right side */}
       <div
