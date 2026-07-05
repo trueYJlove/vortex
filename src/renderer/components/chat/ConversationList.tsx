@@ -287,7 +287,7 @@ export const ConversationList = memo(function ConversationList({
     setHeaderMenuOpen(false)
     const confirmed = await showConfirm({
       title: t('Clear all conversations?'),
-      message: t('This will delete all conversations in the current space, including pinned conversations. This cannot be undone.'),
+      message: t('This will delete all conversations in the current space except the current one. This cannot be undone.'),
       confirmLabel: t('Clear'),
       cancelLabel: t('Cancel'),
       variant: 'danger',
@@ -296,7 +296,7 @@ export const ConversationList = memo(function ConversationList({
 
     const spaceId = useSpaceStore.getState().currentSpace?.id
     if (spaceId) {
-      await useChatStore.getState().clearConversations(spaceId)
+      await useChatStore.getState().clearConversations(spaceId, currentConversationId)
     }
   }
 
