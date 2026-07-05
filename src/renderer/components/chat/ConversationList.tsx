@@ -290,7 +290,7 @@ export const ConversationList = memo(function ConversationList({
             <span className="text-sm truncate flex-1">
               {conversation.title}
             </span>
-            {/* Engine badge — visible only for non-default engines (Codex / Halo SDK).
+            {/* Engine badge — visible only for non-default engines (Codex / Vortex SDK).
                 Anthropic conversations render nothing to keep the UI uncluttered. */}
             <EngineBadge engineId={conversation.engineId} size="xs" className="ml-1" />
             {/* Absolutely positioned so idle placeholder doesn't steal title space */}

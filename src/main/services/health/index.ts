@@ -2,7 +2,7 @@
  * Health System Module - System Health Management (SHM)
  *
  * Provides comprehensive health monitoring, process tracking,
- * and automatic recovery for the Halo application.
+ * and automatic recovery for the Vortex application.
  *
  * Architecture:
  * - Process Guardian: Track and cleanup subprocess lifecycle

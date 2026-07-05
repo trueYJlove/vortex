@@ -48,7 +48,7 @@ public class MainActivity extends BridgeActivity {
                     if (++attempts >= SAFE_AREA_RETRY_MAX) {
                         // Give up. Renderer-side fallbacks (visualViewport listener,
                         // Capacitor SystemBars on Android 16+) will still recover.
-                        android.util.Log.w("Halo", "Safe-area injection skipped: WebView not ready after "
+                        android.util.Log.w("Vortex", "Safe-area injection skipped: WebView not ready after "
                                 + SAFE_AREA_RETRY_MAX + " attempts");
                         return;
                     }

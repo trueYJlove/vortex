@@ -1,11 +1,11 @@
 /**
- * CodeMirror Theme for Halo
+ * CodeMirror Theme for Vortex
  *
- * Creates a theme that matches Halo's CSS variable-based theme system.
+ * Creates a theme that matches Vortex's CSS variable-based theme system.
  * The theme automatically adapts to light/dark mode via CSS variables.
  *
  * Design principles:
- * - Use Halo CSS variables (--background, --foreground, etc.)
+ * - Use Vortex CSS variables (--background, --foreground, etc.)
  * - Syntax colors complement the base theme
  * - Comfortable reading experience (proper contrast, spacing)
  * - Visual consistency with highlight.js syntax-theme.css

@@ -2,7 +2,7 @@
  * EngineBadge
  *
  * Subtle inline marker that tells the user which agent engine
- * ("Claude Code", "Halo SDK", "Codex", "MiMo Code") owns a conversation.
+ * ("Claude Code", "Vortex SDK", "Codex", "MiMo Code") owns a conversation.
  *
  * Visual treatment is intentionally low-key — light/translucent colored text,
  * no fill, no border — so the badge informs without competing with the
@@ -15,7 +15,7 @@
  *
  * Renders nothing for the default ('anthropic') engine to avoid badge
  * clutter on existing CC users — the UX promise is zero disruption for them.
- * Codex / Halo SDK / MiMo Code conversations show the badge.
+ * Codex / Vortex SDK / MiMo Code conversations show the badge.
  */
 
 import { useTranslation } from '../../i18n'

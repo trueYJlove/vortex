@@ -40,7 +40,7 @@ export async function exportReport(filePath?: string): Promise<string> {
 export function formatReportAsText(report: DiagnosticReport): string {
   const lines: string[] = [
     '='.repeat(50),
-    'HALO DIAGNOSTIC REPORT',
+    'VORTEX DIAGNOSTIC REPORT',
     '='.repeat(50),
     '',
     `Generated: ${report.timestamp}`,

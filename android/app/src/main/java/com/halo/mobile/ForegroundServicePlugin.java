@@ -22,7 +22,7 @@ public class ForegroundServicePlugin extends Plugin {
 
     @PluginMethod()
     public void start(PluginCall call) {
-        String title = call.getString("title", "Halo");
+        String title = call.getString("title", "Vortex");
         String body = call.getString("body", "Connected to desktop");
 
         Log.d(TAG, "Starting foreground service: " + title + " - " + body);

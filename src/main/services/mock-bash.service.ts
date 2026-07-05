@@ -38,7 +38,7 @@ export function createMockBash(): string {
   const mockScript = `@echo off
 echo.
 echo ============================================================
-echo [HALO SYSTEM MESSAGE - COMMAND EXECUTION UNAVAILABLE]
+echo [VORTEX SYSTEM MESSAGE - COMMAND EXECUTION UNAVAILABLE]
 echo ============================================================
 echo.
 echo The command execution environment (Git Bash) is not installed.

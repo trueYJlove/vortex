@@ -5,7 +5,7 @@
  * Each AppType gets a distinct icon, color, and hover tooltip.
  *
  * The `automation` type receives special primary-color styling as it is
- * Halo's signature "Digital Human" feature.
+ * Vortex's signature "Digital Human" feature.
  *
  * Note: all t() calls use string literals so i18next-parser can extract them.
  */

@@ -5,7 +5,7 @@
  * - Language support (lazy-loaded)
  * - Reading-optimized extensions (line numbers, folding, search)
  * - Light editing support (history for undo/redo)
- * - Theme integration with Halo's CSS variables
+ * - Theme integration with Vortex's CSS variables
  *
  * Design philosophy: Reader-first, not IDE-first
  * - Virtual scrolling for large files
@@ -414,7 +414,7 @@ export interface CreateEditorStateOptions {
 }
 
 /**
- * Create a new EditorState with Halo's default configuration
+ * Create a new EditorState with Vortex's default configuration
  */
 export function createEditorState(options: CreateEditorStateOptions): EditorState {
   const { doc, language, readOnly = true, extensions = [] } = options

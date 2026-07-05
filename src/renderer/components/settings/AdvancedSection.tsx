@@ -267,7 +267,7 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
               </div>
             </label>
 
-            {/* Halo SDK */}
+            {/* Vortex SDK */}
             <label className="flex items-start gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input
                 type="radio"

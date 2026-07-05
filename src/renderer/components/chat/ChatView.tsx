@@ -443,7 +443,7 @@ function LoadingState() {
 // Empty state component - adapts to compact mode
 function EmptyState({ isTemp, isCompact = false }: { isTemp: boolean; isCompact?: boolean }) {
   const { t } = useTranslation()
-  // Reflect the actual driving engine ("Claude Code" / "Codex" / "Halo SDK")
+  // Reflect the actual driving engine ("Claude Code" / "Codex" / "Vortex SDK")
   // so a user creating a new conversation immediately sees what's powering
   // it, rather than a hardcoded brand name.
   const capabilities = useEngineCapabilities()

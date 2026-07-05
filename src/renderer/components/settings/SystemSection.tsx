@@ -429,7 +429,7 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
             </button>
           </div>
 
-          {/* Restart Halo */}
+          {/* Restart Vortex */}
           <div className="flex items-center justify-between pt-4 border-t border-border">
             <div className="flex-1">
               <p className="font-medium">{t('Restart Vortex')}</p>

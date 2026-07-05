@@ -185,7 +185,7 @@ export function registerAppHandlers(): void {
         // Preserve `errorName` (e.g. "BuiltinAppProtectedError") so the
         // renderer can route the error by discriminator instead of parsing
         // the message string. Lets the UI provide a localized prompt for
-        // protected built-ins ("This app is bundled with Halo and can't be
+        // protected built-ins ("This app is bundled with Vortex and can't be
         // permanently deleted; uninstall to disable instead.") rather than
         // surfacing the raw English error text.
         return { success: false, error: err.message, errorName: err.name }
