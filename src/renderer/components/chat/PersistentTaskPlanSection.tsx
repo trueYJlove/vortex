@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { CheckCircle2, ChevronDown, Circle, ListTodo, Loader2 } from 'lucide-react'
+import { useMemo } from 'react'
+import { CheckCircle2, Circle, ListTodo, Loader2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chat.store'
 import { getLatestTodosFromThoughts, getTodoStats, type TodoItem, type TodoStatus } from '../tool/TodoCard'
@@ -33,7 +33,6 @@ function SidebarTodoRow({ item }: { item: TodoItem }) {
 
 export function PersistentTaskPlanSection() {
   const { t } = useTranslation()
-  const [collapsed, setCollapsed] = useState(false)
   const todos = useChatStore(state => {
     const spaceState = state.spaceStates.get(state.currentSpaceId ?? '')
     const conversationId = spaceState?.currentConversationId
@@ -56,49 +55,38 @@ export function PersistentTaskPlanSection() {
   const stats = useMemo(() => getTodoStats(todos ?? []), [todos])
   const hasTodos = todos && todos.length > 0
 
-  const activeTodo = hasTodos ? todos.find(todo => todo.status === 'in_progress') : null
-  const activeText = activeTodo
-    ? activeTodo.activeForm || activeTodo.content
-    : hasTodos
-      ? stats.completed === stats.total
-        ? t('All tasks completed')
-        : t('{{count}} pending', { count: stats.pending })
-      : t('No task plan')
+  if (!hasTodos && !stats) {
+    return null
+  }
 
   return (
     <div className="border-b border-border bg-card/40 flex-shrink-0">
-      <button
-        onClick={() => setCollapsed(value => !value)}
-        title={collapsed ? t('Expand task plan') : t('Collapse task plan')}
-        className="w-full px-3 py-2 text-left hover:bg-secondary/30 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <ListTodo size={14} className="text-primary flex-shrink-0" />
-          <span className="text-sm font-medium text-foreground flex-1 min-w-0">{t('Task plan')}</span>
-          {hasTodos && (
-            <span className="text-xs text-muted-foreground tabular-nums">{stats.completed}/{stats.total}</span>
-          )}
-          <ChevronDown size={14} className={`text-muted-foreground transition-transform ${collapsed ? '-rotate-90' : ''}`} />
-        </div>
-        <div className="mt-1 truncate text-xs text-muted-foreground">
-          {activeText}
-        </div>
-      </button>
+      <div className="flex items-center gap-2 px-3 py-2">
+        <ListTodo size={14} className="text-primary" />
+        <span className="text-sm font-medium">{t('Task plan')}</span>
+        {stats && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            {stats.completed}/{stats.total}
+          </span>
+        )}
+      </div>
 
-      {!collapsed && hasTodos && (
-        <div className="px-3 pb-3 animate-slide-down">
-          <div className="h-1 rounded-full bg-secondary/40 overflow-hidden">
-            <div
-              className="h-full bg-green-500 transition-all duration-500 ease-out"
-              style={{ width: `${stats.progress}%` }}
-            />
+      {hasTodos && stats && (
+        <>
+          <div className="px-3 pb-2">
+            <div className="h-1 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all"
+                style={{ width: `${stats.progress}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-2 max-h-48 overflow-y-auto scrollbar-overlay space-y-0.5">
+          <div className="max-h-48 overflow-y-auto px-3 pb-2">
             {todos.map((item, index) => (
               <SidebarTodoRow key={index} item={item} />
             ))}
           </div>
-        </div>
+        </>
       )}
     </div>
   )
