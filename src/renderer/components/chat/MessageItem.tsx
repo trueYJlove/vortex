@@ -238,20 +238,19 @@ function ThoughtItem({ thought }: { thought: Thought }) {
   )
 }
 
-function MessageHeader({ isUser }: { isUser: boolean }) {
+function MessageAvatar({ isUser }: { isUser: boolean }) {
   const { t } = useTranslation()
   return (
-    <div className={`flex items-center gap-1.5 mb-1.5 ${
-      isUser ? 'justify-end' : 'justify-start'
-    }`}>
-      {isUser && <span className="text-xs text-primary font-medium">{t('You')}</span>}
-      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+    <div className="flex flex-col items-center gap-1 shrink-0">
+      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
         {isUser
           ? <User size={12} className="text-primary" />
           : <Bot size={12} className="text-primary" />
         }
       </div>
-      {!isUser && <span className="text-xs text-primary font-medium">{t('Vortex')}</span>}
+      <span className="text-[10px] sm:text-xs text-primary font-medium whitespace-nowrap">
+        {isUser ? t('You') : t('Vortex')}
+      </span>
     </div>
   )
 }
@@ -315,29 +314,24 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
   const isErrorOnly = !isUser && !message.content?.trim() && !!message.error && !isWorking
 
   // Message bubble content
-  const bubble = isErrorOnly ? (
-    <div className={`${!isInContainer ? 'w-[85%]' : 'w-full'}`}>
-      <div className="rounded-2xl px-4 py-3 bg-destructive/10 border border-destructive/30">
-        <div className="flex items-center gap-2 text-destructive">
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span className="text-sm font-medium">{t('Something went wrong')}</span>
-        </div>
-        <p className="mt-1.5 text-sm text-destructive/80">{message.error}</p>
+  const bubbleContent = isErrorOnly ? (
+    <div className="rounded-2xl px-4 py-3 bg-destructive/10 border border-destructive/30">
+      <div className="flex items-center gap-2 text-destructive">
+        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span className="text-sm font-medium">{t('Something went wrong')}</span>
       </div>
+      <p className="mt-1.5 text-sm text-destructive/80">{message.error}</p>
     </div>
   ) : (
     <div
       className={`px-4 py-3 ${
         isUser ? 'message-user rounded-[16px_16px_16px_4px]' : 'message-assistant rounded-[16px_16px_4px_16px]'
-      } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''} ${!isInContainer ? 'max-w-[85%]' : 'w-full'}`}
+      } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''}`}
     >
-      {/* Avatar + Label */}
-      <MessageHeader isUser={isUser} />
-
       {/* Working indicator - shows when AI is working */}
       {isWorking && !isUser && (
         <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-border/30 working-indicator-fade">
@@ -469,6 +463,14 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
           </button>
         </div>
       )}
+    </div>
+  )
+
+  // Wrap bubble with avatar in side-by-side layout
+  const bubble = (
+    <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'} ${!isInContainer ? 'max-w-[85%]' : 'w-full'}`}>
+      <MessageAvatar isUser={isUser} />
+      {bubbleContent}
     </div>
   )
 
