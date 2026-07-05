@@ -4,10 +4,10 @@
  * Supports drag-to-resize, inline title editing, and conversation management.
  */
 
-import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Virtuoso } from 'react-virtuoso'
-import { MessageSquare, Plus } from '../icons/ToolIcons'
+import { MessageSquare, Plus, ListTodo } from '../icons/ToolIcons'
 import { ChevronLeft, EllipsisVertical, Pin, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore, useAllConversationStatuses } from '../../stores/chat.store'
@@ -20,20 +20,16 @@ import { PulseSidebarSection } from '../pulse/PulseSidebarSection'
 import { AutomationBadge } from '../apps/AutomationBadge'
 import { EngineBadge } from './EngineBadge'
 import { PersistentTaskPlanSection } from './PersistentTaskPlanSection'
+import { PinnedItem } from './PinnedItem'
+import { SidebarSection } from '../layout/SidebarSection'
+import { usePulseItems } from '../../stores/chat.store'
 import type { ConversationMeta } from '../../types'
 
 // Width constraints (in pixels)
 const MIN_WIDTH = 140
 const MAX_WIDTH = 360
 const DEFAULT_WIDTH = 260
-const MIN_TOP_SECTION_HEIGHT = 80
-const DEFAULT_TOP_SECTION_HEIGHT = 180
-const SIDEBAR_HEADER_HEIGHT = 48
 const clampWidth = (v: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, v))
-const clampTopSectionHeight = (value: number, containerHeight: number) => {
-  const maxAllowed = Math.max(MIN_TOP_SECTION_HEIGHT, containerHeight - 160)
-  return Math.min(maxAllowed, Math.max(MIN_TOP_SECTION_HEIGHT, value))
-}
 
 interface ConversationListProps {
   onClose?: () => void
@@ -64,15 +60,22 @@ export const ConversationList = memo(function ConversationList({
   // Single batch subscription for all conversation statuses (replaces N individual hooks)
   const conversationStatuses = useAllConversationStatuses()
 
+  // Derive pinned idle item from pulse items (first starred idle conversation)
+  const pulseItems = usePulseItems()
+  const pinnedItem = useMemo(() => {
+    const pinned = pulseItems.find(item => item.status === 'idle')
+    return pinned ? {
+      id: pinned.conversationId,
+      title: pinned.title,
+      status: pinned.status as 'idle',
+    } : null
+  }, [pulseItems])
+
   // Width state - initialized from persisted config
   const initialWidth = layoutConfig?.sidebarWidth
-  const initialTopSectionHeight = layoutConfig?.sidebarTopSectionHeight
   const [width, setWidth] = useState(initialWidth != null ? clampWidth(initialWidth) : DEFAULT_WIDTH)
   const [isDragging, setIsDragging] = useState(false)
-  const [isDraggingTopSection, setIsDraggingTopSection] = useState(false)
   const widthRef = useRef(width)
-  const topSectionHeightRef = useRef(initialTopSectionHeight ?? DEFAULT_TOP_SECTION_HEIGHT)
-  const [topSectionHeight, setTopSectionHeight] = useState(topSectionHeightRef.current)
 
   // Sync width when config arrives asynchronously
   useEffect(() => {
@@ -83,13 +86,6 @@ export const ConversationList = memo(function ConversationList({
     }
   }, [initialWidth, isDragging])
 
-  // Sync top section height from config
-  useEffect(() => {
-    if (initialTopSectionHeight !== undefined && !isDraggingTopSection) {
-      topSectionHeightRef.current = initialTopSectionHeight
-      setTopSectionHeight(initialTopSectionHeight)
-    }
-  }, [initialTopSectionHeight, isDraggingTopSection])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
@@ -142,44 +138,6 @@ export const ConversationList = memo(function ConversationList({
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [isDragging, side])
-
-  // Handle top section vertical resize
-  const handleTopSectionMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsDraggingTopSection(true)
-  }, [])
-
-  useEffect(() => {
-    if (!isDraggingTopSection) return
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return
-      const rect = containerRef.current.getBoundingClientRect()
-      const offsetY = e.clientY - rect.top - SIDEBAR_HEADER_HEIGHT
-      const clamped = clampTopSectionHeight(offsetY, rect.height)
-      setTopSectionHeight(clamped)
-      topSectionHeightRef.current = clamped
-    }
-
-    const handleMouseUp = () => {
-      setIsDraggingTopSection(false)
-      const currentConfig = useAppStore.getState().config
-      if (currentConfig) {
-        useAppStore.getState().updateConfig({ layout: { ...currentConfig.layout, sidebarTopSectionHeight: topSectionHeightRef.current } })
-      }
-      api.setConfig({ layout: { sidebarTopSectionHeight: topSectionHeightRef.current } }).catch(err =>
-        console.error('[ConversationList] Failed to persist sidebar top section height:', err)
-      )
-    }
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isDraggingTopSection])
 
   // Close dropdown menu on outside click
   useEffect(() => {
@@ -438,46 +396,64 @@ export const ConversationList = memo(function ConversationList({
         </div>
       </div>
 
-      <PersistentTaskPlanSection />
+      {/* Sessions section */}
+      <SidebarSection
+        title={t('Sessions')}
+        icon={<MessageSquare size={14} />}
+        defaultExpanded={true}
+      >
+        {/* Pinned idle item */}
+        {pinnedItem && (
+          <>
+            <PinnedItem
+              item={pinnedItem}
+              isSelected={pinnedItem.id === currentConversationId}
+              onClick={() => {
+                const spaceId = useSpaceStore.getState().currentSpace?.id
+                if (spaceId) useChatStore.getState().selectConversation(pinnedItem.id)
+              }}
+            />
+            <div className="border-b border-border" />
+          </>
+        )}
 
-      {/* Top section: automation badge + pinned conversations (resizable) */}
-      <div className="relative flex-shrink-0 flex flex-col overflow-hidden" style={{ maxHeight: topSectionHeight }}>
-        {/* Automation apps status badge — quick jump to AppsPage */}
-        <AutomationBadge />
-
-        {/* Pinned section - fills remaining space and scrolls within the dragged height */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {visible && <PulseSidebarSection />}
+        {/* Conversation list (virtualized) */}
+        <div style={{ height: 'calc(100vh - 140px)' }}>
+          <Virtuoso
+            data={conversations}
+            overscan={200}
+            itemContent={(_index, conversation) => renderConversationItem(conversation)}
+          />
         </div>
 
-        {/* Vertical drag handle */}
-        <div
-          className={`absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/40 transition-colors ${isDraggingTopSection ? 'bg-primary/40' : ''}`}
-          onMouseDown={handleTopSectionMouseDown}
-        />
-      </div>
+        {/* New conversation button */}
+        <div className="border-t border-border">
+          <button
+            onClick={() => {
+              const spaceId = useSpaceStore.getState().currentSpace?.id
+              if (spaceId) useChatStore.getState().createConversation(spaceId)
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/50 transition-colors"
+          >
+            <Plus size={14} />
+            <span>{t('New conversation')}</span>
+          </button>
+        </div>
+      </SidebarSection>
 
-      {/* Conversation list - virtualized for performance with large lists */}
-      <div className="flex-1 overflow-hidden border-t border-border">
-        <Virtuoso
-          data={conversations}
-          overscan={200}
-          itemContent={(_index, conversation) => renderConversationItem(conversation)}
-        />
-      </div>
+      {/* Task plan section */}
+      <SidebarSection
+        title={t('Task plan')}
+        icon={<ListTodo size={14} />}
+        defaultExpanded={false}
+      >
+        <PersistentTaskPlanSection embedded />
+      </SidebarSection>
 
-      {/* New conversation button */}
-      <div className="p-2 border-t border-border">
-        <button
-          onClick={() => {
-            const spaceId = useSpaceStore.getState().currentSpace?.id
-            if (spaceId) useChatStore.getState().createConversation(spaceId)
-          }}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-primary hover:bg-primary/10 rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          {t('New conversation')}
-        </button>
+      {/* Top section: automation badge + pinned conversations */}
+      <div className="flex flex-col">
+        <AutomationBadge />
+        {visible && <PulseSidebarSection />}
       </div>
 
       {/* Drag handle - on right side */}

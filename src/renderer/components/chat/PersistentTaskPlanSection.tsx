@@ -31,7 +31,12 @@ function SidebarTodoRow({ item }: { item: TodoItem }) {
   )
 }
 
-export function PersistentTaskPlanSection() {
+interface PersistentTaskPlanSectionProps {
+  /** When true, renders content only without its own header (for use inside SidebarSection) */
+  embedded?: boolean
+}
+
+export function PersistentTaskPlanSection({ embedded = false }: PersistentTaskPlanSectionProps) {
   const { t } = useTranslation()
   const todos = useChatStore(state => {
     const spaceState = state.spaceStates.get(state.currentSpaceId ?? '')
@@ -57,6 +62,26 @@ export function PersistentTaskPlanSection() {
 
   if (!hasTodos) {
     return null
+  }
+
+  if (embedded) {
+    return stats ? (
+      <>
+        <div className="px-3 pb-2">
+          <div className="h-1 bg-secondary rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 transition-all"
+              style={{ width: `${stats.progress}%` }}
+            />
+          </div>
+        </div>
+        <div className="max-h-48 overflow-y-auto px-3 pb-2">
+          {todos.map((item, index) => (
+            <SidebarTodoRow key={index} item={item} />
+          ))}
+        </div>
+      </>
+    ) : null
   }
 
   return (
