@@ -30,7 +30,7 @@ export const haloEditorTheme = EditorView.theme(
     '&': {
       height: '100%',
       fontSize: '13px',
-      fontFamily: "'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, 'Courier New', monospace",
+      fontFamily: "'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, 'Cascadia Code', monospace",
       backgroundColor: 'hsl(var(--background))',
       color: 'hsl(var(--foreground))',
     },

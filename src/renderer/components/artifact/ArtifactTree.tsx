@@ -164,6 +164,8 @@ export function ArtifactTree({ spaceId }: ArtifactTreeProps) {
   
   // Workspace root — authoritative absolute path from backend, used for path construction
   const workspaceRootRef = useRef<string>('')
+  // Folder name extracted from workspace root, displayed in header
+  const [folderName, setFolderName] = useState('')
 
   // File operations hook
   const {
@@ -195,6 +197,9 @@ export function ArtifactTree({ spaceId }: ArtifactTreeProps) {
       if (response.success && response.data) {
         const { workspaceRoot, nodes } = response.data as { workspaceRoot: string; nodes: ArtifactTreeNode[] }
         workspaceRootRef.current = workspaceRoot
+        // Extract folder name from path (last segment)
+        const lastSep = Math.max(workspaceRoot.lastIndexOf('/'), workspaceRoot.lastIndexOf('\\'))
+        setFolderName(lastSep >= 0 ? workspaceRoot.substring(lastSep + 1) : workspaceRoot)
         treeDataRef.current = nodes
         nodeIndex.current.clear()
         indexNodes(nodes, nodeIndex.current)
@@ -631,8 +636,8 @@ export function ArtifactTree({ spaceId }: ArtifactTreeProps) {
           {/* Header with toolbar */}
           <div className="flex-shrink-0 bg-card px-2 py-1.5 border-b border-border/50">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground/80 [[data-theme='light']_&]:text-muted-foreground uppercase tracking-wider">
-                {t('Files')}
+              <span className="text-sm font-semibold text-foreground truncate" title={workspaceRootRef.current}>
+                {folderName || t('Files')}
               </span>
               <div className="flex gap-1">
                 <button

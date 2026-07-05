@@ -8,7 +8,8 @@ import { Monitor } from 'lucide-react'
 import type { HaloConfig, ThemeMode, SendKeyMode } from '../../types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
-import { getAllThemes } from '../../themes/registry'
+import { getThemesByType } from '../../themes/registry'
+import { getAllIconThemes, type IconThemeId } from '../../themes/file-icons'
 
 interface AppearanceSectionProps {
   config: HaloConfig | null
@@ -23,6 +24,9 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
 
   // Send key mode state
   const [sendKeyMode, setSendKeyMode] = useState<SendKeyMode>(config?.chat?.sendKeyMode || 'enter')
+
+  // Icon theme state
+  const [iconTheme, setIconTheme] = useState<IconThemeId>(config?.appearance?.iconTheme || 'material-icon-theme')
 
   // Auto-save helper for appearance settings
   const autoSave = useCallback(async (partialConfig: Partial<HaloConfig>) => {
@@ -45,11 +49,19 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
       localStorage.setItem('halo-theme', value)
     } catch (e) { /* ignore */ }
     await autoSave({
-      appearance: { theme: value }
+      appearance: { theme: value, iconTheme }
     })
   }
 
-  const allThemes = getAllThemes()
+  // Handle icon theme change with auto-save
+  const handleIconThemeChange = async (value: IconThemeId) => {
+    setIconTheme(value)
+    await autoSave({
+      appearance: { theme, iconTheme: value }
+    })
+  }
+
+  const { dark: darkThemes, light: lightThemes } = getThemesByType()
 
   return (
     <section id="appearance" className="bg-card rounded-xl border border-border p-6">
@@ -75,26 +87,56 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
               </div>
               <span className="text-xs">{t('Follow System')}</span>
             </button>
+          </div>
 
-            {/* Built-in themes */}
-            {allThemes.map((themeDef) => (
-              <button
-                key={themeDef.id}
-                onClick={() => handleThemeChange(themeDef.id)}
-                className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors ${
-                  theme === themeDef.id
-                    ? 'bg-primary/15 border-primary text-primary'
-                    : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
-                }`}
-              >
-                <div className="flex gap-1">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
-                </div>
-                <span className="text-xs">{themeDef.name}</span>
-              </button>
-            ))}
+          {/* Dark themes */}
+          <div className="mt-3">
+            <span className="text-xs text-muted-foreground/70 mb-1.5 block">{t('Dark Themes')}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {darkThemes.map((themeDef) => (
+                <button
+                  key={themeDef.id}
+                  onClick={() => handleThemeChange(themeDef.id)}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors ${
+                    theme === themeDef.id
+                      ? 'bg-primary/15 border-primary text-primary'
+                      : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                  }`}
+                >
+                  <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
+                  </div>
+                  <span className="text-xs">{themeDef.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Light themes */}
+          <div className="mt-3">
+            <span className="text-xs text-muted-foreground/70 mb-1.5 block">{t('Light Themes')}</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {lightThemes.map((themeDef) => (
+                <button
+                  key={themeDef.id}
+                  onClick={() => handleThemeChange(themeDef.id)}
+                  className={`flex flex-col items-center gap-2 p-3 rounded-lg border transition-colors ${
+                    theme === themeDef.id
+                      ? 'bg-primary/15 border-primary text-primary'
+                      : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                  }`}
+                >
+                  <div className="flex gap-1">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.background }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.primary }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: themeDef.preview.accent }} />
+                  </div>
+                  <span className="text-xs">{themeDef.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -112,6 +154,28 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Icon Theme */}
+        <div>
+          <label className="block text-sm text-muted-foreground mb-2">{t('Icon Theme')}</label>
+          <div className="grid grid-cols-2 gap-3">
+            {getAllIconThemes().map((themeDef) => (
+              <button
+                key={themeDef.id}
+                onClick={() => handleIconThemeChange(themeDef.id as IconThemeId)}
+                className={`flex flex-col items-start gap-1 p-3 rounded-lg border transition-colors text-left ${
+                  iconTheme === themeDef.id
+                    ? 'bg-primary/15 border-primary text-primary'
+                    : 'bg-card border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+                }`}
+                aria-pressed={iconTheme === themeDef.id}
+              >
+                <span className="text-sm font-medium">{themeDef.name}</span>
+                <span className="text-xs opacity-70">{t(themeDef.description)}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Send Key */}

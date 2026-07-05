@@ -11,9 +11,16 @@ import { darkTheme } from './builtins/dark'
 import { lightTheme } from './builtins/light'
 import { draculaTheme } from './builtins/dracula'
 import { tokyoNightTheme } from './builtins/tokyo-night'
+import { tokyoNightDayTheme } from './builtins/tokyo-night-day'
 import { oneDarkProTheme } from './builtins/one-dark-pro'
 import { nordTheme } from './builtins/nord'
 import { catppuccinMochaTheme } from './builtins/catppuccin-mocha'
+import { intellijLightTheme } from './builtins/intellij-light'
+import { intellijDarkTheme } from './builtins/darcula'
+import { githubDarkTheme } from './builtins/github-dark'
+import { monokaiTheme } from './builtins/monokai'
+import { gruvboxTheme } from './builtins/gruvbox'
+import { solarizedDarkTheme } from './builtins/solarized-dark'
 
 // ============================================
 // Types
@@ -71,9 +78,16 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   lightTheme,
   draculaTheme,
   tokyoNightTheme,
+  tokyoNightDayTheme,
   oneDarkProTheme,
   nordTheme,
   catppuccinMochaTheme,
+  intellijLightTheme,
+  intellijDarkTheme,
+  githubDarkTheme,
+  monokaiTheme,
+  gruvboxTheme,
+  solarizedDarkTheme,
 ]
 
 /** Auto-derived union type from BUILTIN_THEMES — no manual maintenance needed. */
@@ -91,6 +105,17 @@ export function getTheme(id: string): ThemeDefinition | undefined {
 
 export function getAllThemes(): ThemeDefinition[] {
   return BUILTIN_THEMES
+}
+
+/** Get themes grouped by type (dark/light). */
+export function getThemesByType(): { dark: ThemeDefinition[]; light: ThemeDefinition[] } {
+  const dark: ThemeDefinition[] = []
+  const light: ThemeDefinition[] = []
+  for (const theme of BUILTIN_THEMES) {
+    if (theme.type === 'dark') dark.push(theme)
+    else light.push(theme)
+  }
+  return { dark, light }
 }
 
 /** Resolve 'system' to the concrete theme ID based on OS preference. */

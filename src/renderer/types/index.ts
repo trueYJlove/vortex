@@ -10,6 +10,7 @@ import {
   hasAnyAISource
 } from '../../shared/types/ai-sources';
 import type { BuiltInThemeId } from '../themes/registry';
+import type { IconThemeId } from '../themes/file-icons';
 import { NotificationChannelsConfig }  from '../../shared/types/notification-channels';
 // Re-export them
 export { DEFAULT_MODEL, getCurrentModelName, hasAnyAISource };
@@ -107,6 +108,7 @@ export interface PermissionConfig {
 
 export interface AppearanceConfig {
   theme: ThemeMode;
+  iconTheme?: IconThemeId;
 }
 
 // Send key mode: 'enter' = Enter to send, 'ctrl-enter' = Ctrl+Enter to send
@@ -781,7 +783,8 @@ export const DEFAULT_CONFIG: HaloConfig = {
     trustMode: false
   },
   appearance: {
-    theme: 'system'
+    theme: 'system',
+    iconTheme: 'material-icon-theme'
   },
   system: {
     autoLaunch: false
@@ -818,57 +821,3 @@ export type SpaceIconId = typeof SPACE_ICONS[number];
 // Default space icon
 export const DEFAULT_SPACE_ICON: SpaceIconId = 'folder';
 
-// File type to icon ID mapping (maps to Lucide icon names)
-export const FILE_ICON_IDS: Record<string, string> = {
-  html: 'globe',
-  htm: 'globe',
-  css: 'palette',
-  scss: 'palette',
-  less: 'palette',
-  js: 'file-code',
-  jsx: 'file-code',
-  ts: 'file-code',
-  tsx: 'file-code',
-  json: 'file-json',
-  md: 'book',
-  markdown: 'book',
-  txt: 'file-text',
-  py: 'file-code',
-  rs: 'cpu',
-  go: 'file-code',
-  java: 'coffee',
-  cpp: 'cpu',
-  c: 'cpu',
-  h: 'cpu',
-  hpp: 'cpu',
-  rb: 'gem',
-  swift: 'apple',
-  sql: 'database',
-  sh: 'terminal',
-  bash: 'terminal',
-  zsh: 'terminal',
-  yaml: 'file-json',
-  yml: 'file-json',
-  xml: 'file-json',
-  svg: 'image',
-  png: 'image',
-  jpg: 'image',
-  jpeg: 'image',
-  gif: 'image',
-  webp: 'image',
-  ico: 'image',
-  pdf: 'book',
-  doc: 'file-text',
-  docx: 'file-text',
-  xls: 'database',
-  xlsx: 'database',
-  zip: 'package',
-  tar: 'package',
-  gz: 'package',
-  rar: 'package',
-  default: 'file-text'
-};
-
-export function getFileIconId(extension: string): string {
-  return FILE_ICON_IDS[extension.toLowerCase()] || FILE_ICON_IDS.default;
-}

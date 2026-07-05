@@ -536,22 +536,7 @@ export function ArtifactRail({
               {/* Header */}
               <div className="p-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium text-muted-foreground">{t('Artifacts')}</span>
-                  <button
-                    onClick={toggleViewMode}
-                    className={`
-                      p-1 rounded transition-all duration-200
-                      hover:bg-secondary/80
-                      ${viewMode === 'tree' ? 'bg-secondary text-primary' : 'text-muted-foreground/50 hover:text-muted-foreground'}
-                    `}
-                    title={viewMode === 'card' ? t('Switch to tree view') : t('Switch to card view')}
-                  >
-                    {viewMode === 'card' ? (
-                      <FolderTree className="w-3.5 h-3.5" />
-                    ) : (
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                    )}
-                  </button>
+                  <span className="text-sm font-medium text-muted-foreground">{t('Workspace')}</span>
                 </div>
                 <button
                   onClick={() => setMobileOverlayOpen(false)}
@@ -602,22 +587,7 @@ export function ArtifactRail({
       <div className="flex-shrink-0 px-3 h-10 border-b border-border flex items-center justify-between">
         {isExpanded && (
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-muted-foreground">{t('Artifacts')}</span>
-            <button
-              onClick={toggleViewMode}
-              className={`
-                p-1 rounded transition-all duration-200
-                hover:bg-secondary/80
-                ${viewMode === 'tree' ? 'bg-secondary text-primary' : 'text-muted-foreground/50 hover:text-muted-foreground'}
-              `}
-              title={viewMode === 'card' ? t('Switch to tree view (developer)') : t('Switch to card view')}
-            >
-              {viewMode === 'card' ? (
-                <FolderTree className="w-3.5 h-3.5" />
-              ) : (
-                <LayoutGrid className="w-3.5 h-3.5" />
-              )}
-            </button>
+            <span className="text-sm font-medium text-muted-foreground">{t('Workspace')}</span>
           </div>
         )}
         <button
