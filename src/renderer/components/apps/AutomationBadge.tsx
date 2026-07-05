@@ -41,7 +41,7 @@ export function AutomationBadge({ onClose, side = 'left' }: AutomationBadgeProps
   if (!hasContent) {
     if (!onClose) return null
     return (
-      <div className="flex items-center justify-end px-2 py-1.5 border-b border-border">
+      <div className="flex items-center justify-end px-3 py-2 border-b border-border">
         <button
           onClick={onClose}
           className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
@@ -60,26 +60,24 @@ export function AutomationBadge({ onClose, side = 'left' }: AutomationBadgeProps
       setView('apps')
     }
     return (
-      <div className="border-b border-orange-400/20">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-orange-400/20 bg-orange-400/10 hover:bg-orange-400/20 transition-colors">
         <button
           onClick={handleClick}
-          className="w-full flex items-center gap-2 px-3 py-2 text-left bg-orange-400/10 hover:bg-orange-400/20 transition-colors"
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
         >
           <span className="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0" />
-          <span className="text-xs text-orange-300 truncate flex-1 min-w-0">
+          <span className="text-xs text-orange-300 truncate">
             {waitingApp.spec.name} — {t('needs your input')}
           </span>
         </button>
         {onClose && (
-          <div className="flex justify-end px-2 py-1">
-            <button
-              onClick={onClose}
-              className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
-              title={t('Close sidebar')}
-            >
-              <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+            title={t('Close sidebar')}
+          >
+            <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
+          </button>
         )}
       </div>
     )
@@ -91,13 +89,13 @@ export function AutomationBadge({ onClose, side = 'left' }: AutomationBadgeProps
   }
 
   return (
-    <div className="border-b border-border">
+    <div className="flex items-center gap-2 px-3 py-2 border-b border-border hover:bg-secondary/50 transition-colors">
       <button
         onClick={handleClick}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-secondary/50 transition-colors"
+        className="flex items-center gap-2 flex-1 min-w-0 text-left"
       >
         <span className="w-2 h-2 rounded-full bg-green-500/70 flex-shrink-0" />
-        <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+        <span className="text-xs text-muted-foreground truncate">
           {runningApps.length === 1
             ? t('{{name}} running', { name: runningApps[0].spec.name })
             : t('{{count}} apps running', { count: runningApps.length })
@@ -105,15 +103,13 @@ export function AutomationBadge({ onClose, side = 'left' }: AutomationBadgeProps
         </span>
       </button>
       {onClose && (
-        <div className="flex justify-end px-2 py-1">
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
-            title={t('Close sidebar')}
-          >
-            <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+          title={t('Close sidebar')}
+        >
+          <ChevronLeft className={`w-4 h-4 ${side === 'right' ? 'rotate-180' : ''}`} />
+        </button>
       )}
     </div>
   )

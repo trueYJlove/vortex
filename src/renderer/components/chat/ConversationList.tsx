@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Virtuoso } from 'react-virtuoso'
 import { Plus, ListTodo } from '../icons/ToolIcons'
-import { MessageCircle } from 'lucide-react'
+import { MessageSquareText } from 'lucide-react'
 import { EllipsisVertical, Pin, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore, useAllConversationStatuses } from '../../stores/chat.store'
@@ -286,7 +286,7 @@ export const ConversationList = memo(function ConversationList({
       ) : (
         <>
           <div className="flex items-center gap-2 relative">
-            <MessageCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+            <MessageSquareText className="w-4 h-4 text-blue-500 flex-shrink-0" />
             <span className="text-sm truncate flex-1">
               {conversation.title}
             </span>
@@ -365,7 +365,7 @@ export const ConversationList = memo(function ConversationList({
         {/* Sessions section */}
         <SidebarSection
           title={t('Sessions')}
-          icon={<MessageCircle size={14} />}
+          icon={<MessageSquareText size={14} />}
           defaultExpanded={true}
           className={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
           contentClassName={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
