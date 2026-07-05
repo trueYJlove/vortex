@@ -232,7 +232,7 @@ export class DaemonBrowserManager {
     if (!this.downloadHandlerPartitions.has(partition)) {
       this.downloadHandlerPartitions.add(partition)
       sess.on('will-download', (_event, item) => {
-        const downloadDir = path.join(app.getPath('downloads'), 'halo-daemon')
+        const downloadDir = path.join(app.getPath('downloads'), 'vortex-daemon')
         fs.mkdirSync(downloadDir, { recursive: true })
         const safeName = sanitizeFilename(item.getFilename())
         const savePath = resolveUniquePath(downloadDir, safeName)

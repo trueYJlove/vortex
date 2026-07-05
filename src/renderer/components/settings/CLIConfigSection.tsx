@@ -2,9 +2,9 @@
  * CLI Config Section Component
  *
  * Advanced section for Claude CLI integration:
- * - Config directory mode (Halo Default / CC Default / Custom)
- * - Migrate Skills from ~/.claude/skills/ to Halo
- * - Migrate MCP servers from ~/.claude.json to Halo
+ * - Config directory mode (Vortex Default / CC Default / Custom)
+ * - Migrate Skills from ~/.claude/skills/ to Vortex
+ * - Migrate MCP servers from ~/.claude.json to Vortex
  *
  * Desktop-only (not shown in remote mode).
  */
@@ -216,7 +216,7 @@ function CLIConfigSectionInner() {
         </p>
 
         <div className="space-y-2">
-          {/* Halo Default */}
+          {/* Vortex Default */}
           <label className={cn(
             'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
             'hover:bg-muted/50',

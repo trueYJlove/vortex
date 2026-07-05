@@ -1,8 +1,8 @@
 # 企业部署指南
 
-本文档面向需要将 Halo 作为公司内部 AI 客户端发行的 IT 与研发团队。
+本文档面向需要将 Vortex 作为公司内部 AI 客户端发行的 IT 与研发团队。
 
-Halo 通过 `product.json` 配置 + electron-builder overlay 支持企业定制。所有定制都在企业自己的私有仓库内完成，hello-halo 主仓库代码保持原样，便于后续跟随上游升级。常见定制项：
+Vortex 通过 `product.json` 配置 + electron-builder overlay 支持企业定制。所有定制都在企业自己的私有仓库内完成，hello-halo 主仓库代码保持原样，便于后续跟随上游升级。常见定制项：
 
 - **品牌标识** — 应用名称、Bundle ID、应用图标、数据目录、版本号、关于页信息
 - **AI 接入** — 预置公司内部 AI 网关地址（兼容 OpenAI Chat Completions / Responses / Anthropic 协议），员工安装后无需自行配置即可使用
@@ -28,7 +28,7 @@ hello-halo/                              主仓库（保持原样，不修改）
         └── README.md
 ```
 
-构建产物：`dist/Halo-Acme-x.x.x-arm64.dmg`，包含企业品牌信息、预置的 AI 网关地址与安全策略。
+构建产物：`dist/Vortex-Acme-x.x.x-arm64.dmg`，包含企业品牌信息、预置的 AI 网关地址与安全策略。
 
 > 本文档以 `acme` 作为占位公司名，请按实际情况替换（如 `tencent`、`yourcompany`）。
 
@@ -83,13 +83,13 @@ git init
 ```json
 {
   "$schema": "../../../product.schema.json",
-  "name": "Halo Acme",
-  "dataFolderName": "halo-acme",
+  "name": "Vortex Acme",
+  "dataFolderName": "vortex-acme",
   "version": "1.0.0",
 
   "updateConfig": {
     "provider": "generic",
-    "url": "https://release.acme.intra/halo/"
+    "url": "https://release.acme.intra/vortex/"
   },
 
   "authProviders": [
@@ -142,7 +142,7 @@ git init
 | 字段 | 说明 |
 |---|---|
 | `name` | 应用显示名，用于关于页、菜单栏、安装包名 |
-| `dataFolderName` | 用户数据目录名（生成 `~/.halo-acme/`）。每个企业版必须使用唯一值，避免与开源版数据目录冲突 |
+| `dataFolderName` | 用户数据目录名（生成 `~/.vortex-acme/`）。每个企业版必须使用唯一值，避免与开源版数据目录冲突 |
 | `updateConfig.url` | 企业内网更新服务器地址。不启用自动更新时删除整个 `updateConfig` 块 |
 | `authProviders[].preset.baseUrl` | 企业 AI 网关地址，需兼容 OpenAI 协议 |
 | `authProviders[].preset.fallbackModels` | 网关 `/models` 接口不可达时的降级模型列表 |
@@ -224,8 +224,8 @@ npm run build
 export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/  # 国内镜像加速
 export CSC_IDENTITY_AUTO_DISCOVERY=false                        # 跳过签名
 
-PRODUCT_NAME="Halo-Acme"
-APP_ID="com.acme.halo"
+PRODUCT_NAME="Vortex-Acme"
+APP_ID="com.acme.vortex"
 
 PLATFORMS="$@"
 [ -z "$PLATFORMS" ] && PLATFORMS="--mac"   # 默认当前平台
@@ -242,14 +242,14 @@ ls -la dist/ | grep -i acme || true
 **配置项**：
 
 - `PRODUCT_NAME`：应用产物名称
-- `APP_ID`：反向域名格式的 Bundle ID，必须与开源版（`com.openkursar.halo`）不同，否则 macOS 会识别为同一应用
+- `APP_ID`：反向域名格式的 Bundle ID，必须与开源版（`com.openkursar.vortex`）不同，否则 macOS 会识别为同一应用
 
 #### 文件 4：`README.md`
 
 ```markdown
-# Halo Acme
+# Vortex Acme
 
-Acme 公司内部的 Halo 企业版构建仓库。
+Acme 公司内部的 Vortex 企业版构建仓库。
 
 ## 构建
 
@@ -258,7 +258,7 @@ cd <hello-halo 主仓库根目录>
 bash halo-local/acme/scripts/build.sh --mac
 ```
 
-产物位置：`hello-halo/dist/Halo-Acme-*.dmg`
+产物位置：`hello-halo/dist/Vortex-Acme-*.dmg`
 
 ## 配置
 
@@ -279,15 +279,15 @@ bash halo-local/acme/scripts/build.sh --mac
 
 ```
 hello-halo/dist/
-├── Halo-Acme-1.0.0-arm64.dmg
-└── Halo-Acme-1.0.0-arm64-mac.zip
+├── Vortex-Acme-1.0.0-arm64.dmg
+└── Vortex-Acme-1.0.0-arm64-mac.zip
 ```
 
 安装后启动，验证下列项：
 
-1. **品牌信息**：菜单栏显示 "Halo Acme"，关于页显示版本 1.0.0
+1. **品牌信息**：菜单栏显示 "Vortex Acme"，关于页显示版本 1.0.0
 2. **登录入口**：登录界面首选项为 "Acme AI 网关"，对应 baseUrl 为企业内网网关地址
-3. **数据隔离**：`~/.halo-acme/` 目录已创建，与开源版 `~/.halo/` 完全隔离
+3. **数据隔离**：`~/.vortex-acme/` 目录已创建，与开源版 `~/.vortex/` 完全隔离
 
 ---
 
@@ -312,7 +312,7 @@ hello-halo/dist/
 
 模板中的 `electron-builder.acme.cjs` 已显式设置 `publish: null`，且构建命令未包含 `--publish` 参数，构建产物不会被推送到任何远端。禁止执行 `electron-builder --publish always`。
 
-**手动分发**：将 `dist/Halo-Acme-*.dmg` 上传至企业内部 OA、文件服务器或制品库。
+**手动分发**：将 `dist/Vortex-Acme-*.dmg` 上传至企业内部 OA、文件服务器或制品库。
 
 **自动更新**：在内网部署静态 HTTP 服务（nginx 即可），按 [electron-updater generic provider 规范](https://www.electron.build/configuration/publish.html#genericserveroptions) 放置 `latest-mac.yml` 等元数据文件。`product.acme.json#updateConfig.url` 指向该服务即可生效。
 

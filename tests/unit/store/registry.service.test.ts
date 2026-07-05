@@ -84,7 +84,7 @@ describe("registry.service", () => {
   beforeEach(() => {
     fetchMock.mockReset()
     vi.stubGlobal("fetch", fetchMock)
-    mkdirSync(join(homedir(), ".halo-dev"), { recursive: true })
+    mkdirSync(join(homedir(), ".vortex-dev"), { recursive: true })
     db = createDatabaseManager(":memory:")
     getAppManagerMock.mockReset()
     getAppRuntimeMock.mockReset()

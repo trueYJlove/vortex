@@ -226,7 +226,7 @@ export class SearchService {
         try {
           const space = getSpace(spaceId)
           if (space) {
-            return this.scanConversationFiles(join(space.path, '.halo', 'conversations'))
+            return this.scanConversationFiles(join(space.path, '.vortex', 'conversations'))
           }
         } catch (e) {
           console.error(`Failed to get space ${spaceId}:`, e)
@@ -250,7 +250,7 @@ export class SearchService {
         const spaceNames = readdirSync(spacesDir)
         spaceNames.forEach(spaceName => {
           try {
-            const convDir = join(spacesDir, spaceName, '.halo', 'conversations')
+            const convDir = join(spacesDir, spaceName, '.vortex', 'conversations')
             if (existsSync(convDir)) {
               files.push(...this.scanConversationFiles(convDir))
             }
@@ -308,7 +308,7 @@ export class SearchService {
         try {
           const space = getSpace(spaceId)
           if (space) {
-            const filePath = join(space.path, '.halo', 'conversations', `${conversationId}.json`)
+            const filePath = join(space.path, '.vortex', 'conversations', `${conversationId}.json`)
             if (existsSync(filePath)) {
               return filePath
             }
@@ -333,7 +333,7 @@ export class SearchService {
       const spaceNames = readdirSync(spacesDir)
       for (const spaceName of spaceNames) {
         try {
-          filePath = join(spacesDir, spaceName, '.halo', 'conversations', `${conversationId}.json`)
+          filePath = join(spacesDir, spaceName, '.vortex', 'conversations', `${conversationId}.json`)
           if (existsSync(filePath)) {
             return filePath
           }

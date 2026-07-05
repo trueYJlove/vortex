@@ -19,7 +19,7 @@
       // Apply theme from main window
       (function() {
         try {
-          var stored = localStorage.getItem('halo-theme');
+          var stored = localStorage.getItem('vortex-theme');
           var themeId = stored || 'dark';
           if (themeId === 'system') {
             themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

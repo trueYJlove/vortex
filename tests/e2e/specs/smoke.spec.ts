@@ -54,7 +54,7 @@ test.describe('Smoke Tests', () => {
       window.waitForSelector('[data-testid="main-content"]', { timeout: 5000 }).catch(() => null),
       window.waitForSelector('[data-testid="api-setup"]', { timeout: 5000 }).catch(() => null),
       // Fallback: any visible text content
-      window.waitForSelector('text=/Halo|API|连接|设置/', { timeout: 5000 }).catch(() => null)
+      window.waitForSelector('text=/Vortex|API|连接|设置/', { timeout: 5000 }).catch(() => null)
     ])
 
     // Take screenshot for debugging
@@ -162,7 +162,7 @@ test.describe('Core Features', () => {
     await window.waitForSelector('.message-assistant', { timeout: 30000 })
 
     // Wait for AI to finish working (supports both EN and CN)
-    await window.waitForSelector('text=/Halo 工作中|Halo is working/i', { state: 'hidden', timeout: 45000 }).catch(() => {})
+    await window.waitForSelector('text=/Vortex 正在运行|Vortex is working/i', { state: 'hidden', timeout: 45000 }).catch(() => {})
 
     // Verify AI response contains expected content
     const assistantMessage = await window.waitForSelector('.message-assistant', { timeout: 5000 })

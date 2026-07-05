@@ -1,27 +1,41 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Stronger blue gradient: from-primary/45 to transparent -->
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.5"/>
-      <stop offset="70%" stop-color="#3b82f6" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    <linearGradient id="vortex-f-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
     </linearGradient>
+    <linearGradient id="vortex-f-grad2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <radialGradient id="vortex-f-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
   </defs>
 
-  <!-- Dark background inside the ring -->
-  <circle cx="512" cy="512" r="408" fill="#0a0a0a"/>
+  <!-- Dark background -->
+  <circle cx="512" cy="512" r="480" fill="#0a0a0a"/>
 
-  <!-- Inner gradient circle - stronger blue -->
-  <circle cx="512" cy="512" r="326" fill="url(#grad)"/>
+  <!-- Center glow -->
+  <circle cx="512" cy="512" r="280" fill="url(#vortex-f-glow)"/>
 
-  <!-- Thin outer ring -->
-  <circle
-    cx="512"
-    cy="512"
-    r="420"
-    fill="none"
-    stroke="#3b82f6"
-    stroke-width="24"
-    stroke-opacity="0.6"
-  />
+  <!-- Spiral arm 1 - blue -->
+  <path d="M 512 512 C 612 412, 712 412, 762 512 C 812 612, 712 712, 612 712 C 512 712, 462 662, 462 612"
+        fill="none" stroke="#3b82f6" stroke-width="20" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Spiral arm 2 - purple -->
+  <path d="M 512 512 C 412 412, 312 412, 262 512 C 212 612, 312 712, 412 712 C 512 712, 562 662, 562 612"
+        fill="none" stroke="#8b5cf6" stroke-width="20" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- V letterform - gradient stroke -->
+  <path d="M 340 280 L 512 680 L 684 280"
+        fill="none" stroke="url(#vortex-f-grad)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Accent dots at V tips -->
+  <circle cx="340" cy="280" r="14" fill="#3b82f6" opacity="0.8"/>
+  <circle cx="684" cy="280" r="14" fill="#8b5cf6" opacity="0.8"/>
+
+  <!-- Center core -->
+  <circle cx="512" cy="512" r="28" fill="url(#vortex-f-grad)" opacity="0.9"/>
 </svg>

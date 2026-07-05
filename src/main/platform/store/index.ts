@@ -46,13 +46,13 @@ export type { DatabaseManager, Migration }
 export { createDatabaseManager }
 
 /** Name of the application-level database file. */
-const APP_DB_FILENAME = 'halo.db'
+const APP_DB_FILENAME = 'vortex.db'
 
 /**
  * Initialize the platform store module.
  *
- * Creates and returns a DatabaseManager configured for the Halo data directory.
- * The app-level database is located at `{haloDir}/halo.db`.
+ * Creates and returns a DatabaseManager configured for the Vortex data directory.
+ * The app-level database is located at `{haloDir}/vortex.db`.
  *
  * This function must be called first in the platform initialization sequence
  * (bootstrap Phase 3), before any other platform or apps module.

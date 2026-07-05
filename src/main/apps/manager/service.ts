@@ -129,7 +129,7 @@ export interface AppManagerDeps {
   /**
    * Resolve a space ID to its raw data path for app work directories.
    * Always returns space.path directly — never the artifacts/ subdirectory —
-   * so that .halo/apps/{appId}/ is co-located with where the runtime writes memory.
+   * so that .vortex/apps/{appId}/ is co-located with where the runtime writes memory.
    * Returns null if the space does not exist.
    */
   getAppDataPath: (spaceId: string) => string | null
@@ -209,7 +209,7 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
 
   /**
    * Resolve the work directory path for an App.
-   * Space-scoped: {spacePath}/.halo/apps/{appId}/
+   * Space-scoped: {spacePath}/.vortex/apps/{appId}/
    * Global: {haloDir}/apps/{appId}/
    */
   function resolveWorkDir(appId: string, spaceId: string | null): string {
@@ -220,7 +220,7 @@ export function createAppManagerService(deps: AppManagerDeps): AppManagerService
     if (!spacePath) {
       throw new SpaceNotFoundError(spaceId)
     }
-    return join(spacePath, '.halo', 'apps', appId)
+    return join(spacePath, '.vortex', 'apps', appId)
   }
 
   /**

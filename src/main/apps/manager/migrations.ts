@@ -139,5 +139,18 @@ export const migrations: Migration[] = [
         ADD COLUMN upgrade_strategy TEXT NOT NULL DEFAULT 'auto'
       `)
     }
+  },
+  {
+    version: 5,
+    description: 'Rename seed app from "Halo AI 数字人模板" to "Vortex AI 数字人模板"',
+    up(db) {
+      // Update the spec_json for the seed app that was created with the old brand name.
+      // Only affects rows where the name matches the old value.
+      db.exec(`
+        UPDATE installed_apps
+        SET spec_json = REPLACE(spec_json, '"Halo AI 数字人模板"', '"Vortex AI 数字人模板"')
+        WHERE spec_json LIKE '%"Halo AI 数字人模板"%'
+      `)
+    }
   }
 ]

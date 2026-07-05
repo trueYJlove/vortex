@@ -1,10 +1,10 @@
 /**
  * Process Registry - Persistent process tracking
  *
- * Manages a disk-based registry of Halo-managed processes.
+ * Manages a disk-based registry of Vortex-managed processes.
  * Uses Instance ID mechanism for safe orphan detection.
  *
- * Location: ~/.halo/.health-registry.json
+ * Location: ~/.vortex/.health-registry.json
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'

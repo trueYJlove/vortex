@@ -165,7 +165,7 @@ async function initPlatformAndApps(): Promise<void> {
   // Order matters here: the built-in loader installs bundled digital humans
   // declared in product.json's `builtinApps` list. The default-app seed then
   // checks whether any automation app exists (or any built-in is bundled) to
-  // decide if the "Halo 助手" placeholder should be created. Running the loader
+  // decide if the "Vortex 助手" placeholder should be created. Running the loader
   // first ensures the seed makes its decision against the post-loader state.
   registerIdleTask('load-builtin-apps', () => loadBuiltinApps(appManager))
   registerIdleTask('seed-default-app', () => seedDefaultAppIfNeeded(appManager))

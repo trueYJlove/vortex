@@ -83,7 +83,7 @@ Module: `src/main/platform/memory`.
 Resolved paths (`src/main/platform/memory/paths.ts`):
 
 - user: `{haloDir}/user-memory.md` and `{haloDir}/user-memory/`
-- space: `{spacePath}/.halo/memory.md` and `{spacePath}/.halo/memory/`
+- space: `{spacePath}/.vortex/memory.md` and `{spacePath}/.vortex/memory/`
 - app: `{spacePath}/apps/{appId}/memory.md` and `{spacePath}/apps/{appId}/memory/`
 
 Tools:

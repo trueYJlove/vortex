@@ -43,21 +43,21 @@ vi.mock('electron', () => {
   return {
     app: {
       // Force "packaged" mode so config.service points HALO_DIR at the test home,
-      // not ~/.halo-dev (which would escape the per-test sandbox).
+      // not ~/.vortex-dev (which would escape the per-test sandbox).
       isPackaged: true,
       getPath: (name: string) => {
         const dir = globalThis.__HALO_TEST_DIR__ || '/tmp/halo-test-fallback'
         if (name === 'home') return dir
-        if (name === 'userData') return path.join(dir, '.halo')
+        if (name === 'userData') return path.join(dir, '.vortex')
         if (name === 'downloads') return path.join(dir, 'Downloads')
-        if (name === 'temp') return path.join(dir, '.halo', 'temp')
+        if (name === 'temp') return path.join(dir, '.vortex', 'temp')
         return dir
       },
       // Mirrors a packaged build: code under the test-home tree, no real asar.
       getAppPath: () => path.join(globalThis.__HALO_TEST_DIR__ || '/tmp/halo-test-fallback', 'app'),
       setLoginItemSettings: vi.fn(),
       getLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
-      getName: vi.fn(() => 'Halo'),
+      getName: vi.fn(() => 'Vortex'),
       getVersion: vi.fn(() => '1.0.0-test')
     },
     BrowserWindow: vi.fn(() => ({
@@ -81,8 +81,8 @@ beforeEach(() => {
   // Create fresh unique test directory for this test
   const testDir = createTestDir()
 
-  // Create .halo directory structure
-  const haloDir = path.join(testDir, '.halo')
+  // Create .vortex directory structure
+  const haloDir = path.join(testDir, '.vortex')
   const tempDir = path.join(haloDir, 'temp')
   const spacesDir = path.join(haloDir, 'spaces')
 

@@ -68,7 +68,7 @@ function applyTheme(themeId: ThemeMode) {
 
   // Save to localStorage for anti-flash script
   try {
-    localStorage.setItem('halo-theme', themeId)
+    localStorage.setItem('vortex-theme', themeId)
   } catch (e) { /* ignore */ }
 
   // Set data-theme attribute

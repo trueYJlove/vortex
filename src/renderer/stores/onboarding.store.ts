@@ -2,7 +2,7 @@
  * Onboarding Store - Manages first-time user guided tour state
  *
  * Flow:
- * 1. step 1: Highlight Halo Space card on HomePage
+ * 1. step 1: Highlight Vortex Space card on HomePage
  * 2. step 2: Pre-fill input with prompt, highlight send button
  * 3. step 3: Show mock AI response, highlight artifact
  * 4. User clicks artifact -> onboarding complete

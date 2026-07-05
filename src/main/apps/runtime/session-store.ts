@@ -2,7 +2,7 @@
  * Session Detail Storage
  *
  * Persists App run execution messages as JSONL for the "View process" drill-down.
- * Files are stored at: {spacePath}/.halo/apps/{appId}/runs/{runId}.jsonl
+ * Files are stored at: {spacePath}/.vortex/apps/{appId}/runs/{runId}.jsonl
  *
  * Completely separate from the conversation storage system — no pollution
  * of the user's conversation list.
@@ -91,7 +91,7 @@ export interface SessionWriter {
 
 /** Get the directory for run session files */
 function getRunsDir(spacePath: string, appId: string): string {
-  return join(spacePath, '.halo', 'apps', appId, 'runs')
+  return join(spacePath, '.vortex', 'apps', appId, 'runs')
 }
 
 /** Get the JSONL file path for a specific run */
@@ -532,7 +532,7 @@ function buildThoughtsSummary(thoughts: ThoughtRecord[]): ThoughtsSummaryRecord 
  * its on-disk session file — same mechanism as the main conversation
  * (conversation.service.saveSessionId).
  *
- * Storage: {spacePath}/.halo/apps/{appId}/runs/_session-ids.json
+ * Storage: {spacePath}/.vortex/apps/{appId}/runs/_session-ids.json
  * Format: { [runId]: sessionId }
  */
 

@@ -35,7 +35,7 @@ export function CreateSpaceForm({ onCreated, onCancel, compact = false }: Create
   const [icon, setIcon] = useState<SpaceIconId>(DEFAULT_SPACE_ICON)
   const [useCustomPath, setUseCustomPath] = useState(false)
   const [customPath, setCustomPath] = useState<string | null>(null)
-  const [defaultPath, setDefaultPath] = useState<string>('~/.halo/spaces')
+  const [defaultPath, setDefaultPath] = useState<string>('~/.vortex/spaces')
 
   // Unique radio group name so multiple form instances on the same page don't conflict
   const radioGroupName = useId()

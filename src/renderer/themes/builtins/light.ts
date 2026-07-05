@@ -24,7 +24,7 @@ export const lightTheme: ThemeDefinition = {
     border:                 '220 14% 90%', // #dce0e8
     input:                  '220 14% 94%',
     ring:                   '217 91% 55%',
-    'halo-glow':            '217 91% 55%',
+    'halo-glow':            '262 83% 60%',
     'halo-success':         '142 71% 40%',
     'halo-warning':         '38 92% 45%',
     'halo-error':           '0 72% 51%',
@@ -32,7 +32,7 @@ export const lightTheme: ThemeDefinition = {
   preview: {
     background: '#ffffff',
     foreground: '#21252b',
-    primary:    '#2563eb',
-    accent:     '#2563eb',
+    primary:    '#8b5cf6',
+    accent:     '#8b5cf6',
   },
 }

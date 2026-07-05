@@ -34,7 +34,7 @@ Each layer is aware only of itself and its parent layer — **not of child layer
 
 | Layer | Owned by | Committed to | Contains |
 |---|---|---|---|
-| 1 | Halo open-source community | github.com/openkursar/hello-halo | UI, Agent SDK, all general capabilities |
+| 1 | Vortex open-source community | github.com/openkursar/hello-halo | UI, Agent SDK, all general capabilities |
 | 2 | You (individual / team) | your own private git (e.g. GitHub Private, private Gitea) | tools shared across enterprises, personal dev scaffolding |
 | 3 | A specific enterprise team | that enterprise's intranet git | branding, Provider, security policy specific to that enterprise |
 
@@ -83,8 +83,8 @@ Grouped below by usage scenario.
 
 ```json
 {
-  "name": "Halo Acme",
-  "dataFolderName": "halo-acme",
+  "name": "Vortex Acme",
+  "dataFolderName": "vortex-acme",
   "version": "1.0.0"
 }
 ```
@@ -100,7 +100,7 @@ Grouped below by usage scenario.
 ```json
 "updateConfig": {
   "provider": "generic",
-  "url": "https://release.acme.intra/halo/"
+  "url": "https://release.acme.intra/vortex/"
 }
 ```
 
@@ -383,7 +383,7 @@ For the `OAuthAISourceProvider` interface, fields, and best practices, see [`cus
 
 ## Cross-platform Builds
 
-Halo carries some native binaries (e.g. `cloudflared`, `better-sqlite3`, `node-pty`); cross-platform packaging requires preparing the corresponding platform's binaries under `node_modules` first.
+Vortex carries some native binaries (e.g. `cloudflared`, `better-sqlite3`, `node-pty`); cross-platform packaging requires preparing the corresponding platform's binaries under `node_modules` first.
 
 ### Prepare all platforms at once
 
@@ -449,11 +449,11 @@ Each vendor has its own independent git and is unaware of the others.
 Switch as needed at build time:
 
 ```bash
-bash halo-local/acme/scripts/build.sh --mac        # produces Halo-Acme.dmg
-bash halo-local/globex/scripts/build.sh --mac      # produces Halo-Globex.dmg
+bash halo-local/acme/scripts/build.sh --mac        # produces Vortex-Acme.dmg
+bash halo-local/globex/scripts/build.sh --mac      # produces Vortex-Globex.dmg
 ```
 
-The two builds have different `appId` (`com.acme.halo` vs `com.globex.halo`) and different `dataFolderName`, so they can coexist on the same machine.
+The two builds have different `appId` (`com.acme.vortex` vs `com.globex.vortex`) and different `dataFolderName`, so they can coexist on the same machine.
 
 ### `halo-local/.gitignore` configuration
 

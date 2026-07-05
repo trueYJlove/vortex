@@ -41,7 +41,7 @@ export interface DatabaseManager {
   /**
    * Get the application-level database instance.
    *
-   * Returns the shared SQLite database at `~/.halo/halo.db`.
+   * Returns the shared SQLite database at `~/.vortex/vortex.db`.
    * The database is opened lazily on first call and cached for reuse.
    * WAL mode and performance PRAGMAs are applied automatically.
    *

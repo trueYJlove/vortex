@@ -77,7 +77,7 @@ Halo is a local-first Electron AI product with:
 ### 3.3 Security & Privacy
 
 - **Never commit real API Keys/Tokens to the repository (including docs).**
-- Configuration stored in `~/.halo/config.json`; never hardcode secrets in source/docs.
+- Configuration stored in `~/.vortex/config.json`; never hardcode secrets in source/docs.
 - Remote Access PIN/token is ephemeral (in-memory only); never output to logs/docs.
 
 ### 3.4 Web Mode

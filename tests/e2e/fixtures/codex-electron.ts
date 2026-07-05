@@ -3,7 +3,7 @@
  *
  * Variant of `electron.ts` that:
  *   1. Forces `config.agent.sdkEngine = "codex"`.
- *   2. Reuses the user's real `~/.halo/config.json` aiSources so an existing
+ *   2. Reuses the user's real `~/.vortex/config.json` aiSources so an existing
  *      Codex-capable provider (gpt-*) can authenticate without a fresh API key.
  *   3. Snapshots/forces a sensible `currentId` pointing at a gpt-* source.
  *   4. Surfaces a clear skip when no Codex-capable source is available.
@@ -77,11 +77,11 @@ function ensureProductJson(projectRoot: string): void {
 }
 
 /**
- * Try `~/.halo` then `~/.halo-dev` for the user's existing config.
+ * Try `~/.vortex` then `~/.vortex-dev` for the user's existing config.
  */
 function loadUserHaloConfig(): { dir: string; config: Record<string, any> } | null {
   const home = os.homedir()
-  for (const dir of [path.join(home, '.halo'), path.join(home, '.halo-dev')]) {
+  for (const dir of [path.join(home, '.vortex'), path.join(home, '.vortex-dev')]) {
     const file = path.join(dir, 'config.json')
     if (fs.existsSync(file)) {
       try {
@@ -176,7 +176,7 @@ function createTestConfigDir(
     process.env.TMPDIR || '/tmp',
     `halo-codex-e2e-${Date.now()}`
   )
-  const haloDir = path.join(testDir, '.halo')
+  const haloDir = path.join(testDir, '.vortex')
   fs.mkdirSync(path.join(haloDir, 'temp', 'artifacts'), { recursive: true })
   fs.mkdirSync(path.join(haloDir, 'temp', 'conversations'), { recursive: true })
   fs.mkdirSync(path.join(haloDir, 'spaces'), { recursive: true })
@@ -222,7 +222,7 @@ function createTestConfigDir(
 
   // SDK headless-electron symlink for macOS (mirrors electron.ts).
   if (process.platform === 'darwin') {
-    const userDataDir = path.join(testDir, 'Library', 'Application Support', 'Halo')
+    const userDataDir = path.join(testDir, 'Library', 'Application Support', 'Vortex')
     const headlessDir = path.join(userDataDir, 'headless-electron')
     fs.mkdirSync(headlessDir, { recursive: true })
     try {
@@ -250,9 +250,9 @@ const codexSource = userConfig ? pickCodexCapableSource(userConfig.config) : nul
 export const codexAvailability = {
   ok: !!(userConfig && codexSource),
   reason: !userConfig
-    ? 'No ~/.halo or ~/.halo-dev config.json found. Configure Halo at least once before running this test.'
+    ? 'No ~/.vortex or ~/.vortex-dev config.json found. Configure Vortex at least once before running this test.'
     : !codexSource
-      ? 'No Codex-capable source found in aiSources. Add any non-Anthropic OpenAI-compatible provider (siliconflow, openrouter, openai, etc.) in Halo Settings → AI Sources, or set HALO_CODEX_TEST_SOURCE_ID to a specific source id.'
+      ? 'No Codex-capable source found in aiSources. Add any non-Anthropic OpenAI-compatible provider (siliconflow, openrouter, openai, etc.) in Vortex Settings → AI Sources, or set VORTEX_CODEX_TEST_SOURCE_ID to a specific source id.'
       : '',
   source: codexSource,
 }
@@ -287,7 +287,7 @@ export const test = base.extend<CodexElectronFixtures>({
         ...cleanEnv,
         HOME: testConfigDir,
         USERPROFILE: testConfigDir,
-        HALO_DATA_DIR: path.join(testConfigDir, '.halo'),
+        VORTEX_DATA_DIR: path.join(testConfigDir, '.vortex'),
         ELECTRON_DISABLE_GPU: '1',
         HALO_E2E_TEST: '1',
       },

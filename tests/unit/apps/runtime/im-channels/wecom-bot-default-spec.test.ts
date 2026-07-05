@@ -81,6 +81,6 @@ describe('buildDefaultAssistantSpec', () => {
     expect(spec.type).toBe('automation')
     expect(spec.spec_version).toBe('1')
     expect(spec.version).toBe('1.0')
-    expect(spec.author).toBe('Halo')
+    expect(spec.author).toBe('Vortex')
   })
 })

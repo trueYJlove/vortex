@@ -82,8 +82,8 @@ const Vendor = vendor.charAt(0).toUpperCase() + vendor.slice(1)
 
 const productJson = {
   $schema: '../../../product.schema.json',
-  name: `Halo ${Vendor}`,
-  dataFolderName: `halo-${vendor}`,
+  name: `Vortex ${Vendor}`,
+  dataFolderName: `vortex-${vendor}`,
   version: '1.0.0',
   updateConfig: {
     provider: 'generic',
@@ -197,8 +197,8 @@ npm run build
 export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/   # mainland mirror
 export CSC_IDENTITY_AUTO_DISCOVERY=false                         # skip code signing
 
-PRODUCT_NAME="Halo-${Vendor}"
-APP_ID="com.${vendor}.halo"
+PRODUCT_NAME="Vortex-${Vendor}"
+APP_ID="com.${vendor}.vortex"
 
 PLATFORMS="$@"
 [ -z "$PLATFORMS" ] && PLATFORMS="--mac"
@@ -213,9 +213,9 @@ echo "Build done. Artifacts:"
 ls -la dist/ | grep -i "${vendor}" || ls -la dist/
 `
 
-const readmeMd = `# Halo ${Vendor}
+const readmeMd = `# Vortex ${Vendor}
 
-${Vendor} private build of Halo.
+${Vendor} private build of Vortex.
 
 ## Build
 
@@ -224,7 +224,7 @@ cd <hello-halo repo root>
 bash halo-local/${vendor}/scripts/build.sh --mac
 \`\`\`
 
-Artifacts land in \`hello-halo/dist/Halo-${Vendor}-*.dmg\`.
+Artifacts land in \`hello-halo/dist/Vortex-${Vendor}-*.dmg\`.
 
 ## Configure
 
@@ -278,6 +278,6 @@ console.log('')
 console.log('Next:')
 console.log(`  1. Edit halo-local/${vendor}/product.${vendor}.json — fill in your real AI gateway URL and brand`)
 console.log(`  2. Build:  bash halo-local/${vendor}/scripts/build.sh --mac`)
-console.log(`  3. Find your dmg in dist/Halo-${Vendor}-*.dmg`)
+console.log(`  3. Find your dmg in dist/Vortex-${Vendor}-*.dmg`)
 console.log('')
 console.log('Full guide: docs/enterprise-deployment.zh.md')

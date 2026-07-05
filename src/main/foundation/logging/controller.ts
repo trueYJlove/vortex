@@ -11,7 +11,7 @@
  *   2. HTTP request/response logging — toggles the dedicated http-raw.log
  *      transport via setHttpLogging().
  *
- *   3. SDK logging — bumps halo-sdk.log between 'info' and 'debug'
+ *   3. SDK logging — bumps vortex-sdk.log between 'info' and 'debug'
  *      via setSdkLogLevel().
  *
  * Adding a new logging transport:
@@ -57,7 +57,7 @@ function applyDeveloperMode(enabled: boolean): void {
   // 2. HTTP request/response logging (dedicated http-raw.log)
   setHttpLogging(enabled)
 
-  // 3. SDK logging level (dedicated halo-sdk.log)
+  // 3. SDK logging level (dedicated vortex-sdk.log)
   setSdkLogLevel(enabled ? 'debug' : 'info')
 }
 

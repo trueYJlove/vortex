@@ -128,32 +128,32 @@ export function getOnboardingHtmlArtifact(translator?: TFunction, lang: string =
       width: 160px;
       height: 160px;
       border-radius: 50%;
-      border: 4px solid #3b82f6;
+      border: 4px solid #8b5cf6;
       display: flex;
       align-items: center;
       justify-content: center;
       margin-bottom: 48px;
-      box-shadow: 0 0 60px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 0 60px rgba(139, 92, 246, 0.3);
       animation: pulse 3s ease-in-out infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 60px rgba(59, 130, 246, 0.3); }
-      50% { box-shadow: 0 0 80px rgba(59, 130, 246, 0.5); }
+      0%, 100% { box-shadow: 0 0 60px rgba(139, 92, 246, 0.3); }
+      50% { box-shadow: 0 0 80px rgba(139, 92, 246, 0.5); }
     }
 
     .logo-inner {
       width: 100px;
       height: 100px;
       border-radius: 50%;
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), transparent);
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(139, 92, 246, 0.2));
     }
 
     h1 {
       font-size: 96px;
       font-weight: 700;
       margin-bottom: 24px;
-      background: linear-gradient(135deg, #fff, #a5b4fc);
+      background: linear-gradient(135deg, #fff, #c4b5fd);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }

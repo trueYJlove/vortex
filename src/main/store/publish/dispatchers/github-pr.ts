@@ -49,7 +49,7 @@ export async function dispatch(
     `Type: ${spec.type}\n` +
     `Slug: ${spec.store?.slug ?? '(none)'}\n\n` +
     `Local .dhpkg artifact: \`${outPath}\`\n\n` +
-    `_(This issue was opened from Halo. Attach the .dhpkg file above for manual review.)_`
+    `_(This issue was opened from Vortex. Attach the .dhpkg file above for manual review.)_`
   )
   const newPrUrl = `https://github.com/${owner}/${repo}/issues/new?title=${title}&body=${body}`
 

@@ -243,7 +243,7 @@ https://github.com/user-attachments/assets/2d4d2f3e-d27c-44b0-8f1d-9059c8372003
 │                      │ Scheduler │                │
 │                      └───────────┘                │
 │                           │                       │
-│                     ~/.halo/ (local)              │
+│                     ~/.vortex/ (local)              │
 └──────────────────────────────────────────────────┘
 ```
 

@@ -132,8 +132,8 @@ export function HomePage() {
       <Header
         left={
           <>
-            <div className="w-[22px] h-[22px] rounded-full border-2 border-primary/60 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-primary/30 to-transparent" />
+            <div className="w-[22px] h-[22px] rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center">
+              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
             </div>
             <span className="text-sm font-medium">Vortex</span>
           </>
@@ -150,9 +150,9 @@ export function HomePage() {
 
       {/* Content */}
       <main className="flex-1 overflow-auto p-6">
-        {/* Primary entry cards: Halo Space + Apps */}
+        {/* Primary entry cards: Vortex Space + Apps */}
         <div className="grid grid-cols-2 gap-4 mb-8 animate-fade-in">
-          {/* Halo Space card */}
+          {/* Vortex Space card */}
           {haloSpace && (
             <div
               data-onboarding="halo-space"

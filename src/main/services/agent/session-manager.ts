@@ -561,7 +561,27 @@ export async function getOrCreateV2Session(
     sdkOptions.resume = effectiveSessionId
   }
   // resolved-sdk handles sdkEngine switch (Halo SDK vs CC SDK) transparently
-  const session = (await createSession(sdkOptions)) as unknown as V2SDKSession
+  // SDK's unstable_v2_createSession doesn't accept cwd parameter — it uses process.cwd() internally.
+  // Temporarily switch to the workspace's working directory so the Claude Code subprocess
+  // spawns with the correct cwd, then restore the original directory.
+  const originalCwd = process.cwd()
+  if (workDir && workDir !== originalCwd) {
+    try {
+      process.chdir(workDir)
+      console.log(`[Agent][${conversationId}] Switched cwd to workDir: ${workDir}`)
+    } catch (err) {
+      console.warn(`[Agent][${conversationId}] Failed to chdir to ${workDir}:`, err)
+    }
+  }
+  let session: V2SDKSession
+  try {
+    session = (await createSession(sdkOptions)) as unknown as V2SDKSession
+  } finally {
+    if (process.cwd() !== originalCwd) {
+      process.chdir(originalCwd)
+      console.log(`[Agent][${conversationId}] Restored cwd to: ${originalCwd}`)
+    }
+  }
 
   // Log PID for health system verification (via SDK patch)
   const pid = (session as any).pid

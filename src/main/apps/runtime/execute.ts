@@ -228,7 +228,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     type: 'app',
     spaceId: app.spaceId!, // Automation apps always have a spaceId
     // Use space.path (not workingDir) to match the directory layout that
-    // AppManager creates: {space.path}/.halo/apps/{appId}/memory/
+    // AppManager creates: {space.path}/.vortex/apps/{appId}/memory/
     spacePath: getSpace(app.spaceId!)?.path ?? '',
     appId: app.id,
   }

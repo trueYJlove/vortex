@@ -492,15 +492,15 @@ Location: `src/main/openai-compat-router/`
 ## 15) Local Storage Layout
 
 ```
-~/.halo/
+~/.vortex/
 ├── config.json                 # Global config (API/permissions/theme/remote access/etc.)
 ├── spaces-index.json           # Space ID -> path registry (v2 format)
-├── temp/                       # Halo temporary space (id: halo-temp)
+├── temp/                       # Vortex temporary space (id: halo-temp)
 │   ├── artifacts/
 │   └── conversations/
 └── spaces/                     # All dedicated spaces (centralized storage)
     └── <uuid>/                 # Space identified by UUID
-        └── .halo/
+        └── .vortex/
             ├── meta.json       # Space metadata (id/name/icon/timestamps/workingDir)
             └── conversations/
                 ├── <id>.json           # Conversation data (lightweight, no thoughts)
@@ -510,7 +510,7 @@ Location: `src/main/openai-compat-router/`
 **Credential master key (enterprise builds only):** when `security.credentialAtRestSafe`
 is enabled, a random 32-byte key is persisted at `<userData>/cred.key` (Electron
 `app.getPath('userData')`, e.g. `~/Library/Application Support/<App>/cred.key` on
-macOS — separate from `~/.halo`). It is the KEK for at-rest credential encryption
+macOS — separate from `~/.vortex`). It is the KEK for at-rest credential encryption
 (`src/main/http/auth/envelope.ts`). Generated once on first run, never rotated
 automatically, and never regenerated if present (regenerating would orphan all
 stored ciphertext). Absent/no-op on open-source builds.
@@ -518,13 +518,13 @@ stored ciphertext). Absent/no-op on open-source builds.
 ### Space Path Architecture
 
 Spaces have two distinct paths:
-- **`path`** (data path): Always centralized under `~/.halo/spaces/{uuid}/`. Used for conversations, meta.json, and all persisted data.
+- **`path`** (data path): Always centralized under `~/.vortex/spaces/{uuid}/`. Used for conversations, meta.json, and all persisted data.
 - **`workingDir`** (optional): The user's project directory for custom/project-linked spaces. Used as agent cwd, artifact scanning root, and file explorer target.
 
 For default spaces (no custom path), `workingDir` is undefined and `path` serves both purposes.
 
 Notes:
-- **Legacy custom-path spaces**: Created before centralized storage, `path` points to the project directory with `.halo/` inside it. These continue to work without migration.
+- **Legacy custom-path spaces**: Created before centralized storage, `path` points to the project directory with `.vortex/` inside it. These continue to work without migration.
 - **Lazy-loaded conversations**: `conversation.service.ts` uses `index.json` for fast listing; full conversation data is loaded only when entering a conversation.
 - **Thoughts separation**: Thoughts data (~97% of file size) stored in separate `.thoughts.json` files, loaded on-demand when user clicks to expand.
 

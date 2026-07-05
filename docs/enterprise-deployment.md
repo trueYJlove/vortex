@@ -1,8 +1,8 @@
 # Enterprise Deployment Guide
 
-This document is for IT and engineering teams that need to distribute Halo as an internal company AI client.
+This document is for IT and engineering teams that need to distribute Vortex as an internal company AI client.
 
-Halo supports enterprise customization through `product.json` configuration + an electron-builder overlay. All customization happens inside the enterprise's own private repository; the hello-halo main repo stays untouched, which keeps it easy to follow upstream upgrades. Common customizations:
+Vortex supports enterprise customization through `product.json` configuration + an electron-builder overlay. All customization happens inside the enterprise's own private repository; the hello-halo main repo stays untouched, which keeps it easy to follow upstream upgrades. Common customizations:
 
 - **Branding** — app name, Bundle ID, app icon, data directory, version number, About-page info
 - **AI access** — preset an internal company AI gateway URL (compatible with OpenAI Chat Completions / Responses / Anthropic protocols) so employees can use it right after install without configuring anything
@@ -28,7 +28,7 @@ hello-halo/                              Main repo (kept as-is, not modified)
         └── README.md
 ```
 
-Build artifact: `dist/Halo-Acme-x.x.x-arm64.dmg`, containing the enterprise branding, the preset AI gateway URL, and the security policy.
+Build artifact: `dist/Vortex-Acme-x.x.x-arm64.dmg`, containing the enterprise branding, the preset AI gateway URL, and the security policy.
 
 > This document uses `acme` as a placeholder company name; replace it with your actual name (e.g. `tencent`, `yourcompany`).
 
@@ -83,13 +83,13 @@ Create 4 files from the templates below; each file is followed by its main confi
 ```json
 {
   "$schema": "../../../product.schema.json",
-  "name": "Halo Acme",
-  "dataFolderName": "halo-acme",
+  "name": "Vortex Acme",
+  "dataFolderName": "vortex-acme",
   "version": "1.0.0",
 
   "updateConfig": {
     "provider": "generic",
-    "url": "https://release.acme.intra/halo/"
+    "url": "https://release.acme.intra/vortex/"
   },
 
   "authProviders": [
@@ -142,7 +142,7 @@ Create 4 files from the templates below; each file is followed by its main confi
 | Field | Description |
 |---|---|
 | `name` | App display name, used on the About page, menu bar, installer name |
-| `dataFolderName` | User data directory name (produces `~/.halo-acme/`). Each enterprise build must use a unique value to avoid colliding with the open-source build's data directory |
+| `dataFolderName` | User data directory name (produces `~/.vortex-acme/`). Each enterprise build must use a unique value to avoid colliding with the open-source build's data directory |
 | `updateConfig.url` | Enterprise intranet update server URL. Delete the whole `updateConfig` block when auto-update is not used |
 | `authProviders[].preset.baseUrl` | Enterprise AI gateway URL; must be OpenAI-protocol compatible |
 | `authProviders[].preset.fallbackModels` | Fallback model list used when the gateway's `/models` endpoint is unreachable |
@@ -224,8 +224,8 @@ npm run build
 export ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/  # China mirror for speed
 export CSC_IDENTITY_AUTO_DISCOVERY=false                        # skip signing
 
-PRODUCT_NAME="Halo-Acme"
-APP_ID="com.acme.halo"
+PRODUCT_NAME="Vortex-Acme"
+APP_ID="com.acme.vortex"
 
 PLATFORMS="$@"
 [ -z "$PLATFORMS" ] && PLATFORMS="--mac"   # default to current platform
@@ -242,14 +242,14 @@ ls -la dist/ | grep -i acme || true
 **Config items:**
 
 - `PRODUCT_NAME`: app artifact name
-- `APP_ID`: reverse-domain Bundle ID, must differ from the open-source build (`com.openkursar.halo`), otherwise macOS treats them as the same app
+- `APP_ID`: reverse-domain Bundle ID, must differ from the open-source build (`com.openkursar.vortex`), otherwise macOS treats them as the same app
 
 #### File 4: `README.md`
 
 ```markdown
-# Halo Acme
+# Vortex Acme
 
-Acme's internal Halo enterprise build repository.
+Acme's internal Vortex enterprise build repository.
 
 ## Build
 
@@ -258,7 +258,7 @@ cd <hello-halo main repo root>
 bash halo-local/acme/scripts/build.sh --mac
 ```
 
-Artifact location: `hello-halo/dist/Halo-Acme-*.dmg`
+Artifact location: `hello-halo/dist/Vortex-Acme-*.dmg`
 
 ## Configuration
 
@@ -279,15 +279,15 @@ Expected artifacts:
 
 ```
 hello-halo/dist/
-├── Halo-Acme-1.0.0-arm64.dmg
-└── Halo-Acme-1.0.0-arm64-mac.zip
+├── Vortex-Acme-1.0.0-arm64.dmg
+└── Vortex-Acme-1.0.0-arm64-mac.zip
 ```
 
 After installing and launching, verify the following:
 
-1. **Branding**: the menu bar shows "Halo Acme", the About page shows version 1.0.0
+1. **Branding**: the menu bar shows "Vortex Acme", the About page shows version 1.0.0
 2. **Sign-in entry**: the sign-in screen's preferred option is "Acme AI 网关", with its baseUrl pointing at the enterprise intranet gateway
-3. **Data isolation**: the `~/.halo-acme/` directory is created, fully isolated from the open-source build's `~/.halo/`
+3. **Data isolation**: the `~/.vortex-acme/` directory is created, fully isolated from the open-source build's `~/.vortex/`
 
 ---
 
@@ -312,7 +312,7 @@ For each switch's interception points, underlying implementation, and field cons
 
 The template's `electron-builder.acme.cjs` explicitly sets `publish: null`, and the build command includes no `--publish` argument, so build artifacts are never pushed to any remote. Do not run `electron-builder --publish always`.
 
-**Manual distribution**: upload `dist/Halo-Acme-*.dmg` to the company's internal OA, file server, or artifact repository.
+**Manual distribution**: upload `dist/Vortex-Acme-*.dmg` to the company's internal OA, file server, or artifact repository.
 
 **Auto-update**: deploy a static HTTP service on the intranet (nginx is enough), and place metadata files such as `latest-mac.yml` per the [electron-updater generic provider spec](https://www.electron.build/configuration/publish.html#genericserveroptions). Pointing `product.acme.json#updateConfig.url` at that service is enough to take effect.
 

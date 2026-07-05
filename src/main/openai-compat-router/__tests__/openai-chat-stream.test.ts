@@ -8,8 +8,8 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('electron', () => ({
   app: {
     isPackaged: false,
-    getPath: () => '/tmp/halo-test',
-    getName: () => 'Halo',
+    getPath: () => '/tmp/vortex-test',
+    getName: () => 'Vortex',
     getVersion: () => '1.0.0-test'
   },
   session: {

@@ -1,7 +1,7 @@
 {
   "$schema": "./product.schema.json",
-  "name": "Halo",
-  "dataFolderName": "halo",
+  "name": "Vortex",
+  "dataFolderName": "vortex",
   "version": "1.0.0",
   "updateConfig": {
     "provider": "github",

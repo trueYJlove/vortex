@@ -603,7 +603,7 @@ export class BrowserContext implements BrowserContextInterface {
   getDownloadDir(): string {
     const dir = this.workDir
       ? path.join(this.workDir, 'downloads')
-      : path.join(app.getPath('downloads'), 'halo-ai')
+      : path.join(app.getPath('downloads'), 'vortex-ai')
     if (!this.downloadDirCreated) {
       fs.mkdirSync(dir, { recursive: true })
       this.downloadDirCreated = true

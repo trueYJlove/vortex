@@ -49,28 +49,34 @@ export function HaloLogo({ size = 'md', className = '' }: HaloLogoProps) {
       className={`relative ${className}`}
       style={{ width: pixelSize, height: pixelSize }}
     >
-      {/* Outer glow ring */}
-      <div className={`absolute inset-0 rounded-full bg-primary/20 ${styles.blur} halo-breathe`} />
+      {/* Outer glow ring - purple tint */}
+      <div className={`absolute inset-0 rounded-full bg-[#8b5cf6]/20 ${styles.blur} halo-breathe`} />
 
       {/* Main ring */}
       <div
-        className={`relative rounded-full ${styles.border} border-primary/60 flex items-center justify-center halo-glow`}
+        className={`relative rounded-full ${styles.border} border-[#8b5cf6]/60 flex items-center justify-center halo-glow`}
         style={{ width: pixelSize, height: pixelSize }}
       >
-        {/* Inner glow */}
-        <div className={`absolute ${styles.inset} rounded-full bg-gradient-to-br from-primary/30 to-transparent`} />
+        {/* Inner glow - blue to purple gradient */}
+        <div className={`absolute ${styles.inset} rounded-full bg-gradient-to-br from-primary/30 via-[#8b5cf6]/20 to-transparent`} />
 
-        {/* Animated ring segment - the key spinning arc */}
+        {/* Animated ring segment - blue to purple gradient arc */}
         <svg
           className="absolute inset-0 w-full h-full -rotate-90"
           viewBox="0 0 100 100"
         >
+          <defs>
+            <linearGradient id="vortex-arc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6"/>
+              <stop offset="100%" stopColor="#8b5cf6"/>
+            </linearGradient>
+          </defs>
           <circle
             cx="50"
             cy="50"
             r="45"
             fill="none"
-            stroke="hsl(var(--primary))"
+            stroke="url(#vortex-arc-grad)"
             strokeWidth={styles.strokeWidth}
             strokeLinecap="round"
             strokeDasharray="70 200"

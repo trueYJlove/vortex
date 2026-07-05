@@ -34,7 +34,7 @@ Layer 1 — hello-halo/                  公开 OSS
 
 | 层级 | 谁拥有 | 提交到哪 | 包含什么 |
 |---|---|---|---|
-| 1 | Halo 开源社区 | github.com/openkursar/hello-halo | UI、Agent SDK、所有通用能力 |
+| 1 | Vortex 开源社区 | github.com/openkursar/hello-halo | UI、Agent SDK、所有通用能力 |
 | 2 | 你（个人 / 团队） | 你自己的私有 git（如 GitHub Private、私有 Gitea） | 跨企业共享的工具、个人开发脚手架 |
 | 3 | 某个企业团队 | 该企业内网 git | 这家企业专属的品牌、Provider、安全策略 |
 
@@ -83,8 +83,8 @@ hello-halo/halo-local/.gitignore    包含  <vendor>/
 
 ```json
 {
-  "name": "Halo Acme",
-  "dataFolderName": "halo-acme",
+  "name": "Vortex Acme",
+  "dataFolderName": "vortex-acme",
   "version": "1.0.0"
 }
 ```
@@ -100,7 +100,7 @@ hello-halo/halo-local/.gitignore    包含  <vendor>/
 ```json
 "updateConfig": {
   "provider": "generic",
-  "url": "https://release.acme.intra/halo/"
+  "url": "https://release.acme.intra/vortex/"
 }
 ```
 
@@ -381,7 +381,7 @@ module.exports = {
 
 ## 跨平台构建
 
-Halo 携带一些原生二进制（如 `cloudflared`、`better-sqlite3`、`node-pty`），跨平台打包时需要先把对应平台的二进制准备到 `node_modules` 下。
+Vortex 携带一些原生二进制（如 `cloudflared`、`better-sqlite3`、`node-pty`），跨平台打包时需要先把对应平台的二进制准备到 `node_modules` 下。
 
 ### 一次性准备所有平台
 
@@ -447,11 +447,11 @@ halo-local/
 构建时按需切换：
 
 ```bash
-bash halo-local/acme/scripts/build.sh --mac        # 出 Halo-Acme.dmg
-bash halo-local/globex/scripts/build.sh --mac      # 出 Halo-Globex.dmg
+bash halo-local/acme/scripts/build.sh --mac        # 出 Vortex-Acme.dmg
+bash halo-local/globex/scripts/build.sh --mac      # 出 Vortex-Globex.dmg
 ```
 
-两次构建产物 `appId` 不同（`com.acme.halo` vs `com.globex.halo`），`dataFolderName` 不同，可以在同一台机器上共存。
+两次构建产物 `appId` 不同（`com.acme.vortex` vs `com.globex.vortex`），`dataFolderName` 不同，可以在同一台机器上共存。
 
 ### `halo-local/.gitignore` 配置
 

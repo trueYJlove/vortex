@@ -75,7 +75,7 @@ export function saveOnboardingConversation(
     if (space.isTemp) {
       conversationsDir = join(space.path, 'conversations')
     } else {
-      conversationsDir = join(space.path, '.halo', 'conversations')
+      conversationsDir = join(space.path, '.vortex', 'conversations')
     }
 
     // Ensure directory exists

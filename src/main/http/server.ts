@@ -152,7 +152,7 @@ export async function startHttpServer(
       if (req.path === '/' && !urlToken && !headerToken) {
         // Check cookie for token
         const cookies = req.headers.cookie || ''
-        const hasToken = cookies.includes('halo_authenticated=true')
+        const hasToken = cookies.includes('vortex_authenticated=true')
         if (!hasToken) {
           return res.send(getRemoteLoginPage())
         }
@@ -210,7 +210,7 @@ export async function startHttpServer(
 
       // Check if authenticated via cookie
       const cookies = req.headers.cookie || ''
-      const hasToken = cookies.includes('halo_authenticated=true')
+      const hasToken = cookies.includes('vortex_authenticated=true')
 
       // If not authenticated, show login page
       if (!hasToken) {
@@ -415,13 +415,13 @@ function getRemoteLoginPage(): string {
       width: 80px;
       height: 80px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
       margin: 0 auto 1.5rem;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 2rem;
-      box-shadow: 0 0 30px rgba(102, 126, 234, 0.4);
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.4);
     }
     h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
     p { color: #888; margin-bottom: 2rem; }
@@ -442,12 +442,12 @@ function getRemoteLoginPage(): string {
       text-align: center;
       letter-spacing: 0.5em;
     }
-    input:focus { outline: none; border-color: #667eea; }
+    input:focus { outline: none; border-color: #8b5cf6; }
     button {
       padding: 1rem 2rem;
       border: none;
       border-radius: 12px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
       color: #fff;
       font-size: 1rem;
       cursor: pointer;
@@ -488,9 +488,9 @@ function getRemoteLoginPage(): string {
         });
 
         if (res.ok) {
-          localStorage.setItem('halo_remote_token', token);
+          localStorage.setItem('vortex_remote_token', token);
           // Set cookie for server-side auth check
-          document.cookie = 'halo_authenticated=true; path=/';
+          document.cookie = 'vortex_authenticated=true; path=/';
           error.textContent = '';
           error.classList.remove('error');
           error.classList.add('success');

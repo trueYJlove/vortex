@@ -128,7 +128,7 @@ export function getRemoteServerUrl(): string {
 /** Get stored auth token */
 export function getAuthToken(): string | null {
   try {
-    return localStorage.getItem('halo_remote_token')
+    return localStorage.getItem('vortex_remote_token')
   } catch {
     return null
   }
@@ -137,14 +137,14 @@ export function getAuthToken(): string | null {
 /** Set auth token */
 export function setAuthToken(token: string): void {
   try {
-    localStorage.setItem('halo_remote_token', token)
+    localStorage.setItem('vortex_remote_token', token)
   } catch { /* ignore */ }
 }
 
 /** Clear auth token */
 export function clearAuthToken(): void {
   try {
-    localStorage.removeItem('halo_remote_token')
+    localStorage.removeItem('vortex_remote_token')
   } catch { /* ignore */ }
 }
 
@@ -192,7 +192,7 @@ export async function httpRequest<T>(
         window.dispatchEvent(new CustomEvent('halo:auth-expired'))
       } else {
         // Remote browser: reload → server shows login page
-        document.cookie = 'halo_authenticated=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+        document.cookie = 'vortex_authenticated=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
         window.location.reload()
       }
 

@@ -305,7 +305,7 @@ export async function showRecoverySuccessDialog(
 ): Promise<void> {
   await showNotificationDialog(
     'Recovery Successful',
-    `${strategyName} completed successfully.\n\nHalo should be working normally now.`,
+    `${strategyName} completed successfully.\n\nVortex should be working normally now.`,
     'info',
     parentWindow
   )

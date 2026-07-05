@@ -38,9 +38,9 @@ function setCredentialAtRestSafe(on: boolean): void {
 
 describe('Config Service', () => {
   describe('getHaloDir', () => {
-    it('should return path to .halo directory in home', () => {
+    it('should return path to .vortex directory in home', () => {
       const haloDir = getHaloDir()
-      expect(haloDir).toContain('.halo')
+      expect(haloDir).toContain('.vortex')
     })
   })
 
@@ -48,7 +48,7 @@ describe('Config Service', () => {
     it('should return path to config.json', () => {
       const configPath = getConfigPath()
       expect(configPath).toContain('config.json')
-      expect(configPath).toContain('.halo')
+      expect(configPath).toContain('.vortex')
     })
   })
 

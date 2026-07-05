@@ -96,7 +96,7 @@ export function SpaceSelector() {
     setView('home')
   }
 
-  // Build space list: Halo Space first, then dedicated spaces
+  // Build space list: Vortex Space first, then dedicated spaces
   // Fallback: if store hasn't loaded yet, at least show currentSpace
   const storeSpaces: Space[] = [
     ...(haloSpace ? [haloSpace] : []),

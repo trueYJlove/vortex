@@ -443,7 +443,7 @@ function applyTemplateVariables(template: string, ctx: SystemPromptContext): str
   const folderName = getDataFolderName()
   const home = os.homedir()
 
-  // Vortex config directory (e.g. ~/.halo/ or ~/.halo-enterprise/)
+  // Vortex config directory (e.g. ~/.vortex/ or ~/.vortex-enterprise/)
   const haloDir = `${home}/.${folderName}/`
 
   // Claude config directory based on platform (Electron's userData + /claude-config)

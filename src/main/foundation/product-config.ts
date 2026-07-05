@@ -313,7 +313,7 @@ export function loadProductConfig(): ProductConfig {
 }
 
 /** Default data folder name when product.json omits dataFolderName */
-export const DEFAULT_DATA_FOLDER_NAME = 'halo'
+export const DEFAULT_DATA_FOLDER_NAME = 'vortex'
 
 /**
  * Get the data folder name from product.json configuration.

@@ -105,7 +105,7 @@ This guarantees at most one catch-up run per job, never a backlog storm.
 ### 2.6 SQLite Persistence Strategy
 
 Using `better-sqlite3` synchronous API through `DatabaseManager`. The scheduler
-owns two tables in the app-level database (`~/.halo/halo.db`):
+owns two tables in the app-level database (`~/.vortex/vortex.db`):
 
 - `scheduler_jobs`: Job definitions and runtime state
 - `scheduler_run_log`: Execution history

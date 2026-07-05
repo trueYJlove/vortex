@@ -1,17 +1,17 @@
 /**
  * SDK Log Transport
  *
- * Dedicated electron-log instance for Halo SDK (@hello-halo/agent-sdk) output.
+ * Dedicated electron-log instance for Vortex SDK (@hello-halo/agent-sdk) output.
  * Implements the SDK's Logger interface and writes structured entries to
- * halo-sdk.log, independent of main.log.
+ * vortex-sdk.log, independent of main.log.
  *
  * Lifecycle: Controlled by the logging controller (controller.ts).
  * - Default level: 'info' (always-on for production diagnostics)
  * - Developer Mode: bumps to 'debug' for full trace output
  *
- * Log file: same directory as main.log, filename = halo-sdk.log
- *   macOS:   ~/Library/Logs/Halo/halo-sdk.log
- *   Windows: %USERPROFILE%\AppData\Roaming\Halo\logs\halo-sdk.log
+ * Log file: same directory as main.log, filename = vortex-sdk.log
+ *   macOS:   ~/Library/Logs/Vortex/vortex-sdk.log
+ *   Windows: %USERPROFILE%\AppData\Roaming\Halo\logs\vortex-sdk.log
  *
  * Architecture:
  *   SDK defines a Logger port (interface + setLogger DI).
@@ -27,9 +27,9 @@ import { redactSecrets, truncateField } from './redact'
 // Dedicated log instance
 // ============================================================================
 
-const sdkLog = log.create({ logId: 'halo-sdk' })
+const sdkLog = log.create({ logId: 'vortex-sdk' })
 
-sdkLog.transports.file.fileName = 'halo-sdk.log'
+sdkLog.transports.file.fileName = 'vortex-sdk.log'
 // File only — do NOT write to console (avoids polluting main.log)
 sdkLog.transports.console.level = false
 // Default: info level — always-on for production diagnostics
@@ -182,7 +182,7 @@ const rootLogger = new ElectronLogAdapter('SDK')
 export function installSdkLogger(setLoggerFn: (logger: Logger) => void): void {
   setLoggerFn(rootLogger)
   const filePath = getSdkLogFilePath()
-  console.log(`[SdkTransport] halo-sdk.log installed → ${filePath}`)
+  console.log(`[SdkTransport] vortex-sdk.log installed → ${filePath}`)
 }
 
 /**
@@ -191,8 +191,8 @@ export function installSdkLogger(setLoggerFn: (logger: Logger) => void): void {
 function getSdkLogFilePath(): string {
   try {
     const file = sdkLog.transports.file.getFile()
-    return file?.path ?? 'halo-sdk.log'
+    return file?.path ?? 'vortex-sdk.log'
   } catch {
-    return 'halo-sdk.log'
+    return 'vortex-sdk.log'
   }
 }
