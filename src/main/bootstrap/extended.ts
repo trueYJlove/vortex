@@ -34,6 +34,7 @@ import { cleanupAIBrowser } from '../services/ai-browser'
 import { registerOverlayHandlers, cleanupOverlayHandlers } from '../ipc/overlay'
 import { initializeSearchHandlers, cleanupSearchHandlers } from '../ipc/search'
 import { registerPerfHandlers } from '../ipc/perf'
+import { perfService } from '../services/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
 import { cleanupAllCaches } from '../services/artifact-cache.service'
 import { flushSpaceActivity } from '../services/space.service'
@@ -260,9 +261,13 @@ export function initializeExtendedServices(): void {
   // Search: Global search functionality
   initializeSearchHandlers()
 
-  // Performance: Developer monitoring tools (only if window is available)
+  // Performance: System resource monitoring for StatusBar display
   if (mainWindow) {
     registerPerfHandlers(mainWindow)
+    // Auto-start perf monitoring so StatusBar can display CPU/Memory
+    perfService.start().catch(err => {
+      console.warn('[Bootstrap] Perf monitoring auto-start failed:', err)
+    })
   }
 
   // GitBash: Windows Git Bash detection and setup

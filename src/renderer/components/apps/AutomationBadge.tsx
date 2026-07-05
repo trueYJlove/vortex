@@ -1,8 +1,9 @@
 /**
  * AutomationBadge
  *
- * Compact close button for the ConversationList sidebar.
- * Automation status is now shown in StatusBar instead.
+ * Compact header for the ConversationList sidebar.
+ * Shows interaction area label and close button.
+ * Automation status is shown in StatusBar instead.
  */
 
 import { ChevronLeft } from 'lucide-react'
@@ -19,7 +20,8 @@ export function AutomationBadge({ onClose, side = 'left' }: AutomationBadgeProps
   if (!onClose) return null
 
   return (
-    <div className="flex items-center justify-end px-3 py-2 border-b border-border">
+    <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+      <span className="text-xs text-muted-foreground">{t('Interaction area')}</span>
       <button
         onClick={onClose}
         className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"

@@ -136,7 +136,7 @@ export function StatusBar() {
               ? `${waitingApp.spec.name} — ${t('needs your input')}`
               : runningCount > 0
                 ? t('{{count}} apps running', { count: runningCount })
-                : undefined
+                : t('Digital human')
             }
           >
             <span className={`w-1.5 h-1.5 rounded-full ${
