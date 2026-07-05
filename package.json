@@ -203,7 +203,7 @@
       "out/**/*",
       "resources/**/*",
       "product.json",
-      "halo-webank/build/dist/**/*",
+      "halo-local/dist/**/*",
       "!node_modules/better-sqlite3/prebuilds"
     ],
     "asarUnpack": [
