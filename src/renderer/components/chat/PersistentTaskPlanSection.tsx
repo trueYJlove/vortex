@@ -55,7 +55,7 @@ export function PersistentTaskPlanSection() {
   const stats = useMemo(() => getTodoStats(todos ?? []), [todos])
   const hasTodos = todos && todos.length > 0
 
-  if (!hasTodos && !stats) {
+  if (!hasTodos) {
     return null
   }
 
