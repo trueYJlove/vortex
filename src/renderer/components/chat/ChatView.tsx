@@ -420,7 +420,7 @@ export function ChatView({ isCompact = false }: ChatViewProps) {
         }}
         onStop={handleStop}
         isGenerating={isGenerating}
-        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Halo...') : t('Continue conversation...'))}
+        placeholder={isCompact ? t('Continue conversation...') : (currentSpace?.isTemp ? t('Say something to Halo...') : t('Send a message to Vortex or type / to select a skill'))}
         isCompact={isCompact}
         slashCommands={slashCommands}
         mentionArtifacts={mentionArtifacts}
