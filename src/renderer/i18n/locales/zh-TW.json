@@ -62,7 +62,6 @@
   "{{count}}m ago_one": "{{count}}分鐘前",
   "{{count}}m ago_other": "{{count}}分鐘前",
   "{{field}} is required": "{{field}} 為必填欄位",
-  "{{name}} running": "{{name}} 正在執行",
   "{{name}} was installed, but some bundled skills failed.": "{{name}} 已安裝，但部分捆綁技能失敗。",
   "← → to switch files": "← → 切換檔案",
   "🤖 AI Browser": "🤖 AI 瀏覽器",

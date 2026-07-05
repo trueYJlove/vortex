@@ -90,7 +90,6 @@
   "{{count}}m ago_many": "",
   "{{count}}m ago_other": "Il y a {{count}} minutes",
   "{{field}} is required": "{{field}} est requis",
-  "{{name}} running": "{{name}} en cours d'exécution",
   "{{name}} was installed, but some bundled skills failed.": "{{name}} a été installé, mais certaines compétences regroupées ont échoué.",
   "← → to switch files": "← → pour changer de fichier",
   "🤖 AI Browser": "🤖 Navigateur IA",

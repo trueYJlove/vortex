@@ -62,7 +62,6 @@
   "{{count}}m ago_one": "{{count}}m ago",
   "{{count}}m ago_other": "{{count}}m ago",
   "{{field}} is required": "{{field}} is required",
-  "{{name}} running": "{{name}} running",
   "{{name}} was installed, but some bundled skills failed.": "{{name}} was installed, but some bundled skills failed.",
   "← → to switch files": "← → to switch files",
   "🤖 AI Browser": "🤖 AI Browser",

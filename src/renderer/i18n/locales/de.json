@@ -62,7 +62,6 @@
   "{{count}}m ago_one": "vor {{count}} Minute",
   "{{count}}m ago_other": "vor {{count}} Minuten",
   "{{field}} is required": "{{field}} ist erforderlich",
-  "{{name}} running": "{{name}} läuft",
   "{{name}} was installed, but some bundled skills failed.": "{{name}} wurde installiert, aber einige gebündelte Fähigkeiten sind fehlgeschlagen.",
   "← → to switch files": "← → zum Wechseln der Dateien",
   "🤖 AI Browser": "🤖 AI-Browser",

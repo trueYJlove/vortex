@@ -62,7 +62,6 @@
   "{{count}}m ago_one": "{{count}}分前",
   "{{count}}m ago_other": "{{count}}分前",
   "{{field}} is required": "{{field}}は必須です",
-  "{{name}} running": "{{name}} 実行中",
   "{{name}} was installed, but some bundled skills failed.": "{{name}}をインストールしましたが、一部のバンドルスキルに失敗しました。",
   "← → to switch files": "← → でファイルを切り替え",
   "🤖 AI Browser": "🤖 AIブラウザ",
