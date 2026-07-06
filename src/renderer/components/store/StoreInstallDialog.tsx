@@ -7,6 +7,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { X, Loader2 } from 'lucide-react'
+import { StoreIcon } from './StoreIcon'
 import { useSpaceStore } from '../../stores/space.store'
 import { useAppsPageStore } from '../../stores/apps-page.store'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
@@ -139,9 +140,7 @@ export function StoreInstallDialog({ detail, onClose, onInstalled, showGlobalOpt
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            {detail.entry.icon && (
-              <span className="text-base">{detail.entry.icon}</span>
-            )}
+            <StoreIcon icon={detail.entry.icon} className="w-5 h-5" />
             <h2 className="text-sm font-semibold truncate">
               {t('Install')} {resolveSpecI18n(detail.spec, getCurrentLanguage()).name}
             </h2>
