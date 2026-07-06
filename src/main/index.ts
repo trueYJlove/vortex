@@ -117,8 +117,13 @@ if (dataFolderName !== DEFAULT_DATA_FOLDER_NAME) {
 // Single instance lock: Prevent multiple instances of the application
 // Must be called before app.whenReady()
 // Skip in development mode and E2E tests to allow multiple instances
+// IMPORTANT: app.name must be set to a variant-specific value before requesting
+// the lock, because Electron uses app.name as the lock key (mutex name on Windows).
+// Without this, Vortex and Halo (different product.json variants) share the same
+// package.json name "halo" and would block each other from running simultaneously.
+app.name = dataFolderName
 const gotTheLock =
-  !app.isPackaged || process.env.VORTEX_E2E_TEST ? true : app.requestSingleInstanceLock(dataFolderName)
+  !app.isPackaged || process.env.VORTEX_E2E_TEST ? true : app.requestSingleInstanceLock()
 
 if (!gotTheLock) {
   // Another instance is already running, exit immediately
