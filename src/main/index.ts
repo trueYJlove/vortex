@@ -118,7 +118,7 @@ if (dataFolderName !== DEFAULT_DATA_FOLDER_NAME) {
 // Must be called before app.whenReady()
 // Skip in development mode and E2E tests to allow multiple instances
 const gotTheLock =
-  !app.isPackaged || process.env.VORTEX_E2E_TEST ? true : app.requestSingleInstanceLock()
+  !app.isPackaged || process.env.VORTEX_E2E_TEST ? true : app.requestSingleInstanceLock(dataFolderName)
 
 if (!gotTheLock) {
   // Another instance is already running, exit immediately
