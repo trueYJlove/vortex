@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
+import iconUrl from '../../../resources/icon.svg?url'
 import { SPACE_ICONS, DEFAULT_SPACE_ICON } from '../types'
 import type { Space, SpaceIconId } from '../types'
 import {
@@ -132,9 +133,7 @@ export function HomePage() {
       <Header
         left={
           <>
-            <div className="w-[22px] h-[22px] rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center">
-              <div className="w-3 h-3 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
-            </div>
+            <img src={iconUrl} className="w-[22px] h-[22px] rounded" alt="Vortex" />
             <span className="text-sm font-medium">Vortex</span>
           </>
         }

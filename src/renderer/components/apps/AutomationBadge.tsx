@@ -21,7 +21,7 @@ export function AutomationBadge({ onClose, side = 'left' }: AutomationBadgeProps
 
   return (
     <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-      <span className="text-xs text-muted-foreground">{t('Interaction area')}</span>
+      <span className="text-sm sm:text-[14px] text-muted-foreground">{t('Interaction area')}</span>
       <button
         onClick={onClose}
         className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
