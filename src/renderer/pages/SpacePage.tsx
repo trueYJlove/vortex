@@ -72,7 +72,7 @@ export function SpacePage() {
 
   // Show conversation list (persisted globally in config)
   const [showConversationList, setShowConversationList] = useState(
-    sidebarOpenConfig ?? false
+    sidebarOpenConfig ?? true
   )
 
   // Sync sidebar state when config loads asynchronously

@@ -24,6 +24,7 @@ import { useAppStore } from '../../stores/app.store'
 import { getThemesByType } from '../../themes/registry'
 import { getAllIconThemes, type IconThemeId } from '../../themes/file-icons'
 import type { HaloConfig, ThemeMode } from '../../types'
+import iconUrl from '../../../../resources/icon.svg?url'
 
 interface PreferencesStepProps {
   /** Invoked once preferences are persisted, hands off to LoginSelector. */
@@ -80,9 +81,7 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
     <div className="h-full w-full overflow-y-auto bg-background p-4 sm:p-8">
       <div className="min-h-full flex flex-col items-center justify-center">
       <div className="flex flex-col items-center mb-8 sm:mb-10">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center halo-glow">
-          <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
-        </div>
+        <img src={iconUrl} className="w-16 h-16 sm:w-20 sm:h-20" alt="Vortex" />
         <h1 className="mt-4 text-2xl sm:text-3xl font-light tracking-wide">Vortex</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t("Let's set things up")}</p>
       </div>
