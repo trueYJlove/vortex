@@ -77,8 +77,8 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
   }
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center bg-background p-4 sm:p-8">
-      {/* Header with Logo */}
+    <div className="h-full w-full overflow-y-auto bg-background p-4 sm:p-8">
+      <div className="min-h-full flex flex-col items-center justify-center">
       <div className="flex flex-col items-center mb-8 sm:mb-10">
         <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center halo-glow">
           <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
@@ -272,6 +272,7 @@ export function PreferencesStep({ onContinue }: PreferencesStepProps) {
           </span>
         </div>
       </div>
+    </div>
     </div>
   )
 }

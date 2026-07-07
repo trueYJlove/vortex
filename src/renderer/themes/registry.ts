@@ -14,10 +14,6 @@ import { tokyoNightTheme } from './builtins/tokyo-night'
 import { tokyoNightDayTheme } from './builtins/tokyo-night-day'
 import { oneDarkProTheme } from './builtins/one-dark-pro'
 import { nordTheme } from './builtins/nord'
-import { catppuccinMochaTheme } from './builtins/catppuccin-mocha'
-import { intellijLightTheme } from './builtins/intellij-light'
-import { intellijDarkTheme } from './builtins/darcula'
-import { githubDarkTheme } from './builtins/github-dark'
 import { monokaiTheme } from './builtins/monokai'
 import { gruvboxTheme } from './builtins/gruvbox'
 import { solarizedDarkTheme } from './builtins/solarized-dark'
@@ -81,10 +77,6 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   tokyoNightDayTheme,
   oneDarkProTheme,
   nordTheme,
-  catppuccinMochaTheme,
-  intellijLightTheme,
-  intellijDarkTheme,
-  githubDarkTheme,
   monokaiTheme,
   gruvboxTheme,
   solarizedDarkTheme,
