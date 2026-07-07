@@ -8,6 +8,7 @@ import { Globe, ChevronDown, ChevronRight, MessageSquare, Wrench, Key, KeyRound,
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
 import { resolveLocalizedText, type LocalizedText, type AuthProviderConfig } from '../../../shared/types'
+import iconUrl from '../../../../resources/icon.svg?url'
 
 // Re-export so existing renderer imports (`from './LoginSelector'`) continue
 // to work without churn. The canonical definition lives in shared/types.
@@ -179,10 +180,7 @@ export function LoginSelector({ onSelectProvider, onSelectCustom, onSelectPreset
 
       {/* Header with Logo */}
       <div className="flex flex-col items-center mb-10">
-        {/* Logo with halo glow effect */}
-        <div className="w-20 h-20 rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center halo-glow">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
-        </div>
+        <img src={iconUrl} className="w-20 h-20 rounded-2xl" alt="Vortex" />
         <h1 className="mt-4 text-3xl font-light tracking-wide">Vortex</h1>
       </div>
 
