@@ -149,10 +149,10 @@ export function DataManagementSection() {
   return (
     <>
       <section id="data-management" className="bg-card rounded-xl border border-border p-6">
-        <div className="flex items-center gap-2 mb-2">
-          <Database className="w-5 h-5 text-muted-foreground" />
-          <h2 className="text-lg font-medium">{t('Data Management')}</h2>
-        </div>
+        <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Database className="w-5 h-5 text-primary" />
+          {t('Data Management')}
+        </h2>
         <p className="text-sm text-muted-foreground mb-4">
           {t('Back up or restore all your data — AI model configs, chat history, workspaces, and digital humans — for migration or safekeeping.')}
         </p>

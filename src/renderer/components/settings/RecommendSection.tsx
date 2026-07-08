@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Star, Copy, Check, X } from 'lucide-react'
+import { Star, Copy, Check, X, Heart } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
 
@@ -118,7 +118,10 @@ export function RecommendSection() {
   return (
     <>
       <section id="recommend" className="bg-card rounded-xl border border-border p-6">
-        <h2 className="text-lg font-medium mb-2">{t('Recommend Vortex')}</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Heart className="w-5 h-5 text-primary" />
+          {t('Recommend Vortex')}
+        </h2>
         <p className="text-sm text-muted-foreground mb-4">
           {t('Like it? Help spread the word')}
         </p>

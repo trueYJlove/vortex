@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Bot } from 'lucide-react'
 import { useAppStore } from '../stores/app.store'
 import { api } from '../api'
 import type { HaloConfig } from '../types'
@@ -92,7 +92,10 @@ export function SettingsPage() {
             <div className="max-w-2xl mx-auto space-y-6">
               {/* AI Sources Section (v2) */}
               <section id="ai-model" className="bg-card rounded-xl border border-border p-6">
-                <h2 className="text-lg font-medium mb-4">{t('AI Model')}</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-primary" />
+                  {t('AI Model')}
+                </h2>
                 <AISourcesSection config={config as HaloConfig} setConfig={setConfig} />
               </section>
 
