@@ -142,10 +142,6 @@ export function PulseList({ maxHeight, onItemClick, compact = false }: PulseList
             {item.title}
           </p>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-xs text-muted-foreground truncate">
-              {item.spaceName}
-            </span>
-            <span className="text-muted-foreground/30 text-xs">·</span>
             <span className={`text-xs ${
               item.status === 'waiting' ? 'text-yellow-500' :
               item.status === 'error' ? 'text-red-500' :
