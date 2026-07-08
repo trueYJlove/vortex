@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronUp, Cpu, Puzzle, RefreshCw, Terminal } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, Cpu, Puzzle, RefreshCw, Terminal, Code } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
 import type { HaloConfig } from '../../types'
@@ -228,7 +228,10 @@ export function AdvancedSection({ config, setConfig }: AdvancedSectionProps) {
 
   return (
     <section id="advanced" className="bg-card rounded-xl border border-border p-4 sm:p-6">
-      <h2 className="text-lg font-medium mb-4">{t('Advanced')}</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Code className="w-5 h-5 text-primary" />
+        {t('Advanced')}
+      </h2>
 
       {/* Warning banner */}
       <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-5 text-sm text-amber-600 dark:text-amber-400">

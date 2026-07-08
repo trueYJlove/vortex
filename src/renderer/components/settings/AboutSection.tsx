@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Info } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
 import type { UpdateStatus } from './types'
@@ -73,7 +73,10 @@ export function AboutSection() {
 
   return (
     <section id="about" className="bg-card rounded-xl border border-border p-6">
-      <h2 className="text-lg font-medium mb-4">{t('About')}</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Info className="w-5 h-5 text-primary" />
+        {t('About')}
+      </h2>
 
       <div className="space-y-3 text-sm">
         <div className="flex justify-between items-center">

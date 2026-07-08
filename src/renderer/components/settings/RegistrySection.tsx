@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, Loader2, Key } from 'lucide-react'
+import { Plus, Trash2, Loader2, Key, Store } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
 import type { RegistrySource } from '../../../shared/store/store-types'
@@ -157,7 +157,10 @@ export function RegistrySection() {
   return (
     <section id="app-store" className="bg-card rounded-xl border border-border p-6">
       <div className="mb-4">
-        <h2 className="text-lg font-medium">{t('App Store')}</h2>
+        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <Store className="w-5 h-5 text-primary" />
+          {t('App Store')}
+        </h2>
         <p className="text-sm text-muted-foreground mt-1">
           {t('Manage registry sources for discovering and installing apps')}
         </p>

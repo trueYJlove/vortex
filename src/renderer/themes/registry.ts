@@ -13,14 +13,24 @@ import { draculaTheme } from './builtins/dracula'
 import { tokyoNightTheme } from './builtins/tokyo-night'
 import { tokyoNightDayTheme } from './builtins/tokyo-night-day'
 import { oneDarkProTheme } from './builtins/one-dark-pro'
-import { nordTheme } from './builtins/nord'
-import { catppuccinMochaTheme } from './builtins/catppuccin-mocha'
-import { intellijLightTheme } from './builtins/intellij-light'
-import { intellijDarkTheme } from './builtins/darcula'
-import { githubDarkTheme } from './builtins/github-dark'
+import { githubDarkHighContrastTheme } from './builtins/github-dark-high-contrast'
 import { monokaiTheme } from './builtins/monokai'
 import { gruvboxTheme } from './builtins/gruvbox'
 import { solarizedDarkTheme } from './builtins/solarized-dark'
+// New dark themes
+import { rosePineTheme } from './builtins/rose-pine'
+import { catppuccinMochaTheme } from './builtins/catppuccin'
+import { everforestTheme } from './builtins/everforest'
+import { kanagawaTheme } from './builtins/kanagawa'
+import { materialPalenightTheme } from './builtins/material-palenight'
+import { ayuMirageTheme } from './builtins/ayu-mirage'
+import { nightOwlTheme } from './builtins/night-owl'
+// New light themes
+import { githubLightTheme } from './builtins/github-light'
+import { catppuccinLatteTheme } from './builtins/catppuccin-latte'
+import { solarizedLightTheme } from './builtins/solarized-light'
+import { winterIsComingLightTheme } from './builtins/winter-is-coming-light'
+import { ayuLightTheme } from './builtins/ayu-light'
 
 // ============================================
 // Types
@@ -74,20 +84,30 @@ export interface ThemeDefinition {
 // ============================================
 
 export const BUILTIN_THEMES: ThemeDefinition[] = [
+  // Dark
   darkTheme,
-  lightTheme,
   draculaTheme,
   tokyoNightTheme,
-  tokyoNightDayTheme,
   oneDarkProTheme,
-  nordTheme,
-  catppuccinMochaTheme,
-  intellijLightTheme,
-  intellijDarkTheme,
-  githubDarkTheme,
   monokaiTheme,
   gruvboxTheme,
   solarizedDarkTheme,
+  rosePineTheme,
+  catppuccinMochaTheme,
+  everforestTheme,
+  kanagawaTheme,
+  materialPalenightTheme,
+  ayuMirageTheme,
+  nightOwlTheme,
+  githubDarkHighContrastTheme,
+  // Light
+  lightTheme,
+  tokyoNightDayTheme,
+  githubLightTheme,
+  catppuccinLatteTheme,
+  solarizedLightTheme,
+  winterIsComingLightTheme,
+  ayuLightTheme,
 ]
 
 /** Auto-derived union type from BUILTIN_THEMES — no manual maintenance needed. */

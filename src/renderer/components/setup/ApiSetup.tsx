@@ -17,6 +17,7 @@ import { resolveLocalizedText, type LocalizedText } from '../../../shared/types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import type { AuthProviderConfig } from './LoginSelector'
 import { usePresetModels } from '../../hooks/usePresetModels'
+import iconUrl from '../../../../resources/icon.svg?url'
 
 interface ApiSetupProps {
   /** Called when user clicks back button */
@@ -387,10 +388,7 @@ export function ApiSetup({ onBack, showBack = false, preset }: ApiSetupProps) {
 
       {/* Header */}
       <div className="flex flex-col items-center mb-8">
-        {/* Logo */}
-        <div className="w-16 h-16 rounded-full border-2 border-[#8b5cf6]/60 flex items-center justify-center halo-glow">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#3b82f6]/30 via-[#8b5cf6]/20 to-transparent" />
-        </div>
+        <img src={iconUrl} className="w-16 h-16 rounded-xl" alt="Vortex" />
         <h1 className="mt-4 text-2xl font-light">Vortex</h1>
       </div>
 

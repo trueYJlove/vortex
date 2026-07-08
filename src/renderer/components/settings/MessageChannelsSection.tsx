@@ -1484,7 +1484,10 @@ export function MessageChannelsSection({ config, setConfig }: MessageChannelsSec
   return (
     <section id="message-channels" className="bg-card rounded-xl border border-border p-4 sm:p-6">
       <div className="mb-4">
-        <h2 className="text-lg font-medium">{t('Message Channels')}</h2>
+        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <Bell className="w-5 h-5 text-primary" />
+          {t('Message Channels')}
+        </h2>
         <p className="text-sm text-muted-foreground mt-1">
           {t('Configure channels for sending and receiving messages with digital humans')}
         </p>

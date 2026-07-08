@@ -16,6 +16,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAppStore } from '../stores/app.store'
 import { useSpaceStore } from '../stores/space.store'
+import iconUrl from '../../../resources/icon.svg?url'
 import { useChatStore } from '../stores/chat.store'
 import { useCanvasStore, useCanvasIsOpen, useCanvasIsMaximized } from '../stores/canvas.store'
 import { canvasLifecycle } from '../services/canvas-lifecycle'
@@ -72,7 +73,7 @@ export function SpacePage() {
 
   // Show conversation list (persisted globally in config)
   const [showConversationList, setShowConversationList] = useState(
-    sidebarOpenConfig ?? false
+    sidebarOpenConfig ?? true
   )
 
   // Sync sidebar state when config loads asynchronously
@@ -324,6 +325,9 @@ export function SpacePage() {
       <Header
         left={
           <>
+            {/* App Logo */}
+            <img src={iconUrl} className="w-5 h-5 rounded" alt="Vortex" />
+
             {/* Back button */}
             <button
               onClick={() => setView('home')}

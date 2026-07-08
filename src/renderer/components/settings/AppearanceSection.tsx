@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Monitor } from 'lucide-react'
+import { Palette } from 'lucide-react'
 import type { HaloConfig, ThemeMode, SendKeyMode } from '../../types'
 import { useTranslation, setLanguage, getCurrentLanguage, SUPPORTED_LOCALES, type LocaleCode } from '../../i18n'
 import { api } from '../../api'
@@ -65,7 +65,10 @@ export function AppearanceSection({ config, setConfig }: AppearanceSectionProps)
 
   return (
     <section id="appearance" className="bg-card rounded-xl border border-border p-6">
-      <h2 className="text-lg font-medium mb-4">{t('Appearance')}</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Palette className="w-5 h-5 text-primary" />
+        {t('Appearance')}
+      </h2>
 
       <div className="space-y-6">
         {/* Theme */}

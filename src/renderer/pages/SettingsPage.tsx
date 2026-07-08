@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Bot } from 'lucide-react'
 import { useAppStore } from '../stores/app.store'
 import { api } from '../api'
 import type { HaloConfig } from '../types'
@@ -19,6 +19,7 @@ import {
   AISourcesSection,
   AppearanceSection,
   SystemSection,
+  DataManagementSection,
   AdvancedSection,
   RemoteAccessSection,
   AboutSection,
@@ -32,6 +33,9 @@ export function SettingsPage() {
   const { config, setConfig, goBack } = useAppStore()
   const isMobile = useIsMobile()
   const isRemoteMode = api.isRemoteMode()
+
+  // Feature flags for optional sections
+  const SHOW_RECOMMEND_SECTION = false
 
   // Active navigation section (click-only, no scroll spy - standard settings page behavior)
   const [activeSection, setActiveSection] = useState('ai-model')
@@ -91,7 +95,10 @@ export function SettingsPage() {
             <div className="max-w-2xl mx-auto space-y-6">
               {/* AI Sources Section (v2) */}
               <section id="ai-model" className="bg-card rounded-xl border border-border p-6">
-                <h2 className="text-lg font-medium mb-4">{t('AI Model')}</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <Bot className="w-5 h-5 text-primary" />
+                  {t('AI Model')}
+                </h2>
                 <AISourcesSection config={config as HaloConfig} setConfig={setConfig} />
               </section>
 
@@ -109,6 +116,11 @@ export function SettingsPage() {
                 <SystemSection config={config} setConfig={setConfig} />
               )}
 
+              {/* Data Management Section - Desktop only */}
+              {!isRemoteMode && (
+                <DataManagementSection />
+              )}
+
               {/* Advanced Section - Desktop only */}
               {!isRemoteMode && (
                 <AdvancedSection config={config} setConfig={setConfig} />
@@ -120,7 +132,7 @@ export function SettingsPage() {
               )}
 
               {/* Recommend Section */}
-              <RecommendSection />
+              {SHOW_RECOMMEND_SECTION && <RecommendSection />}
 
               {/* About Section */}
               <AboutSection />

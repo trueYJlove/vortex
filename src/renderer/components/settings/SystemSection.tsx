@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react'
 import {
   FolderOpen, Activity, Loader2, AlertTriangle, CheckCircle,
-  XOctagon, ChevronRight, Copy, FileText, RotateCcw, RefreshCw, Save, Power
+  XOctagon, ChevronRight, Copy, FileText, RotateCcw, RefreshCw, Save, Power, Settings, Shield
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
@@ -257,7 +257,10 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
       {/* Permissions Section */}
       <section id="permissions" className="bg-card rounded-xl border border-border p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium">{t('Permissions')}</h2>
+          <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            {t('Permissions')}
+          </h2>
           <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-500">
             {t('Full Permission Mode')}
           </span>
@@ -294,7 +297,10 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
 
       {/* System Section */}
       <section id="system" className="bg-card rounded-xl border border-border p-6">
-        <h2 className="text-lg font-medium mb-4">{t('System')}</h2>
+        <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Settings className="w-5 h-5 text-primary" />
+          {t('System')}
+        </h2>
 
         <div className="space-y-4">
           {/* Auto Launch */}

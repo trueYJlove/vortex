@@ -172,8 +172,11 @@ export class TrayManager {
       return icon
     }
 
-    // Windows/Linux: Use standard 16x16 icon
-    const iconPath = join(resourcesPath, 'tray-16.png')
+    // Windows/Linux: Use 32x32 (@2x) icon for sharp rendering on HiDPI displays.
+    // At 100% scaling Windows renders the system tray at ~16px, and Electron
+    // downscales the 32px source cleanly. At 200% the 32px matches 1:1.
+    // Using 16px on a high-DPI display would force blurry upscaling.
+    const iconPath = join(resourcesPath, 'tray-16@2x.png')
     return nativeImage.createFromPath(iconPath)
   }
 }

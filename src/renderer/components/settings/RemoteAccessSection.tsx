@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { Globe } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { api } from '../../api'
 import { useSecurityPolicy } from '../../hooks/useSecurityPolicy'
@@ -158,7 +159,10 @@ export function RemoteAccessSection() {
 
   return (
     <section id="remote" className="bg-card rounded-xl border border-border p-6">
-      <h2 className="text-lg font-medium mb-4">{t('Remote Access')}</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+        <Globe className="w-5 h-5 text-primary" />
+        {t('Remote Access')}
+      </h2>
 
       {/* Security Warning */}
       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">

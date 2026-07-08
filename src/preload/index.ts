@@ -28,6 +28,7 @@ import { wecomBotRpc } from '../shared/rpc/contracts/wecom-bot.contract'
 import { gitBashRpc } from '../shared/rpc/contracts/git-bash.contract'
 import { overlayRpc } from '../shared/rpc/contracts/overlay.contract'
 import { appRpc } from '../shared/rpc/contracts/app.contract'
+import { backupRpc } from '../shared/rpc/contracts/backup.contract'
 import type {
   HealthStatusResponse,
   HealthStateResponse,
@@ -501,6 +502,19 @@ export interface HaloAPI {
 
   // Telemetry (fire-and-forget — no response)
   trackEvent: (event: string, properties?: Record<string, unknown>) => void
+
+  // Backup & Restore — renderer invokes with no args; main pops Save/Open
+  // dialogs itself (see ipc/backup.ts). `canceled: true` set on user-cancel.
+  // `requiresManualRestart: true` on import means the app exited in dev mode
+  // (no packaged binary to relaunch) — the user must restart manually.
+  backupExport: () => Promise<{ success: boolean; error?: string; canceled?: boolean }>
+  backupImport: () => Promise<{
+    success: boolean
+    error?: string
+    canceled?: boolean
+    requiresManualRestart?: boolean
+  }>
+  onBackupProgress: (callback: (data: { phase: string; percent?: number }) => void) => () => void
 }
 
 interface IpcResponse<T = unknown> {
@@ -772,6 +786,10 @@ const api: HaloAPI = {
   trackEvent: (event: string, properties?: Record<string, unknown>) => {
     ipcRenderer.send('analytics:report', { event, properties })
   },
+
+  // Backup & Restore (derived from backupRpc contract; progress listener kept)
+  ...bindRpc(backupRpc),
+  onBackupProgress: (callback) => createEventListener('backup:progress', callback),
 }
 
 contextBridge.exposeInMainWorld('halo', api)

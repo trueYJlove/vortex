@@ -13,6 +13,7 @@ import { BrowserTaskCard } from '../tool/BrowserTaskCard'
 import { AskUserQuestionCard } from './AskUserQuestionCard'
 import { TeamPanel } from './TeamPanel'
 import { QueuedMessagesPanel } from './QueuedMessagesPanel'
+import { MessageAvatar } from './MessageItem'
 import type { Thought, PendingQuestion } from '../../types'
 import type { BrowserToolCall } from './useBrowserToolCalls'
 
@@ -66,7 +67,8 @@ export function StreamingSection({
   queuedMessages = [],
 }: StreamingSectionProps) {
   return (
-    <div className={`flex justify-start animate-fade-in pb-4 ${className}`}>
+    <div className={`flex justify-start items-start gap-2 animate-fade-in pb-4 ${className}`}>
+      <MessageAvatar isUser={false} />
       <div className="w-[85%] relative">
         {/* Real-time thought process */}
         {(thoughts.length > 0 || isThinking) && (

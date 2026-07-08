@@ -41,6 +41,7 @@ interface MessageItemProps {
   previousCost?: number  // Previous message's cumulative cost
   hideThoughts?: boolean
   isInContainer?: boolean
+  hideAvatar?: boolean
   isWorking?: boolean  // True when AI is still generating (not yet complete)
   isWaitingMore?: boolean  // True when content paused (e.g., during tool call), show "..." animation
   hideBrowserViewButton?: boolean  // Hide the "View live feed" button in BrowserTaskCard (e.g. in automation app context)
@@ -238,7 +239,7 @@ function ThoughtItem({ thought }: { thought: Thought }) {
   )
 }
 
-function MessageAvatar({ isUser }: { isUser: boolean }) {
+export function MessageAvatar({ isUser }: { isUser: boolean }) {
   const { t } = useTranslation()
   return (
     <div className="flex flex-col items-center gap-1 shrink-0">
@@ -255,7 +256,7 @@ function MessageAvatar({ isUser }: { isUser: boolean }) {
   )
 }
 
-export const MessageItem = memo(function MessageItem({ message, previousCost = 0, hideThoughts = false, isInContainer = false, isWorking = false, isWaitingMore = false, hideBrowserViewButton = false }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ message, previousCost = 0, hideThoughts = false, isInContainer = false, hideAvatar = false, isWorking = false, isWaitingMore = false, hideBrowserViewButton = false }: MessageItemProps) {
   const isUser = message.role === 'user'
   const isStreaming = (message as any).isStreaming
   const [copied, setCopied] = useState(false)
@@ -466,10 +467,16 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
     </div>
   )
 
-  // Wrap bubble with avatar in side-by-side layout
-  const bubble = (
-    <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'} ${!isInContainer ? 'max-w-[85%]' : 'w-full'}`}>
-      <MessageAvatar isUser={isUser} />
+  // Wrap bubble with avatar in side-by-side layout.
+  // When hideAvatar is true (avatar rendered by parent MessageRow/StreamingSection),
+  // skip avatar — the bubble fills the parent's content column directly.
+  const bubble = hideAvatar ? (
+    <div className="w-full">{bubbleContent}</div>
+  ) : (
+    <div className={`relative ${isUser ? 'pr-[52px]' : 'pl-[52px]'} ${isInContainer ? 'w-full' : 'max-w-[85%]'}`}>
+      <div className={`absolute top-0 ${isUser ? 'right-0' : 'left-0'}`}>
+        <MessageAvatar isUser={isUser} />
+      </div>
       {bubbleContent}
     </div>
   )

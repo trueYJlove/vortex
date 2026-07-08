@@ -3,7 +3,7 @@
  * Data-driven navigation items for the settings page
  */
 
-import { Bot, Palette, Settings, Globe, Info, Bell, Store, Code, Heart } from 'lucide-react'
+import { Bot, Palette, Settings, Globe, Info, Bell, Store, Code, Heart, Database } from 'lucide-react'
 import type { SettingsNavItem } from './types'
 
 /**
@@ -38,6 +38,12 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     desktopOnly: true
   },
   {
+    id: 'data-management',
+    labelKey: 'Data Management',
+    icon: Database,
+    desktopOnly: true
+  },
+  {
     id: 'advanced',
     labelKey: 'Advanced',
     icon: Code,
@@ -66,5 +72,14 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
  * @param isRemoteMode - Whether running in remote/web mode
  */
 export function getFilteredNavItems(isRemoteMode: boolean): SettingsNavItem[] {
-  return SETTINGS_NAV_ITEMS.filter(item => !item.desktopOnly || !isRemoteMode)
+  // Feature flag for optional sections
+  const SHOW_RECOMMEND_SECTION = false
+
+  return SETTINGS_NAV_ITEMS.filter(item => {
+    // Filter by desktop-only
+    if (item.desktopOnly && isRemoteMode) return false
+    // Filter by feature flags
+    if (item.id === 'recommend' && !SHOW_RECOMMEND_SECTION) return false
+    return true
+  })
 }

@@ -313,9 +313,9 @@ export function ImSessionsSection({ appId, appName, compact }: ImSessionsSection
     <section id="im-sessions" className="bg-card rounded-xl border border-border p-6">
       <div className="mb-4">
         <div className="flex items-center gap-3">
-          <Radio className="w-5 h-5 text-muted-foreground" />
+          <MessageSquare className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-lg font-medium">
+            <h2 className="text-xl font-semibold text-foreground">
               {t('IM Sessions')}
               {appName && <span className="text-sm text-muted-foreground ml-2">— {appName}</span>}
             </h2>

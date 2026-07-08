@@ -8,7 +8,7 @@
  */
 
 import { memo } from 'react'
-import { MessageItem } from './MessageItem'
+import { MessageItem, MessageAvatar } from './MessageItem'
 import { CollapsedThoughtProcess, LazyCollapsedThoughtProcess } from './CollapsedThoughtProcess'
 import { TeamSnapshotPanel } from './TeamPanel'
 import { InjectionAnnotation } from './InjectionAnnotation'
@@ -57,10 +57,13 @@ export const MessageRow = memo(function MessageRow({
   const hasInlineThoughts = Array.isArray(message.thoughts) && message.thoughts.length > 0
   const hasSeparatedThoughts = message.thoughts === null && !!message.thoughtsSummary
 
-  // Assistant messages with thoughts: show collapsed thoughts above message bubble
+  // Assistant messages with thoughts: show collapsed thoughts above message bubble.
+  // Avatar is rendered outside the content column so the thinking panel and
+  // reply bubble stay left-aligned with each other.
   if (message.role === 'assistant' && (hasInlineThoughts || hasSeparatedThoughts)) {
     return (
-      <div className={`flex justify-start pb-4 ${className}`}>
+      <div className={`flex justify-start items-start gap-2 pb-4 ${className}`}>
+        <MessageAvatar isUser={false} />
         <div className="w-[85%]">
           {hasInlineThoughts ? (
             <CollapsedThoughtProcess
@@ -94,6 +97,7 @@ export const MessageRow = memo(function MessageRow({
               previousCost={previousCost}
               hideThoughts
               isInContainer
+              hideAvatar
               hideBrowserViewButton={hideBrowserViewButton}
             />
           )}
@@ -113,13 +117,15 @@ export const MessageRow = memo(function MessageRow({
   if (message.role === 'assistant' && hasInjections) {
     return (
       <div className={`pb-4 ${className}`}>
-        <div className="flex justify-start">
+        <div className="flex justify-start items-start gap-2">
+          <MessageAvatar isUser={false} />
           <div className="w-[85%]">
             <MessageItem
               message={message}
               previousCost={previousCost}
               hideBrowserViewButton={hideBrowserViewButton}
               isInContainer
+              hideAvatar
             />
             <InjectionAnnotation messages={injectionMessages} />
           </div>
