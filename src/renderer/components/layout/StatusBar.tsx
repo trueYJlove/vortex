@@ -73,15 +73,21 @@ export function StatusBar() {
     let tokensPerSec: number | null = null
     const messages = currentConversation?.messages
     if (messages && tokenUsage.outputTokens > 0) {
+      // Find the last assistant message with tokenUsage
       const lastAssistIdx = messages.findLastIndex(m => m.role === 'assistant' && m.tokenUsage)
       if (lastAssistIdx >= 0) {
-        // Find the preceding user message to measure wall-clock span
+        const lastAssistMsg = messages[lastAssistIdx]
+        // Find the preceding user message that triggered this assistant response
         const prevUserIdx = findPrecedingUserMessage(messages, lastAssistIdx)
         if (prevUserIdx >= 0) {
           const start = new Date(messages[prevUserIdx].timestamp).getTime()
-          const end = new Date(messages[lastAssistIdx].timestamp).getTime()
-          const durSec = (end - start) / 1000
-          if (durSec > 0) tokensPerSec = Math.round(tokenUsage.outputTokens / durSec)
+          const end = new Date(lastAssistMsg.timestamp).getTime()
+          const durMs = end - start
+          // Only calculate if duration is reasonable (> 100ms to avoid division by very small numbers)
+          if (durMs > 100) {
+            const durSec = durMs / 1000
+            tokensPerSec = Math.round(tokenUsage.outputTokens / durSec)
+          }
         }
       }
     }
