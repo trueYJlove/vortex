@@ -34,6 +34,9 @@ export function SettingsPage() {
   const isMobile = useIsMobile()
   const isRemoteMode = api.isRemoteMode()
 
+  // Feature flags for optional sections
+  const SHOW_RECOMMEND_SECTION = false
+
   // Active navigation section (click-only, no scroll spy - standard settings page behavior)
   const [activeSection, setActiveSection] = useState('ai-model')
 
@@ -129,7 +132,7 @@ export function SettingsPage() {
               )}
 
               {/* Recommend Section */}
-              <RecommendSection />
+              {SHOW_RECOMMEND_SECTION && <RecommendSection />}
 
               {/* About Section */}
               <AboutSection />

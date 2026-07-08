@@ -72,5 +72,14 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
  * @param isRemoteMode - Whether running in remote/web mode
  */
 export function getFilteredNavItems(isRemoteMode: boolean): SettingsNavItem[] {
-  return SETTINGS_NAV_ITEMS.filter(item => !item.desktopOnly || !isRemoteMode)
+  // Feature flag for optional sections
+  const SHOW_RECOMMEND_SECTION = false
+
+  return SETTINGS_NAV_ITEMS.filter(item => {
+    // Filter by desktop-only
+    if (item.desktopOnly && isRemoteMode) return false
+    // Filter by feature flags
+    if (item.id === 'recommend' && !SHOW_RECOMMEND_SECTION) return false
+    return true
+  })
 }
