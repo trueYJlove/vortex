@@ -38,6 +38,7 @@ import { join } from 'path'
 import { getHaloDir } from '../../foundation/config.service'
 import { createDatabaseManager } from './database-manager'
 import type { DatabaseManager, Migration } from './types'
+import { setStoreBackupBridge } from './backup-bridge'
 
 // Re-export types for consumers
 export type { DatabaseManager, Migration }
@@ -45,8 +46,15 @@ export type { DatabaseManager, Migration }
 // Re-export createDatabaseManager for testing with :memory: databases
 export { createDatabaseManager }
 
+// Re-export bridge callers so the backup service has a single import surface.
+export { closeStoreForBackup, getStoreDbPath, checkpointAndVacuumDb } from './backup-bridge'
+
 /** Name of the application-level database file. */
 const APP_DB_FILENAME = 'vortex.db'
+
+// Path of the app DB captured at init so the backup bridge can return it
+// without holding a live Database reference.
+let appDbPath: string | null = null
 
 /**
  * Initialize the platform store module.
@@ -63,16 +71,30 @@ export async function initStore(): Promise<DatabaseManager> {
   const start = performance.now()
 
   const haloDir = getHaloDir()
-  const appDbPath = join(haloDir, APP_DB_FILENAME)
+  const dbPath = join(haloDir, APP_DB_FILENAME)
+  appDbPath = dbPath
+  console.log(`[Store] Initializing store at: ${dbPath}`)
 
-  console.log(`[Store] Initializing store at: ${appDbPath}`)
-
-  const manager = createDatabaseManager(appDbPath)
+  const manager = createDatabaseManager(dbPath)
 
   // Eagerly open the app database to verify it works at startup time.
   // This catches corruption/permission issues early, before other modules
   // try to use the database.
   manager.getAppDatabase()
+
+  // Register the backup bridge so the backup service (which lives in
+  // services/ and cannot import platform/ directly) can close all
+  // connections and run a checkpoint+VACUUM on export.
+  setStoreBackupBridge({
+    closeAll: () => manager.closeAll(),
+    getDbPath: () => appDbPath,
+    checkpointAndVacuum: (p: string) => {
+      // Import lazily to avoid a circular at load time — better-sqlite3
+      // is only needed when a checkpoint is actually requested.
+      const { checkpointAndVacuumDb } = require('./backup-bridge')
+      checkpointAndVacuumDb(p)
+    },
+  })
 
   const duration = performance.now() - start
   console.log(`[Store] Store initialized in ${duration.toFixed(1)}ms`)

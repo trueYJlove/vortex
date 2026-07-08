@@ -19,6 +19,7 @@ import {
   AISourcesSection,
   AppearanceSection,
   SystemSection,
+  DataManagementSection,
   AdvancedSection,
   RemoteAccessSection,
   AboutSection,
@@ -107,6 +108,11 @@ export function SettingsPage() {
               {/* System Section - Desktop only */}
               {!isRemoteMode && (
                 <SystemSection config={config} setConfig={setConfig} />
+              )}
+
+              {/* Data Management Section - Desktop only */}
+              {!isRemoteMode && (
+                <DataManagementSection />
               )}
 
               {/* Advanced Section - Desktop only */}

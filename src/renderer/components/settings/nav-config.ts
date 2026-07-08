@@ -3,7 +3,7 @@
  * Data-driven navigation items for the settings page
  */
 
-import { Bot, Palette, Settings, Globe, Info, Bell, Store, Code, Heart } from 'lucide-react'
+import { Bot, Palette, Settings, Globe, Info, Bell, Store, Code, Heart, Database } from 'lucide-react'
 import type { SettingsNavItem } from './types'
 
 /**
@@ -35,6 +35,12 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     id: 'system',
     labelKey: 'System',
     icon: Settings,
+    desktopOnly: true
+  },
+  {
+    id: 'data-management',
+    labelKey: 'Data Management',
+    icon: Database,
     desktopOnly: true
   },
   {

@@ -1,6 +1,6 @@
 {
   "name": "halo",
-  "version": "2.1.10-rc.32",
+  "version": "2.1.10-rc.33",
   "description": "AI that gets things done",
   "type": "module",
   "main": "./out/main/index.mjs",
@@ -98,6 +98,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/diff": "^7.0.2",
     "@wecom/aibot-node-sdk": "^1.0.6",
+    "archiver": "^8.0.0",
     "better-sqlite3": "^12.6.2",
     "boring-avatars": "^2.0.4",
     "cloudflared": "^0.7.1",
@@ -142,6 +143,7 @@
     "sm-crypto": "^0.4.0",
     "streamdown": "^2.2.0",
     "tailwind-merge": "^2.2.0",
+    "unzipper": "^0.12.5",
     "uuid": "^13.0.0",
     "ws": "^8.18.3",
     "yaml": "^2.8.2",
