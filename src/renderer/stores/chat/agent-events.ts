@@ -16,7 +16,7 @@ function isVirtualConversationId(conversationId: string): boolean {
   return isAppChatKey(conversationId)
 }
 
-export const createAgentEventsSlice: ChatSlice<'handleAgentMessage' | 'handleAgentToolCall' | 'handleAgentToolResult' | 'handleAgentError' | 'handleAgentComplete' | 'handleAgentThought' | 'handleAgentThoughtDelta' | 'handleAgentCompact' | 'handleAgentSessionInfo' | 'handleAgentTurnStart' | 'handleAskQuestion'> = (set, get) => ({
+export const createAgentEventsSlice: ChatSlice<'handleAgentMessage' | 'handleAgentToolCall' | 'handleAgentToolResult' | 'handleAgentError' | 'handleAgentComplete' | 'handleAgentThought' | 'handleAgentThoughtDelta' | 'handleAgentCompact' | 'handleAgentSessionInfo' | 'handleAgentTurnStart' | 'handleAskQuestion' | 'handleAgentTokenUsage'> = (set, get) => ({
   handleAgentMessage: (data) => {
     const { conversationId, content, delta, isStreaming, isNewTextBlock } = data as AgentEventBase & {
       content?: string
@@ -42,11 +42,16 @@ export const createAgentEventsSlice: ChatSlice<'handleAgentMessage' | 'handleAge
         ? (session.streamingContent || '') + delta
         : (content ?? session.streamingContent)
 
+      // Record first token time only if we have messageSentTime (prevents race condition)
+      const isFirstToken = !session.firstTokenTime && session.messageSentTime && (delta || content)
+      const firstTokenTime = isFirstToken ? Date.now() : session.firstTokenTime
+
       newSessions.set(conversationId, {
         ...session,
         streamingContent: newContent,
         isStreaming: isStreaming ?? false,
-        textBlockVersion: newTextBlockVersion
+        textBlockVersion: newTextBlockVersion,
+        firstTokenTime,
       })
       return { sessions: newSessions }
     })
@@ -443,6 +448,25 @@ export const createAgentEventsSlice: ChatSlice<'handleAgentMessage' | 'handleAge
         pendingQuestion: null,
         queuedMessages: [],
         turnId: (prevSession?.turnId ?? 0) + 1,
+        streamingTokenUsage: null,
+        messageSentTime: Date.now(),
+        firstTokenTime: null,
+      })
+      return { sessions: newSessions }
+    })
+  },
+
+  // Handle real-time token usage update during streaming
+  handleAgentTokenUsage: (data) => {
+    const { conversationId, tokenUsage } = data as AgentEventBase & { tokenUsage: import('./internal').SingleCallUsage }
+    console.log(`[ChatStore] handleAgentTokenUsage [${conversationId}]:`, tokenUsage)
+
+    set((state) => {
+      const newSessions = new Map(state.sessions)
+      const session = newSessions.get(conversationId) || createEmptySessionState()
+      newSessions.set(conversationId, {
+        ...session,
+        streamingTokenUsage: tokenUsage
       })
       return { sessions: newSessions }
     })

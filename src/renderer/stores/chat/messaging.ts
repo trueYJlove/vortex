@@ -38,6 +38,9 @@ export const createMessagingSlice: ChatSlice<'sendMessage' | 'stopGeneration' | 
           pendingQuestion: null,
           queuedMessages: [],
           turnId: (prevSession?.turnId ?? 0) + 1,
+          streamingTokenUsage: null,
+          messageSentTime: Date.now(),
+          firstTokenTime: null,
         })
         return { sessions: newSessions }
       })

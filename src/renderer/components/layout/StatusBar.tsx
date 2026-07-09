@@ -8,7 +8,7 @@
  * Height: 24px (compact, VSCode-style).
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chat.store'
 import { usePerfStore } from '../../stores/perf.store'
@@ -55,45 +55,94 @@ export function StatusBar() {
   )
 
   // --- Context (left side) ---
+  // Real-time streaming token usage (updated during generation)
+  const streamingTokenUsage = useChatStore(s => {
+    const session = s.getCurrentSession()
+    return session?.streamingTokenUsage ?? null
+  })
+
+  // Timestamps for calculating TTFT and t/s
+  const messageSentTime = useChatStore(s => {
+    const session = s.getCurrentSession()
+    return session?.messageSentTime ?? null
+  })
+  const firstTokenTime = useChatStore(s => {
+    const session = s.getCurrentSession()
+    return session?.firstTokenTime ?? null
+  })
+
+  // Is currently generating (for real-time updates)
+  const isGenerating = useChatStore(s => {
+    const session = s.getCurrentSession()
+    return session?.isGenerating ?? false
+  })
+
+  // Last completed conversation's token usage (for context window info)
   const currentConversation = useChatStore(s => s.getCurrentConversation())
-  const tokenUsage = useMemo(() => {
+  const lastTokenUsage = useMemo(() => {
     if (!currentConversation?.messages) return null
     return getLastTokenUsage(currentConversation.messages)
   }, [currentConversation?.messages])
+
+  // Use streaming data when available, fallback to last completed
+  const tokenUsage = streamingTokenUsage ?? lastTokenUsage
+
+  // Real-time clock for calculating t/s during streaming
+  const [currentTime, setCurrentTime] = useState(Date.now())
+  const lastTokensPerSecRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!isGenerating) return
+    const interval = setInterval(() => setCurrentTime(Date.now()), 1000)
+    return () => clearInterval(interval)
+  }, [isGenerating])
 
   const contextInfo = useMemo(() => {
     if (!tokenUsage) return null
 
     const contextUsed = tokenUsage.inputTokens + tokenUsage.cacheReadTokens + tokenUsage.cacheCreationTokens
-    const contextWindow = tokenUsage.contextWindow > 0 ? tokenUsage.contextWindow : 200_000
+    // For streaming, we don't have contextWindow in SingleCallUsage, use default
+    const contextWindow = 200_000
     const usagePercent = Math.round((contextUsed / contextWindow) * 100)
 
-    // Speed: outputTokens / duration — only available from last complete turn
-    // tokenUsage doesn't carry duration, so derive from message timestamps
+    // Calculate TTFT (Time to First Token) - only non-negative values, in seconds
+    let ttftSec: number | null = null
+    if (messageSentTime && firstTokenTime && firstTokenTime >= messageSentTime) {
+      ttftSec = (firstTokenTime - messageSentTime) / 1000
+    } else if (isGenerating && messageSentTime && !firstTokenTime) {
+      // Still waiting for first token - calculate elapsed time
+      const elapsed = currentTime - messageSentTime
+      if (elapsed > 0) {
+        ttftSec = elapsed / 1000
+      }
+    }
+
+    // Calculate t/s - simplified logic
     let tokensPerSec: number | null = null
-    const messages = currentConversation?.messages
-    if (messages && tokenUsage.outputTokens > 0) {
-      // Find the last assistant message with tokenUsage
-      const lastAssistIdx = messages.findLastIndex(m => m.role === 'assistant' && m.tokenUsage)
-      if (lastAssistIdx >= 0) {
-        const lastAssistMsg = messages[lastAssistIdx]
-        // Find the preceding user message that triggered this assistant response
-        const prevUserIdx = findPrecedingUserMessage(messages, lastAssistIdx)
-        if (prevUserIdx >= 0) {
-          const start = new Date(messages[prevUserIdx].timestamp).getTime()
-          const end = new Date(lastAssistMsg.timestamp).getTime()
-          const durMs = end - start
-          // Only calculate if duration is reasonable (> 100ms to avoid division by very small numbers)
-          if (durMs > 100) {
-            const durSec = durMs / 1000
-            tokensPerSec = Math.round(tokenUsage.outputTokens / durSec)
-          }
+    
+    // During streaming: calculate if we have first token and output tokens
+    if (isGenerating && firstTokenTime && tokenUsage.outputTokens > 0) {
+      const elapsedMs = currentTime - firstTokenTime
+      if (elapsedMs >= 500) { // Wait at least 500ms
+        tokensPerSec = Math.round(tokenUsage.outputTokens / (elapsedMs / 1000))
+        lastTokensPerSecRef.current = tokensPerSec
+      }
+    }
+    // After streaming ends: show final speed
+    else if (!isGenerating && tokenUsage.outputTokens > 0) {
+      // Use last calculated speed if available, otherwise calculate from last token usage
+      if (lastTokensPerSecRef.current !== null) {
+        tokensPerSec = lastTokensPerSecRef.current
+      } else if (firstTokenTime) {
+        const elapsedMs = Date.now() - firstTokenTime
+        if (elapsedMs > 100) {
+          tokensPerSec = Math.round(tokenUsage.outputTokens / (elapsedMs / 1000))
         }
       }
     }
 
-    return { contextUsed, contextWindow, usagePercent, tokensPerSec }
-  }, [tokenUsage, currentConversation?.messages])
+    return { contextUsed, contextWindow, usagePercent, ttftSec, tokensPerSec }
+  }, [tokenUsage, isGenerating, messageSentTime, firstTokenTime, currentTime])
 
   // --- System resources (right side) ---
   const snapshot = usePerfStore(s => s.latestSnapshot)
@@ -112,6 +161,9 @@ export function StatusBar() {
             <span className="font-medium text-foreground/80">{t('Context')}</span>
             <span>{formatTokenCount(contextInfo.contextUsed)} tokens</span>
             <span>{contextInfo.usagePercent}% {t('used')}</span>
+            {contextInfo.ttftSec !== null && (
+              <span>{contextInfo.ttftSec.toFixed(1)}s {t('TTFT')}</span>
+            )}
             {contextInfo.tokensPerSec !== null && (
               <span>{contextInfo.tokensPerSec} t/s</span>
             )}

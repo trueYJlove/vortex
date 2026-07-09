@@ -45,6 +45,8 @@ export const eventsApi = {
     onEvent('agent:session-info', callback),
   onAgentTurnStart: (callback: (data: unknown) => void) =>
     onEvent('agent:turn-start', callback),
+  onAgentTokenUsage: (callback: (data: unknown) => void) =>
+    onEvent('agent:token-usage', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
 

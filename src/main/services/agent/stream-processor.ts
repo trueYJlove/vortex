@@ -811,6 +811,11 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
       if (usage) {
         lastSingleUsage = usage
         pendingInvocation.usage = usage
+        // Emit real-time token usage update for UI
+        emitAgentEvent('agent:token-usage', spaceId, conversationId, {
+          type: 'token-usage',
+          tokenUsage: usage
+        })
       }
     }
 
