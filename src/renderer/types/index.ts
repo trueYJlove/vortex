@@ -249,6 +249,7 @@ export interface LayoutConfig {
   sidebarOpen?: boolean;                 // Whether conversation list sidebar is open
   sidebarWidth?: number;                 // Conversation list sidebar width (px)
   artifactRailWidth?: number;            // Artifact rail panel width (px)
+  taskPlanHeight?: number;               // Task plan panel height (px)
 }
 
 // Network configuration

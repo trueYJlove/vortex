@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Virtuoso } from 'react-virtuoso'
-import { Plus, ListTodo } from '../icons/ToolIcons'
+import { Plus } from '../icons/ToolIcons'
 import { MessageSquareText } from 'lucide-react'
 import { EllipsisVertical, Pin, Pencil, Trash2 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
@@ -20,9 +20,8 @@ import { TaskStatusDot } from '../pulse/TaskStatusDot'
 import { PulseSidebarSection } from '../pulse/PulseSidebarSection'
 import { AutomationBadge } from '../apps/AutomationBadge'
 import { EngineBadge } from './EngineBadge'
-import { PersistentTaskPlanSection } from './PersistentTaskPlanSection'
+import { PersistentTaskPlanPanel } from './PersistentTaskPlanPanel'
 import { SidebarSection } from '../layout/SidebarSection'
-import { useTodos } from '../../hooks/useTodos'
 import type { ConversationMeta } from '../../types'
 
 // Width constraints (in pixels)
@@ -59,10 +58,6 @@ export const ConversationList = memo(function ConversationList({
 
   // Single batch subscription for all conversation statuses (replaces N individual hooks)
   const conversationStatuses = useAllConversationStatuses()
-
-  // Todos for the current conversation (drives Task plan section visibility)
-  const todos = useTodos()
-  const hasTodos = todos !== null && todos.length > 0
 
   // Width state - initialized from persisted config
   const initialWidth = layoutConfig?.sidebarWidth
@@ -372,25 +367,37 @@ export const ConversationList = memo(function ConversationList({
           onToggle={setSessionsExpanded}
           badge={conversations.length > 0 ? conversations.length : undefined}
           actions={
-            <div ref={headerMenuRef} className="relative">
+            <div ref={headerMenuRef} className="flex items-center gap-1">
               <button
-                onClick={() => setHeaderMenuOpen(value => !value)}
+                onClick={() => {
+                  const spaceId = useSpaceStore.getState().currentSpace?.id
+                  if (spaceId) useChatStore.getState().createConversation(spaceId)
+                }}
                 className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
-                title={t('More')}
+                title={t('New conversation')}
               >
-                <EllipsisVertical className="w-4 h-4" />
+                <Plus size={14} />
               </button>
-              {headerMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 z-[9999] min-w-[180px] bg-popover border border-border rounded-lg shadow-lg py-1">
-                  <button
-                    onClick={handleClearConversations}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>{t('Clear session list')}</span>
-                  </button>
-                </div>
-              )}
+              <div className="relative">
+                <button
+                  onClick={() => setHeaderMenuOpen(value => !value)}
+                  className="p-1 hover:bg-secondary rounded-md transition-colors text-muted-foreground hover:text-foreground"
+                  title={t('More')}
+                >
+                  <EllipsisVertical className="w-4 h-4" />
+                </button>
+                {headerMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-[9999] min-w-[180px] bg-popover border border-border rounded-lg shadow-lg py-1">
+                    <button
+                      onClick={handleClearConversations}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors text-left"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{t('Clear session list')}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           }
         >
@@ -402,32 +409,12 @@ export const ConversationList = memo(function ConversationList({
               itemContent={(_index, conversation) => renderConversationItem(conversation)}
             />
           </div>
-
-          {/* New conversation button */}
-          <div className="border-t border-border">
-            <button
-              onClick={() => {
-                const spaceId = useSpaceStore.getState().currentSpace?.id
-                if (spaceId) useChatStore.getState().createConversation(spaceId)
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-secondary/50 transition-colors"
-            >
-              <Plus size={14} />
-              <span>{t('New conversation')}</span>
-            </button>
-          </div>
         </SidebarSection>
 
         {/* Task plan section - pushed to bottom when Sessions is expanded */}
-        <SidebarSection
-          title={t('Task plan')}
-          icon={<ListTodo size={14} />}
-          defaultExpanded={false}
-          className={sessionsExpanded ? 'mt-auto' : ''}
-          visible={hasTodos}
-        >
-          <PersistentTaskPlanSection embedded />
-        </SidebarSection>
+        <div className={sessionsExpanded ? 'mt-auto' : ''}>
+          <PersistentTaskPlanPanel />
+        </div>
       </div>
 
       {/* Drag handle - on right side */}

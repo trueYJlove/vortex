@@ -33,9 +33,11 @@ function SidebarTodoRow({ item }: { item: TodoItem }) {
 interface PersistentTaskPlanSectionProps {
   /** When true, renders content only without its own header (for use inside SidebarSection) */
   embedded?: boolean
+  /** When true, removes max-height constraint so the panel controls sizing */
+  disableMaxHeight?: boolean
 }
 
-export function PersistentTaskPlanSection({ embedded = false }: PersistentTaskPlanSectionProps) {
+export function PersistentTaskPlanSection({ embedded = false, disableMaxHeight = false }: PersistentTaskPlanSectionProps) {
   const { t } = useTranslation()
   const todos = useTodos()
   const stats = useTodoStats()
@@ -48,6 +50,17 @@ export function PersistentTaskPlanSection({ embedded = false }: PersistentTaskPl
   if (embedded) {
     return stats ? (
       <>
+        <div className="flex items-center gap-2 px-3 pb-1">
+          <span className="text-xs text-muted-foreground">
+            {stats.completed}/{stats.total} {t('completed')}
+          </span>
+          {stats.inProgress > 0 && (
+            <span className="text-xs text-primary">{t('{{count}} in progress', { count: stats.inProgress })}</span>
+          )}
+          {stats.pending > 0 && (
+            <span className="text-xs text-muted-foreground/50">{t('{{count}} pending', { count: stats.pending })}</span>
+          )}
+        </div>
         <div className="px-3 pb-2">
           <div className="h-1 bg-secondary rounded-full overflow-hidden">
             <div
@@ -56,7 +69,7 @@ export function PersistentTaskPlanSection({ embedded = false }: PersistentTaskPl
             />
           </div>
         </div>
-        <div className="max-h-48 overflow-y-auto px-3 pb-2">
+        <div className={`${disableMaxHeight ? '' : 'max-h-80'} overflow-y-auto px-3 pb-2`}>
           {todos.map((item, index) => (
             <SidebarTodoRow key={index} item={item} />
           ))}
@@ -87,7 +100,7 @@ export function PersistentTaskPlanSection({ embedded = false }: PersistentTaskPl
               />
             </div>
           </div>
-          <div className="max-h-48 overflow-y-auto px-3 pb-2">
+          <div className="max-h-80 overflow-y-auto px-3 pb-2">
             {todos.map((item, index) => (
               <SidebarTodoRow key={index} item={item} />
             ))}

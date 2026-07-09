@@ -16,7 +16,6 @@ import {
   Braces,
   Pin,
 } from 'lucide-react'
-import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { ErrorContent } from './ErrorContent'
@@ -397,8 +396,6 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
     return null
   }, [thoughts.length > 0 ? thoughts[0]?.timestamp : null])
 
-  const latestTodos = useMemo(() => getLatestTodosFromThoughts(thoughts), [thoughts])
-
   // Filter thoughts for display (exclude TodoWrite, tool_result, result, and sub-agent thoughts)
   // tool_result is now merged into tool_use, no need to show separately
   // Sub-agent thoughts (parentToolUseId set) are rendered nested inside their parent Task thought
@@ -543,7 +540,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
                 className={`px-4 pt-3 ${isMaximized ? 'max-h-[80vh]' : 'max-h-[300px]'} overflow-auto scrollbar-overlay transition-all duration-200`}
               >
                 {displayThoughts.map((thought, index) => {
-                  const isLast = index === displayThoughts.length - 1 && !latestTodos && !isThinking
+                  const isLast = index === displayThoughts.length - 1 && !isThinking
                   // Last 3 items render eagerly (near the scroll bottom where the
                   // user is watching during streaming). The rest lazy-load via IO.
                   // Using a single component type for all items avoids React
@@ -564,13 +561,6 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
                     />
                   )
                 })}
-              </div>
-            )}
-
-            {/* TodoCard - fixed at bottom, only one instance */}
-            {latestTodos && latestTodos.length > 0 && (
-              <div className={`px-4 ${hasDisplayContent ? 'pt-2' : 'pt-3'} pb-3`}>
-                <TodoCard todos={latestTodos} isAgentActive={isThinking} />
               </div>
             )}
 
