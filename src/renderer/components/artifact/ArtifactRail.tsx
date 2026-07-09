@@ -19,7 +19,8 @@ import { useSpaceStore } from '../../stores/space.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useCanvasLifecycle } from '../../hooks/useCanvasLifecycle'
 import { useCanvasStore } from '../../stores/canvas.store'
-import { ChevronRight, FolderOpen, Monitor, LayoutGrid, FolderTree, X, Globe } from 'lucide-react'
+import { ChevronRight, FolderOpen, Globe, Monitor, X } from 'lucide-react'
+import { GitChangesPanel } from './GitChangesPanel'
 import { ONBOARDING_ARTIFACT_NAME } from '../onboarding/onboardingData'
 import { useTranslation } from '../../i18n'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -401,7 +402,11 @@ export function ArtifactRail({
   const renderContent = () => (
     <div className="flex-1 overflow-hidden">
       {viewMode === 'tree' ? (
-        <ArtifactTree spaceId={spaceId} />
+        <ArtifactTree
+          spaceId={spaceId}
+          onOpenBrowser={handleOpenBrowser}
+          onOpenFolder={handleOpenFolder}
+        />
       ) : (
         <div className="h-full overflow-auto p-2">
           {isLoading ? (
@@ -441,45 +446,6 @@ export function ArtifactRail({
               })}
             </div>
           )}
-        </div>
-      )}
-    </div>
-  )
-
-  // Shared footer renderer with folder and browser buttons
-  // flex-shrink-0 ensures footer doesn't compress, allowing content to take remaining space
-  const renderFooter = () => (
-    <div className="flex-shrink-0 p-2 border-t border-border">
-      {viewMode === 'card' && artifacts.length > 0 && (
-        <p className="text-xs text-muted-foreground text-center mb-2">
-          {artifacts.length} {t('artifacts')}
-        </p>
-      )}
-      {isWebMode ? (
-        <div className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-muted-foreground/50 rounded-lg cursor-not-allowed">
-          <Monitor className="w-4 h-4" />
-          <span>{t('Please open folder in client')}</span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          {/* Open browser button */}
-          <button
-            onClick={handleOpenBrowser}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
-            title={t('Open browser (⌘⇧B)')}
-          >
-            <Globe className="w-4 h-4 text-blue-500" />
-            <span>{t('Open browser')}</span>
-          </button>
-          {/* Open folder button */}
-          <button
-            onClick={handleOpenFolder}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
-            title={t('Open folder (⌘⇧F)')}
-          >
-            <FolderOpen className="w-4 h-4 text-amber-500" />
-            <span>{t('Open folder')}</span>
-          </button>
         </div>
       )}
     </div>
@@ -549,9 +515,6 @@ export function ArtifactRail({
 
               {/* Content */}
               {renderContent()}
-
-              {/* Footer */}
-              {renderFooter()}
             </div>
           </div>
         )}
@@ -602,13 +565,13 @@ export function ArtifactRail({
         </button>
       </div>
 
-      {/* Content + Footer — CSS-hidden when collapsed to preserve ArtifactTree folder expansion state */}
+      {/* Content — CSS-hidden when collapsed to preserve ArtifactTree folder expansion state */}
       <div className={`flex-1 flex flex-col overflow-hidden${isExpanded ? '' : ' hidden'}`}>
         {renderContent()}
-        {renderFooter()}
+        <GitChangesPanel spaceId={spaceId} />
       </div>
 
-      {/* Collapsed state - show both folder and browser icons */}
+      {/* Collapsed state — show open browser/folder icons */}
       {!isExpanded && (
         <div className="flex-1 flex flex-col items-center py-4 gap-2">
           {isWebMode ? (

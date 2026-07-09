@@ -8,7 +8,7 @@ import type { GitFileStatus } from '../../../shared/rpc/contracts/git.contract'
 
 const MIN_HEIGHT = 120
 const MAX_HEIGHT = 600
-const DEFAULT_HEIGHT = 240
+const DEFAULT_HEIGHT = 320
 
 const STATUS_LABELS: Record<GitFileStatus['status'], string> = {
   modified: 'M',
@@ -34,7 +34,7 @@ interface GitChangesPanelProps {
 export function GitChangesPanel({ spaceId, onFileClick }: GitChangesPanelProps) {
   const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(true)
-  const { files, isEmpty } = useGitStatus(spaceId)
+  const { files, isEmpty, loading } = useGitStatus(spaceId)
 
   // Resizable height — initialized from persisted config
   const layoutConfig = useAppStore(state => state.config?.layout)
@@ -124,7 +124,16 @@ export function GitChangesPanel({ spaceId, onFileClick }: GitChangesPanelProps) 
       {/* Content area */}
       {isExpanded && (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          {isEmpty ? (
+          {loading ? (
+            <div className="px-3 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                <p className="text-xs text-muted-foreground/60">
+                  {t('Loading...')}
+                </p>
+              </div>
+            </div>
+          ) : isEmpty ? (
             <div className="px-3 pb-3">
               <p className="text-xs text-muted-foreground/60">
                 {t('No uncommitted changes')}
