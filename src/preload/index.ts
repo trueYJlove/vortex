@@ -26,6 +26,7 @@ import { artifactRpc } from '../shared/rpc/contracts/artifact.contract'
 import { searchRpc } from '../shared/rpc/contracts/search.contract'
 import { wecomBotRpc } from '../shared/rpc/contracts/wecom-bot.contract'
 import { gitBashRpc } from '../shared/rpc/contracts/git-bash.contract'
+import { gitRpc } from '../shared/rpc/contracts/git.contract'
 import { overlayRpc } from '../shared/rpc/contracts/overlay.contract'
 import { appRpc } from '../shared/rpc/contracts/app.contract'
 import { backupRpc } from '../shared/rpc/contracts/backup.contract'
@@ -359,6 +360,8 @@ export interface HaloAPI {
     message: string
     error?: string
   }) => void) => Promise<{ success: boolean; path?: string; error?: string }>
+  // Git status queries for the file tree git changes panel
+  gitStatus: (spaceId: string) => Promise<{ success: boolean; data?: { branch: string | null; files: Array<{ path: string; relativePath: string; status: string }> }; error?: string }>
   openLoginWindow: (url: string, title?: string) => Promise<IpcResponse>
   openExternal: (url: string) => Promise<void>
 
@@ -719,6 +722,9 @@ const api: HaloAPI = {
       ipcRenderer.removeListener(progressChannel, progressHandler)
     }
   },
+
+  // Git status queries for the file tree git changes panel
+  ...bindRpc(gitRpc),
 
   // Bootstrap lifecycle
   getBootstrapStatus: () => ipcRenderer.invoke('bootstrap:get-status'),
