@@ -302,7 +302,114 @@ export async function createSession(options: Record<string, any>): Promise<any> 
 
   const fnName = sdk.createSession ? 'createSession' : 'unstable_v2_createSession'
   console.log(`[SDK] createSession via ${fnName} (engine=${_engine})`)
-  return fn(options)
+  const session = await fn(options)
+
+  // Wrap CC SDK sessions with a notification queue to ensure incremental event
+  // delivery. The CC SDK reads from a subprocess stdout via readline, which on
+  // Windows can batch events due to pipe buffering. The queue decouples event
+  // production (background consumer) from consumption (stream-processor loop),
+  // guaranteeing one-by-one yield regardless of pipe buffering behavior.
+  if (_engine === 'anthropic' && session && typeof session.stream === 'function') {
+    return wrapWithNotificationQueue(session)
+  }
+
+  return session
+}
+
+/**
+ * Wrap a CC SDK session's stream() with a notification queue.
+ *
+ * On Windows, the CC CLI subprocess's stdout pipe can batch events due to
+ * OS-level buffering. readline.createInterface does not yield lines
+ * individually in this case — events arrive in bursts. The queue decouples
+ * event production from consumption, ensuring one-by-one yield regardless
+ * of pipe buffering behavior.
+ *
+ * Architecture:
+ *   - A background consumer calls the original session.stream() and pushes
+ *     each event into a shared queue.
+ *   - The replacement stream() yields from the queue, one event at a time.
+ *   - For multi-turn sessions, the background consumer re-enters the original
+ *     stream() after each turn (after result event) to read the next turn.
+ */
+function wrapWithNotificationQueue(session: any): any {
+  const queue: any[] = []
+  const waiters: Array<() => void> = []
+  let closed = false
+  let turnDone = false
+  let consumePromise: Promise<void> | null = null
+
+  const wake = (): void => {
+    const w = waiters.shift()
+    if (w) w()
+  }
+
+  // Consume one turn from the original stream and push events to queue.
+  // After a result event, returns so the caller can re-enter for the next turn.
+  async function consumeTurn(): Promise<void> {
+    try {
+      for await (const event of session.stream()) {
+        if (closed) break
+        queue.push(event)
+        wake()
+        if (event?.type === 'result') return
+      }
+    } catch (err) {
+      if (!closed) {
+        console.error('[SDK] Notification queue consumer error:', err)
+        queue.push({ type: 'result', subtype: 'error', is_error: true })
+        wake()
+      }
+    }
+  }
+
+  // Background loop: consume turns continuously until closed.
+  // After each turn completes (result event), re-enter stream() for the next turn.
+  async function consumeLoop(): Promise<void> {
+    while (!closed) {
+      turnDone = false
+      await consumeTurn()
+      if (closed) break
+      // Signal turn done so the stream() consumer knows this turn's events are complete
+      turnDone = true
+      wake()
+    }
+  }
+
+  // Start the background consume loop immediately
+  consumePromise = consumeLoop()
+
+  // Create a proxy that replaces stream() with queue-based iteration
+  const wrappedSession = Object.create(session)
+  wrappedSession.stream = async function* () {
+    while (!closed) {
+      if (queue.length > 0) {
+        const event = queue.shift()!
+        yield event
+        if (event?.type === 'result') return
+      } else if (turnDone) {
+        // Background consumer finished this turn but no more events in queue
+        return
+      } else {
+        // Wait for next event from background consumer
+        await new Promise<void>((resolve) => {
+          waiters.push(resolve)
+          if (closed || turnDone) resolve()
+        })
+      }
+    }
+  }
+
+  // Forward close to original session
+  const originalClose = session.close?.bind(session)
+  wrappedSession.close = async (): Promise<void> => {
+    closed = true
+    while (waiters.length > 0) wake()
+    if (consumePromise) await consumePromise.catch(() => {})
+    if (originalClose) return originalClose()
+  }
+
+  return wrappedSession
 }
 
 /**
