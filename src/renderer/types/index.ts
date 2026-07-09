@@ -250,6 +250,7 @@ export interface LayoutConfig {
   sidebarWidth?: number;                 // Conversation list sidebar width (px)
   artifactRailWidth?: number;            // Artifact rail panel width (px)
   taskPlanHeight?: number;               // Task plan panel height (px)
+  gitChangesHeight?: number;             // Git changes panel height (px)
 }
 
 // Network configuration
