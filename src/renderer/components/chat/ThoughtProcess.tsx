@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Loader2,
   Braces,
+  Pin,
 } from 'lucide-react'
 import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
@@ -366,6 +367,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [hasAutoExpanded, setHasAutoExpanded] = useState(false)
   const [isMaximized, setIsMaximized] = useState(false)
+  const [autoScroll, setAutoScroll] = useState(true)
   const contentRef = useRef<HTMLDivElement>(null)
   const { t } = useTranslation()
 
@@ -382,6 +384,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
   useEffect(() => {
     if (thoughts.length === 0) {
       setHasAutoExpanded(false)
+      setAutoScroll(true)
     }
   }, [thoughts.length])
 
@@ -410,13 +413,31 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
     })
   }, [thoughts])
 
-  // Smart auto-scroll: only scrolls when user is at bottom
-  // Stops auto-scroll when user scrolls up to read history
-  const { handleScroll } = useSmartScroll({
+  // Auto-scroll follows streaming content with instant scroll — smooth animation
+  // conflicts with rapid content updates and layout reflows (expand/collapse),
+  // causing visible jitter. Instant scroll snaps cleanly without fighting layout.
+  const { handleScroll: smartHandleScroll } = useSmartScroll({
     containerRef: contentRef,
     threshold: 50,
-    deps: [thoughts, isExpanded]
+    deps: [thoughts],
+    behavior: 'auto',
+    enabled: autoScroll
   })
+
+  const lastScrollTopRef = useRef(0)
+
+  const handleScroll = () => {
+    const container = contentRef.current
+    if (container) {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+      if (scrollTop < lastScrollTopRef.current && distanceFromBottom > 50) {
+        setAutoScroll(false)
+      }
+      lastScrollTopRef.current = scrollTop
+    }
+    smartHandleScroll()
+  }
 
   // Don't render if no thoughts and not thinking
   if (thoughts.length === 0 && !isThinking) {
@@ -475,6 +496,34 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Auto-scroll toggle — only when expanded and streaming */}
+          {isExpanded && isThinking && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setAutoScroll(prev => {
+                  const next = !prev
+                  if (next) {
+                    // Scrolling to bottom immediately when enabling
+                    requestAnimationFrame(() => {
+                      const el = contentRef.current
+                      if (el) el.scrollTop = el.scrollHeight
+                    })
+                  }
+                  return next
+                })
+              }}
+              className={`p-1 rounded transition-colors ${
+                autoScroll
+                  ? 'text-primary hover:bg-primary/10'
+                  : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
+              }`}
+              title={autoScroll ? t('Auto-scroll on') : t('Auto-scroll off')}
+            >
+              <Pin size={14} className={autoScroll ? '' : 'rotate-45'} />
+            </button>
+          )}
 
           {/* Expand icon */}
           <ChevronDown

@@ -19,6 +19,8 @@ interface UseSmartScrollOptions {
   deps?: unknown[]
   /** Scroll behavior for auto-scroll (default: 'smooth') */
   behavior?: ScrollBehavior
+  /** Whether auto-scroll is enabled (default: true). When false, deps changes do not trigger scroll. */
+  enabled?: boolean
 }
 
 interface UseSmartScrollReturn {
@@ -31,7 +33,7 @@ interface UseSmartScrollReturn {
 }
 
 export function useSmartScroll(options: UseSmartScrollOptions): UseSmartScrollReturn {
-  const { containerRef, threshold = 100, deps = [], behavior = 'smooth' } = options
+  const { containerRef, threshold = 100, deps = [], behavior = 'smooth', enabled = true } = options
 
   // Track if user has scrolled away from bottom
   const [isAtBottom, setIsAtBottom] = useState(true)
@@ -107,16 +109,24 @@ export function useSmartScroll(options: UseSmartScrollOptions): UseSmartScrollRe
     setShowScrollButton(false)
   }, [containerRef])
 
+  // Pending rAF id for debounced auto-scroll
+  const rafId = useRef(0)
+
   /**
-   * Auto-scroll when dependencies change, but only if user is at bottom
+   * Auto-scroll when dependencies change, but only if enabled and user is at bottom.
+   * Uses requestAnimationFrame to debounce — when multiple rapid updates happen
+   * (e.g. streaming thoughts), only the last frame's scroll position is applied,
+   * preventing visible jitter.
    */
   useEffect(() => {
-    // Only auto-scroll if user hasn't scrolled away
-    if (isAtBottom) {
+    if (!enabled || !isAtBottom) return
+    cancelAnimationFrame(rafId.current)
+    rafId.current = requestAnimationFrame(() => {
       scrollToBottom(behavior)
-    }
+    })
+    return () => cancelAnimationFrame(rafId.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, behavior])
+  }, [...deps, behavior, enabled])
 
   return {
     showScrollButton,
