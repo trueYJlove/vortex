@@ -400,7 +400,7 @@ export function ArtifactRail({
 
   // Shared content renderer
   const renderContent = () => (
-    <div className="flex-1 overflow-hidden">
+    <div className="flex-1 min-h-0 overflow-hidden">
       {viewMode === 'tree' ? (
         <ArtifactTree
           spaceId={spaceId}
@@ -565,9 +565,55 @@ export function ArtifactRail({
         </button>
       </div>
 
-      {/* Content — CSS-hidden when collapsed to preserve ArtifactTree folder expansion state */}
-      <div className={`flex-1 flex flex-col overflow-hidden${isExpanded ? '' : ' hidden'}`}>
-        {renderContent()}
+      {/* Content — tree/cards fill flex-1, GitChangesPanel stays at bottom */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {viewMode === 'tree' ? (
+            <ArtifactTree
+              spaceId={spaceId}
+              onOpenBrowser={handleOpenBrowser}
+              onOpenFolder={handleOpenFolder}
+            />
+          ) : (
+            <div className="h-full overflow-auto p-2">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-2">
+                  <div className="w-8 h-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin mb-3" />
+                  <p className="text-xs text-muted-foreground">{t('Loading...')}</p>
+                </div>
+              ) : artifacts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-2">
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-3 halo-breathe">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-transparent" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isTemp ? t('Ideas will crystallize here') : t('Files will appear here')}
+                  </p>
+                  {isGenerating && (
+                    <p className="text-xs text-primary/60 mt-2 animate-pulse">
+                      {t('AI is working...')}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {artifacts.map((artifact) => {
+                    const isOnboardingArtifact = artifact.name === ONBOARDING_ARTIFACT_NAME
+                    return (
+                      <div
+                        key={artifact.id}
+                        data-onboarding={isOnboardingArtifact && isOnboardingViewStep ? 'artifact-card' : undefined}
+                        onClick={isOnboardingArtifact && isOnboardingViewStep ? handleOnboardingArtifactClick : undefined}
+                      >
+                        <ArtifactCard artifact={artifact} onShowContextMenu={handleShowCardContextMenu} />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <GitChangesPanel spaceId={spaceId} />
       </div>
 

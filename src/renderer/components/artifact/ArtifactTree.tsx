@@ -10,7 +10,7 @@
  * - Lazy loading: children fetched on-demand when expanding folders
  */
 
-import { useState, useCallback, useEffect, useMemo, createContext, useContext, useRef } from 'react'
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, createContext, useContext, useRef } from 'react'
 import { Tree, NodeRendererProps, TreeApi, CreateHandler, RenameHandler, DeleteHandler, MoveHandler, NodeApi } from 'react-arborist'
 import { api } from '../../api'
 import { useCanvasStore } from '../../stores/canvas.store'
@@ -60,22 +60,32 @@ interface ArtifactTreeProps {
   onOpenFolder?: () => void
 }
 
-// Fixed offsets for tree height calculation (in pixels)
-// 180px accounts for: header (60px) + toolbar (40px) + padding/margins (80px)
-const TREE_HEIGHT_OFFSET = 180
-
 // Row height for virtual scrolling (in pixels)
 // 26px provides comfortable spacing for file/folder names with icons
 const TREE_ROW_HEIGHT = 26
 
-function useTreeHeight() {
-  const [height, setHeight] = useState(() => window.innerHeight - TREE_HEIGHT_OFFSET)
+/** Measure the tree container's actual available height via ResizeObserver
+ *  so the virtual tree always fits its flex slot regardless of sibling
+ *  panels (e.g. GitChangesPanel docked below).
+ *
+ *  Uses a callback ref pattern so the effect re-runs when the element
+ *  mounts/unmounts — critical because the tree container is inside a
+ *  conditional branch that may not render on the first pass. */
+function useTreeHeight(el: HTMLDivElement | null): number {
+  const [height, setHeight] = useState(400)
 
-  useEffect(() => {
-    const handleResize = () => setHeight(window.innerHeight - TREE_HEIGHT_OFFSET)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  useLayoutEffect(() => {
+    if (!el) return
+
+    setHeight(el.clientHeight)
+
+    const observer = new ResizeObserver(([entry]) => {
+      setHeight(entry.contentRect.height)
+    })
+    observer.observe(el)
+
+    return () => observer.disconnect()
+  }, [el])
 
   return height
 }
@@ -158,7 +168,10 @@ function mergeChildren(
 export function ArtifactTree({ spaceId, onOpenBrowser, onOpenFolder }: ArtifactTreeProps) {
   const { t } = useTranslation()
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set())
-  const treeHeight = useTreeHeight()
+  // Callback ref pattern — must be useState not useRef so useLayoutEffect re-runs
+  // when the tree container mounts/unmounts (conditional render like "No files").
+  const [treeContainerEl, setTreeContainerEl] = useState<HTMLDivElement | null>(null)
+  const treeHeight = useTreeHeight(treeContainerEl)
   const watcherInitialized = useRef(false)
   const treeRef = useRef<TreeApi<ArtifactTreeNode>>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -673,8 +686,8 @@ export function ArtifactTree({ spaceId, onOpenBrowser, onOpenFolder }: ArtifactT
             </div>
           </div>
 
-          {/* Tree — uses window height based calculation */}
-          <div className="flex-1 overflow-hidden">
+          {/* Tree — reacts to available height via ResizeObserver */}
+          <div ref={setTreeContainerEl} className="flex-1 min-h-0 overflow-hidden">
             <Tree<ArtifactTreeNode>
               ref={treeRef}
               data={treeData}
