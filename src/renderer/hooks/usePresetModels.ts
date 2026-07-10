@@ -51,7 +51,7 @@ interface UsePresetModelsResult {
   /** Soft warning shown next to the model list when falling back. Null on clean state. */
   warning: string | null
   /** Triggers a fetch. No-op when key is empty or hook is disabled. */
-  fetchModels: () => Promise<void>
+  fetchModels: () => Promise<ModelOption[]>
 }
 
 function joinUrl(base: string, path: string): string {
@@ -125,10 +125,10 @@ export function usePresetModels(params: UsePresetModelsParams): UsePresetModelsR
     }
   }, [])
 
-  const fetchModels = async (): Promise<void> => {
-    if (!enabled || !baseUrl) return
+  const fetchModels = async (): Promise<ModelOption[]> => {
+    if (!enabled || !baseUrl) return []
     const trimmedKey = apiKey.trim()
-    if (!trimmedKey) return
+    if (!trimmedKey) return []
 
     // Replace any previous controller before starting. abort() on a settled
     // controller is a documented no-op.
@@ -207,6 +207,8 @@ export function usePresetModels(params: UsePresetModelsParams): UsePresetModelsR
       if (!fetched.some(m => m.id === modelRef.current)) {
         setModelRef.current(fetched[0].id)
       }
+
+      return fetched
     } catch (err) {
       // AbortError is the expected outcome when the key changed mid-flight or
       // the component unmounted. Treat as a silent no-op rather than showing
