@@ -362,6 +362,8 @@ export interface HaloAPI {
   }) => void) => Promise<{ success: boolean; path?: string; error?: string }>
   // Git status queries for the file tree git changes panel
   gitStatus: (spaceId: string) => Promise<{ success: boolean; data?: { branch: string | null; files: Array<{ path: string; relativePath: string; status: string }> }; error?: string }>
+  gitDiff: (spaceId: string, filePath: string, staged?: boolean) => Promise<{ success: boolean; data?: { diff: string; filePath: string }; error?: string }>
+  gitCheckAvailability: () => Promise<{ success: boolean; data?: boolean; error?: string }>
   openLoginWindow: (url: string, title?: string) => Promise<IpcResponse>
   openExternal: (url: string) => Promise<void>
 

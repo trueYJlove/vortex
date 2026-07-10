@@ -30,6 +30,7 @@ import type { ImageAttachment, Artifact } from '../../types'
 import type { SlashCommandItem } from '../../types/slash-command'
 import { useTranslation } from '../../i18n'
 import { useEngineCapabilities } from '../../stores/engine.store'
+import { Sparkles } from 'lucide-react'
 
 interface ChatViewProps {
   isCompact?: boolean

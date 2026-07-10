@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseGitStatusPorcelain } from '../../../src/main/services/git.service'
+import { parseGitStatusPorcelain, parseNumstat } from '../../../src/main/services/git.service'
 
 describe('Git Service', () => {
   describe('parseGitStatusPorcelain', () => {
@@ -54,6 +54,42 @@ describe('Git Service', () => {
       const result = parseGitStatusPorcelain('')
       expect(result.branch).toBeNull()
       expect(result.files).toHaveLength(0)
+    })
+  })
+
+  describe('parseNumstat', () => {
+    it('parses normal numstat output', () => {
+      const output = '10\t5\tsrc/foo.ts\n20\t10\tsrc/bar.ts\n'
+      const result = parseNumstat(output)
+      expect(result.size).toBe(2)
+      expect(result.get('src/foo.ts')).toEqual({ insertions: 10, deletions: 5 })
+      expect(result.get('src/bar.ts')).toEqual({ insertions: 20, deletions: 10 })
+    })
+
+    it('handles binary files', () => {
+      const output = '-\t-\timage.png\n'
+      const result = parseNumstat(output)
+      expect(result.get('image.png')).toEqual({ insertions: 0, deletions: 0 })
+    })
+
+    it('handles files with tabs in name', () => {
+      const output = '5\t3\tfile\twith\ttabs.ts\n'
+      const result = parseNumstat(output)
+      expect(result.get('file\twith\ttabs.ts')).toEqual({ insertions: 5, deletions: 3 })
+    })
+
+    it('returns empty map for empty input', () => {
+      const result = parseNumstat('')
+      expect(result.size).toBe(0)
+    })
+
+    it('handles mixed binary and text files', () => {
+      const output = '10\t5\tsrc/foo.ts\n-\t-\timage.png\n20\t10\tsrc/bar.ts\n'
+      const result = parseNumstat(output)
+      expect(result.size).toBe(3)
+      expect(result.get('src/foo.ts')).toEqual({ insertions: 10, deletions: 5 })
+      expect(result.get('image.png')).toEqual({ insertions: 0, deletions: 0 })
+      expect(result.get('src/bar.ts')).toEqual({ insertions: 20, deletions: 10 })
     })
   })
 })

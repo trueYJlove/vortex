@@ -502,7 +502,7 @@ export function ArtifactRail({
               {/* Header */}
               <div className="p-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium text-muted-foreground">{t('Workspace')}</span>
+                  <span className="text-sm font-semibold text-muted-foreground">{t('Workspace')}</span>
                 </div>
                 <button
                   onClick={() => setMobileOverlayOpen(false)}
@@ -550,7 +550,7 @@ export function ArtifactRail({
       <div className="flex-shrink-0 px-3 h-10 border-b border-border flex items-center justify-between">
         {isExpanded && (
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-muted-foreground">{t('Workspace')}</span>
+            <span className="text-sm font-semibold text-muted-foreground">{t('Workspace')}</span>
           </div>
         )}
         <button

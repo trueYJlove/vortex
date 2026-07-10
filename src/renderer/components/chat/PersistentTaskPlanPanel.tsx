@@ -99,7 +99,7 @@ export function PersistentTaskPlanPanel() {
         <span className="text-muted-foreground">
           <ListTodo size={14} />
         </span>
-        <span className="text-sm sm:text-[14px] font-medium text-muted-foreground flex-1 text-left">
+        <span className="text-sm sm:text-[14px] font-semibold text-muted-foreground flex-1 text-left">
           {t('Task plan')}
         </span>
         <ChevronDown
