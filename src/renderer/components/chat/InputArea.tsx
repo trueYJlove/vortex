@@ -948,7 +948,7 @@ function InputToolbar({
               transition-all duration-150"
             title={t('Stop generation (Esc)')}
           >
-            <div className="w-3 h-3 border-2 border-current rounded-sm" />
+            <div className="w-3 h-3 border-2 border-current" />
           </button>
         )}
         {!isOnboarding && (

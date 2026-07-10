@@ -152,11 +152,13 @@ export const ConversationList = memo(function ConversationList({
     return () => document.removeEventListener('click', handleClickOutside)
   }, [headerMenuOpen])
 
-  // Reset menu state when conversations change (e.g. space switch)
+  // Reset menu state when the active conversation disappears (e.g. space switch)
   useEffect(() => {
-    setMenuOpenId(null)
-    setMenuPosition(null)
-  }, [conversations])
+    if (menuOpenId && !conversations.some(conversation => conversation.id === menuOpenId)) {
+      setMenuOpenId(null)
+      setMenuPosition(null)
+    }
+  }, [conversations, menuOpenId])
 
   useEffect(() => {
     if (!editingId) {

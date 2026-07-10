@@ -111,6 +111,7 @@ export function SpacePage() {
   // Chat width drag state
   const [isDraggingChat, setIsDraggingChat] = useState(false)
   const [dragChatWidth, setDragChatWidth] = useState(effectiveChatWidth)
+  const dragChatWidthRef = useRef(effectiveChatWidth)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
   // Search UI state
@@ -120,6 +121,7 @@ export function SpacePage() {
   useEffect(() => {
     if (!isDraggingChat) {
       setDragChatWidth(effectiveChatWidth)
+      dragChatWidthRef.current = effectiveChatWidth
     }
   }, [effectiveChatWidth, isDraggingChat])
 
@@ -144,12 +146,13 @@ export function SpacePage() {
       // Clamp to constraints
       const clampedWidth = Math.max(chatWidthMin, Math.min(chatWidthMax, newWidth))
       setDragChatWidth(clampedWidth)
+      dragChatWidthRef.current = clampedWidth
     }
 
     const handleMouseUp = () => {
       setIsDraggingChat(false)
       // Persist the final width
-      setChatWidth(dragChatWidth)
+      setChatWidth(dragChatWidthRef.current)
     }
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -159,7 +162,7 @@ export function SpacePage() {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isDraggingChat, dragChatWidth, chatWidthMin, chatWidthMax, setChatWidth])
+  }, [isDraggingChat, chatWidthMin, chatWidthMax, setChatWidth])
 
   // Close canvas when switching to mobile with canvas open
   useEffect(() => {
@@ -396,40 +399,27 @@ export function SpacePage() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Artifact rail - desktop left side, auto-collapses when maximized via useEffect above */}
-        {/* Smart collapse: collapses when canvas is open, respects user preference */}
+        {/* Conversation list sidebar - desktop left side, CSS hidden when collapsed or maximized, unmounted on mobile */}
         {!isMobile && (
-          <ArtifactRail
-            side="left"
-            externalExpanded={effectiveRailExpanded}
-            onExpandedChange={setRailExpanded}
-            initialWidth={artifactRailWidthConfig}
-            onWidthChange={handleArtifactRailWidthChange}
-          />
+          <div style={{ display: showConversationList && !isCanvasMaximized ? 'flex' : 'none' }}>
+            <ConversationList
+              side="left"
+              onClose={handleToggleConversationList}
+              visible={showConversationList && !isCanvasMaximized}
+            />
+          </div>
         )}
 
         {/* Desktop Layout */}
         {!isMobile && (
           <>
-            {/* Content Canvas - main viewing area when open, full width when maximized */}
-            <div
-              className={`
-                min-w-0 overflow-hidden
-                ${isCanvasOpen || isCanvasMaximized
-                  ? 'flex-1 opacity-100'
-                  : 'w-0 flex-none opacity-0'}
-              `}
-            >
-              {(isCanvasOpen || isCanvasMaximized || isCanvasTransitioning) && <ContentCanvas />}
-            </div>
-
             {/* Chat view - hidden when maximized, adjusts width based on canvas state */}
             {!isCanvasMaximized && (
               <div
                 ref={chatContainerRef}
                 className={`
                   flex flex-col min-w-0 relative
-                  ${isCanvasOpen ? 'border-l border-border/60' : 'flex-1 border-l border-transparent'}
+                  ${isCanvasOpen ? 'border-r border-border/60' : 'flex-1 border-r border-transparent'}
                 `}
                 style={{
                   width: isCanvasOpen ? dragChatWidth : undefined,
@@ -442,7 +432,7 @@ export function SpacePage() {
 
                 {/* Floating sidebar toggle - shows when sidebar is closed */}
                 {!showConversationList && (
-                  <div className="absolute top-2 right-0 z-10">
+                  <div className="absolute top-2 left-0 z-10">
                     <SidebarToggle
                       isOpen={false}
                       onToggle={handleToggleConversationList}
@@ -454,7 +444,7 @@ export function SpacePage() {
                 {isCanvasOpen && (
                   <div
                     className={`
-                      absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20
+                      absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-20
                       hover:bg-primary/50 transition-colors
                       ${isDraggingChat ? 'bg-primary/50' : ''}
                     `}
@@ -464,18 +454,31 @@ export function SpacePage() {
                 )}
               </div>
             )}
+
+            {/* Content Canvas - main viewing area when open, full width when maximized */}
+            <div
+              className={`
+                min-w-0 overflow-hidden
+                ${isCanvasOpen || isCanvasMaximized
+                  ? 'flex-1 opacity-100'
+                  : 'w-0 flex-none opacity-0'}
+              `}
+            >
+              {(isCanvasOpen || isCanvasMaximized || isCanvasTransitioning) && <ContentCanvas />}
+            </div>
           </>
         )}
 
-        {/* Conversation list sidebar - desktop right side, CSS hidden when collapsed or maximized, unmounted on mobile */}
+        {/* Artifact rail - desktop right side, auto-collapses when maximized via useEffect above */}
+        {/* Smart collapse: collapses when canvas is open, respects user preference */}
         {!isMobile && (
-          <div style={{ display: showConversationList && !isCanvasMaximized ? 'flex' : 'none' }}>
-            <ConversationList
-              side="right"
-              onClose={handleToggleConversationList}
-              visible={showConversationList && !isCanvasMaximized}
-            />
-          </div>
+          <ArtifactRail
+            side="right"
+            externalExpanded={effectiveRailExpanded}
+            onExpandedChange={setRailExpanded}
+            initialWidth={artifactRailWidthConfig}
+            onWidthChange={handleArtifactRailWidthChange}
+          />
         )}
 
         {/* Mobile Layout */}
@@ -488,7 +491,7 @@ export function SpacePage() {
 
       {/* Mobile Canvas Overlay */}
       {isMobile && isCanvasOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-slide-in-left-full">
+        <div className="fixed inset-0 z-50 flex flex-col bg-background animate-slide-in-right-full">
           {/* Mobile Canvas Header */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card/80 backdrop-blur-sm">
             <button
