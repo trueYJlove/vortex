@@ -36,6 +36,7 @@ import { initializeSearchHandlers, cleanupSearchHandlers } from '../ipc/search'
 import { registerPerfHandlers } from '../ipc/perf'
 import { perfService } from '../services/perf'
 import { registerGitBashHandlers, initializeGitBashOnStartup } from '../ipc/git-bash'
+import { registerGitHandlers } from '../ipc/git'
 import { cleanupAllCaches } from '../services/artifact-cache.service'
 import { flushSpaceActivity } from '../services/space.service'
 import { disposeSearchContext } from '../services/web-search'
@@ -273,6 +274,9 @@ export function initializeExtendedServices(): void {
 
   // GitBash: Windows Git Bash detection and setup
   registerGitBashHandlers()
+
+  // Git: Status queries for the file tree git changes panel
+  registerGitHandlers()
 
   // Health: System health monitoring and recovery
   // Register IPC handlers for health queries from renderer

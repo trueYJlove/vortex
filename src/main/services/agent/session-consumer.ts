@@ -25,7 +25,7 @@
  *   - Never exits between turns
  */
 
-import type { V2SDKSession, SessionState, Thought } from './types'
+import type { V2SDKSession, SessionState, Thought, PricingInfo } from './types'
 import type { StreamResult } from './stream-processor'
 import { processStream } from './stream-processor'
 import { emitAgentEvent } from './events'
@@ -58,10 +58,10 @@ export interface ConsumerHandle {
    * Used by session-manager to detect active team agents between turns. */
   getLastTurnThoughts(): Thought[]
   /** Update the display model name used for thought parsing (and the
-   * source-resolved context window shown in token usage).
+   * source-resolved context window and pricing shown in token usage).
    * Called by sendMessage to keep both in sync after model switches
    * without requiring a full session rebuild. */
-  updateDisplayModel(displayModel: string, contextWindow?: number): void
+  updateDisplayModel(displayModel: string, contextWindow?: number, pricing?: PricingInfo): void
 }
 
 /**
@@ -73,6 +73,8 @@ interface ConsumerState {
   displayModel: string
   /** Source-resolved context window for token-usage display (see ProcessStreamParams) */
   contextWindow?: number
+  /** Source-resolved pricing for local cost estimation */
+  pricing?: PricingInfo
   /** AbortController for the consumer loop itself (not per-turn) */
   consumerAbort: AbortController
   /** True when consumer is inside for-await (processing a turn) */
@@ -102,6 +104,7 @@ interface ConsumerState {
  * @param conversationId - Conversation ID for persistence and event routing
  * @param displayModel - Display model name for thought parsing
  * @param contextWindow - Source-resolved context window for token-usage display
+ * @param pricing - Source-resolved pricing for local cost estimation
  * @returns ConsumerHandle for lifecycle control
  */
 export function startConsumer(
@@ -109,13 +112,20 @@ export function startConsumer(
   spaceId: string,
   conversationId: string,
   displayModel: string,
-  contextWindow?: number
+  contextWindow?: number,
+  pricing?: {
+    inputPrice?: number
+    outputPrice?: number
+    cacheReadPrice?: number
+    cacheCreationPrice?: number
+  }
 ): ConsumerHandle {
   const state: ConsumerState = {
     spaceId,
     conversationId,
     displayModel,
     contextWindow,
+    pricing,
     consumerAbort: new AbortController(),
     processingTurn: false,
     currentSessionState: null,
@@ -154,12 +164,13 @@ export function startConsumer(
     getLastTurnThoughts() {
       return state.lastTurnThoughts
     },
-    updateDisplayModel(newDisplayModel: string, newContextWindow?: number) {
+    updateDisplayModel(newDisplayModel: string, newContextWindow?: number, newPricing?: PricingInfo) {
       if (state.displayModel !== newDisplayModel) {
         console.log(`[Consumer][${conversationId}] Display model updated: ${state.displayModel} → ${newDisplayModel}`)
         state.displayModel = newDisplayModel
       }
-      state.contextWindow = newContextWindow
+      if (newContextWindow !== undefined) state.contextWindow = newContextWindow
+      if (newPricing !== undefined) state.pricing = newPricing
     },
   }
 
@@ -217,6 +228,7 @@ async function consumeLoop(v2Session: V2SDKSession, state: ConsumerState): Promi
         conversationId,
         displayModel: state.displayModel,
         contextWindow: state.contextWindow,
+        pricing: state.pricing,
         abortController: turnAbort,
         t0: turnStartTime,
         callbacks: {

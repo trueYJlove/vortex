@@ -9,6 +9,17 @@
 // API Credentials
 // ============================================
 
+export interface PricingInfo {
+  /** Price per 1M input tokens (USD) */
+  inputPrice?: number
+  /** Price per 1M output tokens (USD) */
+  outputPrice?: number
+  /** Price per 1M cache read tokens (USD) */
+  cacheReadPrice?: number
+  /** Price per 1M cache creation tokens (USD) */
+  cacheCreationPrice?: number
+}
+
 /**
  * Resolved per-model capability values consumed by the agent runtime.
  *
@@ -23,6 +34,14 @@ export interface ResolvedModelCapabilities {
   maxOutputTokens: number
   /** Effective context window for the model (preset merged with user override) */
   contextWindow: number
+  /** Price per 1M input tokens (USD) — for local cost estimation */
+  inputPrice?: number
+  /** Price per 1M output tokens (USD) */
+  outputPrice?: number
+  /** Price per 1M cache read tokens (USD) */
+  cacheReadPrice?: number
+  /** Price per 1M cache creation tokens (USD) */
+  cacheCreationPrice?: number
 }
 
 /**
@@ -271,6 +290,8 @@ export interface TokenUsage {
   cacheCreationTokens: number
   totalCostUsd: number
   contextWindow: number
+  /** Source of the pricing data: 'api' = from API response, 'local' = locally estimated, absent = not available */
+  pricingSource?: 'api' | 'local'
 }
 
 export interface SingleCallUsage {

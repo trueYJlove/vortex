@@ -10,6 +10,7 @@ import { create } from 'zustand'
 import { api } from '../../api'
 import type { Conversation, ConversationMeta, Message, ToolCall, Artifact, Thought, AgentEventBase, ImageAttachment, CompactInfo, CanvasContext, AgentErrorType, PendingQuestion, Question, TaskStatus, PulseItem, TaskProgress } from '../../types'
 import type { SessionInitInfo } from '../../types/slash-command'
+import type { SingleCallUsage } from '../../../main/services/agent/types'
 import { PULSE_READ_GRACE_PERIOD_MS } from '../../types'
 import { canvasLifecycle } from '../../services/canvas-lifecycle'
 import type { StoreApi } from 'zustand'
@@ -46,6 +47,12 @@ export interface SessionState {
   // Monotonically increasing turn counter — used to detect stale handleAgentComplete callbacks.
   // Incremented by sendMessage() and handleAgentTurnStart(); checked by handleAgentComplete().
   turnId: number
+  // Real-time token usage during streaming (updated on each API response)
+  streamingTokenUsage?: SingleCallUsage | null
+  // Timestamp when user sent message (for calculating TTFT)
+  messageSentTime?: number | null
+  // Timestamp when first token was received (for calculating TTFT and t/s baseline)
+  firstTokenTime?: number | null
 }
 
 // Create empty session state
@@ -64,6 +71,9 @@ export function createEmptySessionState(): SessionState {
     pendingQuestion: null,
     queuedMessages: [],
     turnId: 0,
+    streamingTokenUsage: null,
+    messageSentTime: null,
+    firstTokenTime: null,
   }
 }
 
@@ -169,6 +179,7 @@ export interface ChatState {
   handleAgentCompact: (data: AgentEventBase & { trigger: 'manual' | 'auto'; preTokens: number }) => void
   handleAgentSessionInfo: (data: AgentEventBase & SessionInitInfo) => void
   handleAgentTurnStart: (data: AgentEventBase & { autonomous?: boolean }) => void
+  handleAgentTokenUsage: (data: AgentEventBase & { tokenUsage: SingleCallUsage }) => void
 
   // AskUserQuestion handlers
   handleAskQuestion: (data: AgentEventBase & { id: string; questions: Question[] }) => void

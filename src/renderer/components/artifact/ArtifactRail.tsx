@@ -19,7 +19,8 @@ import { useSpaceStore } from '../../stores/space.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { useCanvasLifecycle } from '../../hooks/useCanvasLifecycle'
 import { useCanvasStore } from '../../stores/canvas.store'
-import { ChevronRight, FolderOpen, Monitor, LayoutGrid, FolderTree, X, Globe } from 'lucide-react'
+import { ChevronRight, FolderOpen, Globe, Monitor, X } from 'lucide-react'
+import { GitChangesPanel } from './GitChangesPanel'
 import { ONBOARDING_ARTIFACT_NAME } from '../onboarding/onboardingData'
 import { useTranslation } from '../../i18n'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -399,9 +400,13 @@ export function ArtifactRail({
 
   // Shared content renderer
   const renderContent = () => (
-    <div className="flex-1 overflow-hidden">
+    <div className="flex-1 min-h-0 overflow-hidden">
       {viewMode === 'tree' ? (
-        <ArtifactTree spaceId={spaceId} />
+        <ArtifactTree
+          spaceId={spaceId}
+          onOpenBrowser={handleOpenBrowser}
+          onOpenFolder={handleOpenFolder}
+        />
       ) : (
         <div className="h-full overflow-auto p-2">
           {isLoading ? (
@@ -441,45 +446,6 @@ export function ArtifactRail({
               })}
             </div>
           )}
-        </div>
-      )}
-    </div>
-  )
-
-  // Shared footer renderer with folder and browser buttons
-  // flex-shrink-0 ensures footer doesn't compress, allowing content to take remaining space
-  const renderFooter = () => (
-    <div className="flex-shrink-0 p-2 border-t border-border">
-      {viewMode === 'card' && artifacts.length > 0 && (
-        <p className="text-xs text-muted-foreground text-center mb-2">
-          {artifacts.length} {t('artifacts')}
-        </p>
-      )}
-      {isWebMode ? (
-        <div className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-muted-foreground/50 rounded-lg cursor-not-allowed">
-          <Monitor className="w-4 h-4" />
-          <span>{t('Please open folder in client')}</span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          {/* Open browser button */}
-          <button
-            onClick={handleOpenBrowser}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
-            title={t('Open browser (⌘⇧B)')}
-          >
-            <Globe className="w-4 h-4 text-blue-500" />
-            <span>{t('Open browser')}</span>
-          </button>
-          {/* Open folder button */}
-          <button
-            onClick={handleOpenFolder}
-            className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground rounded-lg transition-colors"
-            title={t('Open folder (⌘⇧F)')}
-          >
-            <FolderOpen className="w-4 h-4 text-amber-500" />
-            <span>{t('Open folder')}</span>
-          </button>
         </div>
       )}
     </div>
@@ -536,7 +502,7 @@ export function ArtifactRail({
               {/* Header */}
               <div className="p-3 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium text-muted-foreground">{t('Workspace')}</span>
+                  <span className="text-sm font-semibold text-muted-foreground">{t('Workspace')}</span>
                 </div>
                 <button
                   onClick={() => setMobileOverlayOpen(false)}
@@ -549,9 +515,6 @@ export function ArtifactRail({
 
               {/* Content */}
               {renderContent()}
-
-              {/* Footer */}
-              {renderFooter()}
             </div>
           </div>
         )}
@@ -587,7 +550,7 @@ export function ArtifactRail({
       <div className="flex-shrink-0 px-3 h-10 border-b border-border flex items-center justify-between">
         {isExpanded && (
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-muted-foreground">{t('Workspace')}</span>
+            <span className="text-sm font-semibold text-muted-foreground">{t('Workspace')}</span>
           </div>
         )}
         <button
@@ -602,13 +565,59 @@ export function ArtifactRail({
         </button>
       </div>
 
-      {/* Content + Footer — CSS-hidden when collapsed to preserve ArtifactTree folder expansion state */}
-      <div className={`flex-1 flex flex-col overflow-hidden${isExpanded ? '' : ' hidden'}`}>
-        {renderContent()}
-        {renderFooter()}
+      {/* Content — tree/cards fill flex-1, GitChangesPanel stays at bottom */}
+      <div className={`flex-1 flex flex-col min-h-0 overflow-hidden${isExpanded ? '' : ' hidden'}`}>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {viewMode === 'tree' ? (
+            <ArtifactTree
+              spaceId={spaceId}
+              onOpenBrowser={handleOpenBrowser}
+              onOpenFolder={handleOpenFolder}
+            />
+          ) : (
+            <div className="h-full overflow-auto p-2">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-2">
+                  <div className="w-8 h-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin mb-3" />
+                  <p className="text-xs text-muted-foreground">{t('Loading...')}</p>
+                </div>
+              ) : artifacts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center px-2">
+                  <div className="w-12 h-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center mb-3 halo-breathe">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-transparent" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isTemp ? t('Ideas will crystallize here') : t('Files will appear here')}
+                  </p>
+                  {isGenerating && (
+                    <p className="text-xs text-primary/60 mt-2 animate-pulse">
+                      {t('AI is working...')}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {artifacts.map((artifact) => {
+                    const isOnboardingArtifact = artifact.name === ONBOARDING_ARTIFACT_NAME
+                    return (
+                      <div
+                        key={artifact.id}
+                        data-onboarding={isOnboardingArtifact && isOnboardingViewStep ? 'artifact-card' : undefined}
+                        onClick={isOnboardingArtifact && isOnboardingViewStep ? handleOnboardingArtifactClick : undefined}
+                      >
+                        <ArtifactCard artifact={artifact} onShowContextMenu={handleShowCardContextMenu} />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <GitChangesPanel spaceId={spaceId} />
       </div>
 
-      {/* Collapsed state - show both folder and browser icons */}
+      {/* Collapsed state — show open browser/folder icons */}
       {!isExpanded && (
         <div className="flex-1 flex flex-col items-center py-4 gap-2">
           {isWebMode ? (

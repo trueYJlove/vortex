@@ -44,7 +44,7 @@ export function SidebarSection({
         className="w-full flex items-center gap-2 px-3 py-2 hover:bg-secondary/50 cursor-pointer transition-colors"
       >
         {icon && <span className="text-muted-foreground">{icon}</span>}
-        <span className="text-sm sm:text-[14px] font-medium text-muted-foreground flex-1 text-left">
+        <span className="text-sm sm:text-[14px] font-semibold tracking-wide text-muted-foreground flex-1 text-left">
           {title}
         </span>
         {badge && <span className="text-xs text-muted-foreground">{badge}</span>}

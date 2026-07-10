@@ -156,10 +156,12 @@ export async function sendMessage(
     }
 
     // Get or create persistent V2 session (also starts persistent consumer if new)
+    const caps = resolvedCredentials.capabilities
     const v2Session = await getOrCreateV2Session(
       spaceId, conversationId, sdkOptions, sessionId, sessionConfig, workDir,
-      resolvedCredentials.displayModel,  // Passed to consumer for thought parsing
-      resolvedCredentials.capabilities?.contextWindow
+      resolvedCredentials.displayModel,
+      caps?.contextWindow,
+      caps ? { inputPrice: caps.inputPrice, outputPrice: caps.outputPrice, cacheReadPrice: caps.cacheReadPrice, cacheCreationPrice: caps.cacheCreationPrice } : undefined
     )
 
     sessionObtained = true
@@ -168,7 +170,8 @@ export async function sendMessage(
     // When the session is reused (no rebuild), the consumer retains the old displayModel.
     // This keeps thought parsing ("Connected | Model: X") in sync after model switches.
     updateConsumerDisplayModel(
-      conversationId, resolvedCredentials.displayModel, resolvedCredentials.capabilities?.contextWindow
+      conversationId, resolvedCredentials.displayModel, caps?.contextWindow,
+      caps ? { inputPrice: caps.inputPrice, outputPrice: caps.outputPrice, cacheReadPrice: caps.cacheReadPrice, cacheCreationPrice: caps.cacheCreationPrice } : undefined
     )
 
     // Dynamic runtime parameter adjustment

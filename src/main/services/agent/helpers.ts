@@ -193,6 +193,10 @@ function resolveCapabilitiesFromSource(
   return {
     maxOutputTokens: resolved.maxOutputTokens,
     contextWindow: resolved.contextWindow,
+    inputPrice: resolved.inputPrice,
+    outputPrice: resolved.outputPrice,
+    cacheReadPrice: resolved.cacheReadPrice,
+    cacheCreationPrice: resolved.cacheCreationPrice,
   }
 }
 

@@ -14,7 +14,7 @@
  */
 
 import { modelCapabilitiesService } from '../model-capabilities.service'
-import type { SingleCallUsage, TokenUsage } from './types'
+import type { SingleCallUsage, TokenUsage, PricingInfo } from './types'
 
 /**
  * Synthetic markers copied verbatim from claude-code (`utils/messages.ts`).
@@ -121,6 +121,11 @@ export function resolveContextWindow(model: string): number {
 /**
  * Build the final TokenUsage for a turn.
  *
+ * Pricing priority:
+ *   1. API returned `total_cost_usd` — use as-is, mark `pricingSource: 'api'`
+ *   2. Local pricing available — calculate from token counts × price, mark `pricingSource: 'local'`
+ *   3. Neither available — `totalCostUsd = 0`, no pricingSource
+ *
  * Primary source is `lastRealUsage` — the last real per-call usage captured from
  * the assistant frames (no cumulative aggregation, matches `/context`). Some
  * engines/turns (e.g. a short text-only reply) attach no usage to any assistant
@@ -133,18 +138,59 @@ export function buildTokenUsage(
   resultMsg: RawResultMessage,
   lastRealUsage: SingleCallUsage | null,
   model: string,
-  contextWindow?: number
+  contextWindow?: number,
+  pricing?: PricingInfo
 ): TokenUsage | null {
   const usage = lastRealUsage ?? resultUsageFallback(resultMsg)
   if (!usage) return null
+
+  const apiCost = resultMsg.total_cost_usd ?? 0
+  let totalCostUsd: number
+  let pricingSource: 'api' | 'local' | undefined
+
+  if (apiCost > 0) {
+    totalCostUsd = apiCost
+    pricingSource = 'api'
+  } else if (pricing && Number.isFinite(pricing.inputPrice)) {
+    totalCostUsd = calculateCost(usage, pricing)
+    pricingSource = 'local'
+  } else {
+    totalCostUsd = 0
+  }
+
   return {
     ...usage,
-    totalCostUsd: resultMsg.total_cost_usd || 0,
+    totalCostUsd,
+    pricingSource,
     // Prefer the source-resolved window (same value that drives the CC
     // subprocess via CLAUDE_CODE_AUTO_COMPACT_WINDOW) so the displayed
     // window always matches actual compaction behavior.
     contextWindow: contextWindow ?? resolveContextWindow(model)
   }
+}
+
+/**
+ * Calculate the cost of a single call based on token usage and pricing.
+ * Prices are per 1M tokens. Returns the cost in USD.
+ */
+export function calculateCost(
+  usage: SingleCallUsage,
+  pricing: PricingInfo
+): number {
+  let cost = 0
+  if (Number.isFinite(pricing.inputPrice)) {
+    cost += (usage.inputTokens / 1_000_000) * pricing.inputPrice!
+  }
+  if (Number.isFinite(pricing.outputPrice)) {
+    cost += (usage.outputTokens / 1_000_000) * pricing.outputPrice!
+  }
+  if (Number.isFinite(pricing.cacheReadPrice)) {
+    cost += (usage.cacheReadTokens / 1_000_000) * pricing.cacheReadPrice!
+  }
+  if (Number.isFinite(pricing.cacheCreationPrice)) {
+    cost += (usage.cacheCreationTokens / 1_000_000) * pricing.cacheCreationPrice!
+  }
+  return cost
 }
 
 function resultUsageFallback(resultMsg: RawResultMessage): SingleCallUsage | null {

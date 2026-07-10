@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Braces,
 } from 'lucide-react'
-import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { TeamSnapshotPanel } from './TeamPanel'
@@ -204,8 +203,6 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
   const [isMaximized, setIsMaximized] = useState(defaultMaximized)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  const latestTodos = useMemo(() => getLatestTodosFromThoughts(thoughts), [thoughts])
-
   // Filter thoughts for display (exclude TodoWrite, results, and sub-agent thoughts)
   // Sub-agent thoughts are rendered nested inside their parent Task thought via SubAgentTimeline
   const displayThoughts = useMemo(() => {
@@ -218,7 +215,7 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
   }, [thoughts])
 
   // Check if there's anything to show
-  const hasContent = displayThoughts.length > 0 || (latestTodos && latestTodos.length > 0)
+  const hasContent = displayThoughts.length > 0
   if (!hasContent) return null
 
   // Only count system-level errors, not tool execution failures
@@ -291,13 +288,6 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
           <div className="px-3 mt-2">
             <TeamSnapshotPanel thoughts={thoughts} />
           </div>
-
-          {/* TodoCard at bottom - only one instance */}
-          {latestTodos && latestTodos.length > 0 && (
-            <div className={`px-3 ${displayThoughts.length > 0 ? 'mt-2 pt-2 border-t border-border/20' : ''}`}>
-              <TodoCard todos={latestTodos} isAgentActive={false} />
-            </div>
-          )}
 
           {/* Maximize toggle - bottom right, heuristic: show when likely to overflow */}
           {(displayThoughts.length > 8 || isMaximized) && (

@@ -36,6 +36,7 @@ import type { WsConnectionState } from './api/transport'
 import { useTranslation } from './i18n'
 import type { AgentEventBase, Thought, ToolCall, HaloConfig, AgentErrorType, Question, McpServerStatus } from './types'
 import type { SessionInitInfo } from './types/slash-command'
+import type { SingleCallUsage } from '../main/services/agent/types'
 import { hasAnyAISource } from './types'
 import type { ThemeMode } from './types'
 import { getTheme, resolveSystemTheme } from './themes/registry'
@@ -106,6 +107,7 @@ export default function App() {
     handleAgentCompact,
     handleAgentSessionInfo,
     handleAgentTurnStart,
+    handleAgentTokenUsage,
     handleAskQuestion,
     currentSpaceId,
     setCurrentSpace: setChatCurrentSpace,
@@ -577,6 +579,11 @@ export default function App() {
       handleAgentTurnStart(data as AgentEventBase & { autonomous?: boolean })
     })
 
+    // Real-time token usage update during streaming
+    const unsubTokenUsage = api.onAgentTokenUsage((data) => {
+      handleAgentTokenUsage(data as AgentEventBase & { tokenUsage: SingleCallUsage })
+    })
+
     // MCP status updates (global - not per-conversation)
     const unsubMcpStatus = api.onAgentMcpStatus((data) => {
       console.log('[App] Received agent:mcp-status event:', data)
@@ -598,6 +605,7 @@ export default function App() {
       unsubAskQuestion()
       unsubSessionInfo()
       unsubTurnStart()
+      unsubTokenUsage()
       unsubMcpStatus()
     }
   }, [
@@ -611,6 +619,7 @@ export default function App() {
     handleAgentCompact,
     handleAgentSessionInfo,
     handleAgentTurnStart,
+    handleAgentTokenUsage,
     handleAskQuestion,
     setMcpStatus
   ])

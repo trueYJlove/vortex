@@ -22,7 +22,8 @@ import type {
   ToolCall,
   TokenUsage,
   SingleCallUsage,
-  SessionState
+  SessionState,
+  PricingInfo
 } from './types'
 import { emitAgentEvent } from './events'
 import { parseSDKMessage } from './message-utils'
@@ -233,6 +234,9 @@ export interface ProcessStreamParams {
    *  When provided, token-usage display uses it instead of guessing from the
    *  model name — keeps the UI window consistent with compaction behavior. */
   contextWindow?: number
+  /** Source-resolved pricing for local cost estimation (per 1M tokens, USD).
+   *  When provided and API doesn't return total_cost_usd, costs are estimated locally. */
+  pricing?: PricingInfo
   /** Abort controller for cancellation */
   abortController: AbortController
   /** Timestamp of send start (for timing logs) */
@@ -271,6 +275,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
     messageContent,
     displayModel,
     contextWindow,
+    pricing,
     abortController,
     t0,
     callbacks
@@ -475,7 +480,7 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
           capturedSessionId = sessionIdFromMsg as string
         }
         // Extract token usage
-        tokenUsage = buildTokenUsage(msg, lastSingleUsage, displayModel, contextWindow)
+        tokenUsage = buildTokenUsage(msg, lastSingleUsage, displayModel, contextWindow, pricing)
         console.log(`[Agent][${conversationId}] Drain complete — result consumed after ${Date.now() - drainStartTime}ms`)
         break
       }
@@ -811,6 +816,11 @@ export async function processStream(params: ProcessStreamParams): Promise<Stream
       if (usage) {
         lastSingleUsage = usage
         pendingInvocation.usage = usage
+        // Emit real-time token usage update for UI
+        emitAgentEvent('agent:token-usage', spaceId, conversationId, {
+          type: 'token-usage',
+          tokenUsage: usage
+        })
       }
     }
 

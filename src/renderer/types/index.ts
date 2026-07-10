@@ -249,6 +249,8 @@ export interface LayoutConfig {
   sidebarOpen?: boolean;                 // Whether conversation list sidebar is open
   sidebarWidth?: number;                 // Conversation list sidebar width (px)
   artifactRailWidth?: number;            // Artifact rail panel width (px)
+  taskPlanHeight?: number;               // Task plan panel height (px)
+  gitChangesHeight?: number;             // Git changes panel height (px)
 }
 
 // Network configuration
@@ -671,6 +673,8 @@ export interface TokenUsage {
   cacheCreationTokens: number;
   totalCostUsd: number;
   contextWindow: number;
+  /** Source of the pricing data: 'api' = from API response, 'local' = locally estimated, absent = not available */
+  pricingSource?: 'api' | 'local';
 }
 
 export interface AgentCompleteEvent extends AgentEventBase {

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-10",
+  "updatedAt": "2026-07-10",
   "patterns": {
     "claude-": {
       "displayName": "Claude",
@@ -218,7 +218,9 @@
       "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "vision": false,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 0.3,
+      "outputPrice": 0.6
     },
     "deepseek-v4-pro": {
       "displayName": "DeepSeek V4 Pro",
@@ -226,7 +228,9 @@
       "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "vision": false,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 2,
+      "outputPrice": 8
     },
     "deepseek-chat": {
       "displayName": "DeepSeek V3 (Legacy)",
@@ -234,7 +238,9 @@
       "contextWindow": 128000,
       "maxOutputTokens": 8192,
       "vision": false,
-      "thinking": false
+      "thinking": false,
+      "inputPrice": 0.5,
+      "outputPrice": 2
     },
     "deepseek-reasoner": {
       "displayName": "DeepSeek R1 (Legacy)",
@@ -242,7 +248,9 @@
       "contextWindow": 128000,
       "maxOutputTokens": 65536,
       "vision": false,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 0.55,
+      "outputPrice": 2.19
     },
     "qwen3-max": {
       "displayName": "Qwen3 Max",
@@ -450,7 +458,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-fable-5[1m]": {
       "displayName": "Claude Fable 5 (1M)",
@@ -458,7 +470,11 @@
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-8": {
       "displayName": "Claude Opus 4.8",
@@ -466,7 +482,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-8[1m]": {
       "displayName": "Claude Opus 4.8 (1M)",
@@ -474,7 +494,11 @@
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-7": {
       "displayName": "Claude Opus 4.7",
@@ -482,7 +506,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-7[1m]": {
       "displayName": "Claude Opus 4.7 (1M)",
@@ -490,7 +518,11 @@
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-6": {
       "displayName": "Claude Opus 4.6",
@@ -498,7 +530,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-6[1m]": {
       "displayName": "Claude Opus 4.6 (1M)",
@@ -506,7 +542,11 @@
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-opus-4-5-20251101": {
       "displayName": "Claude Opus 4.5",
@@ -514,7 +554,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-sonnet-4-6": {
       "displayName": "Claude Sonnet 4.6",
@@ -522,7 +566,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-sonnet-4-6[1m]": {
       "displayName": "Claude Sonnet 4.6 (1M)",
@@ -530,7 +578,11 @@
       "contextWindow": 1000000,
       "maxOutputTokens": 128000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-sonnet-4-5-20250929": {
       "displayName": "Claude Sonnet 4.5",
@@ -538,7 +590,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "vision": true,
-      "thinking": true
+      "thinking": true,
+      "inputPrice": 3,
+      "outputPrice": 15,
+      "cacheReadPrice": 0.3,
+      "cacheCreationPrice": 3.75
     },
     "claude-haiku-4-5-20251001": {
       "displayName": "Claude Haiku 4.5",
@@ -546,7 +602,11 @@
       "contextWindow": 200000,
       "maxOutputTokens": 64000,
       "vision": true,
-      "thinking": false
+      "thinking": false,
+      "inputPrice": 0.8,
+      "outputPrice": 4,
+      "cacheReadPrice": 0.08,
+      "cacheCreationPrice": 1
     },
     "gpt-5.4": {
       "displayName": "GPT-5.4",

@@ -25,6 +25,7 @@ import { appsApi } from './apps.api'
 import { storeApi } from './store.api'
 import { eventsApi } from './events.api'
 import { backupApi } from './backup.api'
+import { gitApi } from './git.api'
 
 /**
  * Unified api object — drop-in replacement for window.halo, transport-agnostic.
@@ -49,6 +50,7 @@ export const api = {
   ...storeApi,
   ...eventsApi,
   ...backupApi,
+  ...gitApi,
 }
 
 // Export type for the API

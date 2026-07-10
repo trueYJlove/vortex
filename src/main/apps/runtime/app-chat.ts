@@ -556,6 +556,10 @@ export async function sendAppChatMessage(
       conversationId,
       messageContent,
       displayModel: resolvedCreds.displayModel,
+      contextWindow: resolvedCreds.capabilities?.contextWindow,
+      pricing: resolvedCreds.capabilities
+        ? { inputPrice: resolvedCreds.capabilities.inputPrice, outputPrice: resolvedCreds.capabilities.outputPrice, cacheReadPrice: resolvedCreds.capabilities.cacheReadPrice, cacheCreationPrice: resolvedCreds.capabilities.cacheCreationPrice }
+        : undefined,
       abortController,
       t0,
       callbacks: {

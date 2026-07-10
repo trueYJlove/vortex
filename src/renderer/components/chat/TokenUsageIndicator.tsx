@@ -110,6 +110,11 @@ export function TokenUsageIndicator({ tokenUsage, previousCost = 0, className = 
                   <span>{t('Current / total')}</span>
                   <span className="text-foreground">
                     {formatCost(currentCost)}/{formatCost(tokenUsage.totalCostUsd)}
+                    {tokenUsage.pricingSource === 'local' && (
+                      <span className="ml-1 rounded px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-500 bg-amber-500/10" title={t('Locally estimated')}>
+                        {t('Local estimate')}
+                      </span>
+                    )}
                   </span>
                 </div>
               )}
