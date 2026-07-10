@@ -128,6 +128,7 @@ describe('buildTokenUsage', () => {
     expect(result).toEqual({
       ...usage,
       totalCostUsd: 2.86,
+      pricingSource: 'api',
       contextWindow: 200_000
     })
     // Numerator the UI renders = 600 + 0 + 50_750 = 51_350 (NOT inflated by output).
@@ -146,6 +147,7 @@ describe('buildTokenUsage', () => {
       cacheReadTokens: 0,
       cacheCreationTokens: 0,
       totalCostUsd: 0.5,
+      pricingSource: 'api',
       contextWindow: 200_000
     })
   })

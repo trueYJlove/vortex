@@ -110,12 +110,16 @@ export function ModelConfigPanel({ modelId, overrides, onChange }: ModelConfigPa
     if (activeTab !== 'json') return
     if (jsonLoadedForModel.current === modelId) return
 
-    const entry = {
+    const entry: Record<string, unknown> = {
       contextWindow: effective.contextWindow,
       maxOutputTokens: effective.maxOutputTokens,
       vision: effective.vision,
-      thinking: effective.thinking
+      thinking: effective.thinking,
     }
+    if (effective.inputPrice !== undefined) entry.inputPrice = effective.inputPrice
+    if (effective.outputPrice !== undefined) entry.outputPrice = effective.outputPrice
+    if (effective.cacheReadPrice !== undefined) entry.cacheReadPrice = effective.cacheReadPrice
+    if (effective.cacheCreationPrice !== undefined) entry.cacheCreationPrice = effective.cacheCreationPrice
     setJsonText(JSON.stringify(entry, null, 2))
     setJsonError(null)
     jsonLoadedForModel.current = modelId
@@ -143,6 +147,18 @@ export function ModelConfigPanel({ modelId, overrides, onChange }: ModelConfigPa
     updateField(field, n)
   }
 
+  const handlePriceField = (field: 'inputPrice' | 'outputPrice' | 'cacheReadPrice' | 'cacheCreationPrice', raw: string) => {
+    if (raw.trim() === '') {
+      const next: ModelCapabilityOverride = { ...userOverride }
+      delete next[field]
+      onChange({ ...overrides, [modelId]: next })
+      return
+    }
+    const n = parseFloat(raw)
+    if (!Number.isFinite(n) || n < 0) return
+    updateField(field, n)
+  }
+
   const handleBoolField = (field: 'vision' | 'thinking', checked: boolean) => {
     updateField(field, checked)
   }
@@ -156,6 +172,10 @@ export function ModelConfigPanel({ modelId, overrides, onChange }: ModelConfigPa
       if (typeof parsed.maxOutputTokens === 'number') next.maxOutputTokens = parsed.maxOutputTokens
       if (typeof parsed.vision === 'boolean') next.vision = parsed.vision
       if (typeof parsed.thinking === 'boolean') next.thinking = parsed.thinking
+      if (typeof parsed.inputPrice === 'number') next.inputPrice = parsed.inputPrice
+      if (typeof parsed.outputPrice === 'number') next.outputPrice = parsed.outputPrice
+      if (typeof parsed.cacheReadPrice === 'number') next.cacheReadPrice = parsed.cacheReadPrice
+      if (typeof parsed.cacheCreationPrice === 'number') next.cacheCreationPrice = parsed.cacheCreationPrice
       setJsonError(null)
       onChange({ ...overrides, [modelId]: next })
     } catch {
@@ -322,6 +342,68 @@ export function ModelConfigPanel({ modelId, overrides, onChange }: ModelConfigPa
                   />
                   <span className="text-sm text-foreground">{t('Thinking')}</span>
                 </label>
+              </div>
+
+              {/* Pricing section */}
+              <div className="border-t border-border/50 pt-3">
+                <h4 className="text-xs font-medium text-muted-foreground mb-2">{t('Pricing (USD / 1M tokens)')}</h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">{t('Input price')}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={effective.inputPrice ?? ''}
+                      placeholder={preset?.inputPrice !== undefined ? String(preset.inputPrice) : '-'}
+                      onChange={e => handlePriceField('inputPrice', e.target.value)}
+                      className="flex-1 min-w-0 w-full px-2.5 py-1.5 text-sm bg-input border border-border
+                                 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">{t('Output price')}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={effective.outputPrice ?? ''}
+                      placeholder={preset?.outputPrice !== undefined ? String(preset.outputPrice) : '-'}
+                      onChange={e => handlePriceField('outputPrice', e.target.value)}
+                      className="flex-1 min-w-0 w-full px-2.5 py-1.5 text-sm bg-input border border-border
+                                 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">{t('Cache read price')}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={effective.cacheReadPrice ?? ''}
+                      placeholder={preset?.cacheReadPrice !== undefined ? String(preset.cacheReadPrice) : '-'}
+                      onChange={e => handlePriceField('cacheReadPrice', e.target.value)}
+                      className="flex-1 min-w-0 w-full px-2.5 py-1.5 text-sm bg-input border border-border
+                                 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">{t('Cache write price')}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={effective.cacheCreationPrice ?? ''}
+                      placeholder={preset?.cacheCreationPrice !== undefined ? String(preset.cacheCreationPrice) : '-'}
+                      onChange={e => handlePriceField('cacheCreationPrice', e.target.value)}
+                      className="flex-1 min-w-0 w-full px-2.5 py-1.5 text-sm bg-input border border-border
+                                 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground/60 mt-1.5">
+                  {t('Set prices for local cost estimation. Leave empty to use preset defaults.')}
+                </p>
               </div>
             </div>
           )}

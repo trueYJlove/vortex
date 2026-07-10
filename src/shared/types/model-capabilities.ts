@@ -24,6 +24,14 @@ export interface ModelCapability {
   vision: boolean
   /** Whether the model supports extended thinking / reasoning mode */
   thinking: boolean
+  /** Price per 1M input tokens (USD) — for local cost estimation when API doesn't return total_cost_usd */
+  inputPrice?: number
+  /** Price per 1M output tokens (USD) */
+  outputPrice?: number
+  /** Price per 1M cache read tokens (USD) */
+  cacheReadPrice?: number
+  /** Price per 1M cache creation tokens (USD) */
+  cacheCreationPrice?: number
 }
 
 /**

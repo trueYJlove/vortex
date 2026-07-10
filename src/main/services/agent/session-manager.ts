@@ -20,6 +20,7 @@ import type {
   V2SessionInfo,
   SessionConfig,
   SessionState,
+  PricingInfo,
 } from './types'
 import {
   getHeadlessElectronPath,
@@ -439,6 +440,7 @@ function closeV2SessionForRebuild(conversationId: string): void {
  * @param workDir - Working directory (required for session migration when sessionId is provided)
  * @param displayModel - Display model name for thought parsing (when provided, starts persistent consumer)
  * @param contextWindow - Source-resolved context window for token-usage display
+ * @param pricing - Source-resolved pricing for local cost estimation
  */
 export async function getOrCreateV2Session(
   spaceId: string,
@@ -448,7 +450,8 @@ export async function getOrCreateV2Session(
   config?: SessionConfig,
   workDir?: string,
   displayModel?: string,
-  contextWindow?: number
+  contextWindow?: number,
+  pricing?: PricingInfo
 ): Promise<V2SessionInfo['session']> {
   // Check if we have an existing session for this conversation
   const existing = v2Sessions.get(conversationId)
@@ -626,7 +629,7 @@ export async function getOrCreateV2Session(
   // Automation apps (app-chat.ts, execute.ts) don't pass displayModel and handle
   // their own processStream() calls, so they don't get a consumer.
   if (displayModel) {
-    const consumer = startConsumer(session, spaceId, conversationId, displayModel, contextWindow)
+    const consumer = startConsumer(session, spaceId, conversationId, displayModel, contextWindow, pricing)
     consumers.set(conversationId, consumer)
     console.log(`[Agent][${conversationId}] Persistent consumer started`)
   }
@@ -702,14 +705,17 @@ export async function ensureSessionWarm(
   })
 
   try {
+    const caps = resolvedCredentials.capabilities
     const session = await getOrCreateV2Session(
       spaceId, conversationId, sdkOptions, sessionId, undefined, workDir,
-      resolvedCredentials.displayModel, resolvedCredentials.capabilities?.contextWindow
+      resolvedCredentials.displayModel, caps?.contextWindow,
+      caps ? { inputPrice: caps.inputPrice, outputPrice: caps.outputPrice, cacheReadPrice: caps.cacheReadPrice, cacheCreationPrice: caps.cacheCreationPrice } : undefined
     )
 
     // Ensure consumer's displayModel is up-to-date (same as sendMessage)
     updateConsumerDisplayModel(
-      conversationId, resolvedCredentials.displayModel, resolvedCredentials.capabilities?.contextWindow
+      conversationId, resolvedCredentials.displayModel, caps?.contextWindow,
+      caps ? { inputPrice: caps.inputPrice, outputPrice: caps.outputPrice, cacheReadPrice: caps.cacheReadPrice, cacheCreationPrice: caps.cacheCreationPrice } : undefined
     )
 
     // Fetch supported commands from SDK and send to renderer
@@ -780,11 +786,12 @@ export function getConsumerHandle(conversationId: string): ConsumerHandle | null
 export function updateConsumerDisplayModel(
   conversationId: string,
   displayModel: string,
-  contextWindow?: number
+  contextWindow?: number,
+  pricing?: PricingInfo
 ): void {
   const consumer = consumers.get(conversationId)
   if (consumer) {
-    consumer.updateDisplayModel(displayModel, contextWindow)
+    consumer.updateDisplayModel(displayModel, contextWindow, pricing)
   }
 }
 

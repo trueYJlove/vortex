@@ -673,6 +673,8 @@ export interface TokenUsage {
   cacheCreationTokens: number;
   totalCostUsd: number;
   contextWindow: number;
+  /** Source of the pricing data: 'api' = from API response, 'local' = locally estimated, absent = not available */
+  pricingSource?: 'api' | 'local';
 }
 
 export interface AgentCompleteEvent extends AgentEventBase {
