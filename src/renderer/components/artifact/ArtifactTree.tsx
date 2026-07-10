@@ -14,6 +14,7 @@ import { useState, useCallback, useEffect, useLayoutEffect, useMemo, createConte
 import { Tree, NodeRendererProps, TreeApi, CreateHandler, RenameHandler, DeleteHandler, MoveHandler, NodeApi } from 'react-arborist'
 import { api } from '../../api'
 import { useCanvasStore } from '../../stores/canvas.store'
+import { useSpaceStore } from '../../stores/space.store'
 import type { ArtifactTreeNode, ArtifactTreeUpdateEvent } from '../../types'
 import { FileIcon } from '../icons/ToolIcons'
 import { ChevronRight, ChevronDown, Download, Eye, Loader2, FilePlus, FolderPlus, Edit3, Trash2, FolderOpen, Copy, RefreshCw, Globe } from 'lucide-react'
@@ -181,6 +182,9 @@ export function ArtifactTree({ spaceId, onOpenBrowser, onOpenFolder }: ArtifactT
   const workspaceRootRef = useRef<string>('')
   // Folder name extracted from workspace root, displayed in header
   const [folderName, setFolderName] = useState('')
+  // Space name from store — preferred over filesystem folder name (which is a UUID for centralized spaces)
+  const currentSpace = useSpaceStore(state => state.currentSpace)
+  const headerName = currentSpace?.id === spaceId ? currentSpace.name : (folderName || t('Files'))
 
   // File operations hook
   const {
@@ -628,12 +632,56 @@ export function ArtifactTree({ spaceId, onOpenBrowser, onOpenFolder }: ArtifactT
       return null
     }
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-2">
-        <div className="w-10 h-10 rounded-lg border border-dashed border-muted-foreground/30 flex items-center justify-center mb-2">
-          <ChevronRight className="w-5 h-5 text-muted-foreground/40" />
-        </div>
-        <p className="text-xs text-muted-foreground">{t('No files')}</p>
-      </div>
+      <OpenFileContext.Provider value={openFile}>
+        <LazyLoadContext.Provider value={lazyLoadValue}>
+          <div ref={containerRef} tabIndex={-1} className="flex flex-col h-full outline-none">
+            {/* Toolbar always visible */}
+            <div className="flex-shrink-0 bg-card px-2 py-1.5 border-b border-border/50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground truncate">
+                  {headerName}
+                </span>
+                <div className="flex gap-1">
+                  {onOpenBrowser && (
+                    <button
+                      onClick={onOpenBrowser}
+                      className="p-1 hover:bg-secondary/60 rounded transition-colors"
+                      title={t('Open browser')}
+                    >
+                      <Globe className="w-3.5 h-3.5 text-blue-500" />
+                    </button>
+                  )}
+                  {onOpenFolder && (
+                    <button
+                      onClick={onOpenFolder}
+                      className="p-1 hover:bg-secondary/60 rounded transition-colors"
+                      title={t('Open folder')}
+                    >
+                      <FolderOpen className="w-3.5 h-3.5 text-amber-500" />
+                    </button>
+                  )}
+                  <button onClick={handleNewFile} className="p-1 hover:bg-secondary/60 rounded transition-colors" title={t('New File')}>
+                    <FilePlus className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                  <button onClick={handleNewFolder} className="p-1 hover:bg-secondary/60 rounded transition-colors" title={t('New Folder')}>
+                    <FolderPlus className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                  <button onClick={() => { api.reconcileArtifacts(spaceId) }} className="p-1 hover:bg-secondary/60 rounded transition-colors" title={t('Refresh file tree')}>
+                    <RefreshCw className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* Empty state */}
+            <div className="flex flex-col items-center justify-center flex-1 text-center px-2">
+              <div className="w-10 h-10 rounded-lg border border-dashed border-muted-foreground/30 flex items-center justify-center mb-2">
+                <ChevronRight className="w-5 h-5 text-muted-foreground/40" />
+              </div>
+              <p className="text-xs text-muted-foreground">{t('No files')}</p>
+            </div>
+          </div>
+        </LazyLoadContext.Provider>
+      </OpenFileContext.Provider>
     )
   }
 
@@ -652,7 +700,7 @@ export function ArtifactTree({ spaceId, onOpenBrowser, onOpenFolder }: ArtifactT
           <div className="flex-shrink-0 bg-card px-2 py-1.5 border-b border-border/50">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-foreground truncate" title={workspaceRootRef.current}>
-                {folderName || t('Files')}
+                {headerName}
               </span>
               <div className="flex gap-1">
                 {onOpenBrowser && (
