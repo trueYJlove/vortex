@@ -6,7 +6,6 @@
  * (import). Designed for migration between machines or OS reinstalls.
  *
  * Excluded from the archive:
- *   - `temp/` — runtime temp space
  *   - `store-cache/` — store registry cache
  *   - `logs/` — runtime logs
  *   - `*.wal`, `*.shm` — SQLite WAL artifacts (VACUUM before packing)
@@ -69,7 +68,7 @@ export interface BackupResult {
 // sidecar files. SQLite uses `<db>-wal` and `<db>-shm` naming (e.g.
 // `vortex.db-wal`, `vortex.db-shm`), so the bare `.wal` / `.shm` suffixes
 // never match — use `.db-wal`, `.db-shm` instead.
-const EXCLUDED_DIRS = new Set(['temp', 'store-cache', 'logs'])
+const EXCLUDED_DIRS = new Set(['store-cache', 'logs'])
 const EXCLUDED_SUFFIXES = ['.db-wal', '.db-shm', '.tmp']
 
 type ProgressEmitter = (progress: BackupProgress) => void

@@ -646,7 +646,12 @@ export function listConversations(spaceId: string): ConversationMeta[] {
 
   const index = readIndex(conversationsDir)
   if (index) {
-    return index.conversations
+    // Defensive: if index reports zero but files exist on disk (e.g. after
+    // backup import where the index was stale), fall through to a full scan.
+    if (index.conversations.length > 0) {
+      return index.conversations
+    }
+    console.log(`[Conversation] Index has 0 conversations, falling back to full scan for ${conversationsDir}`)
   }
 
   const metas = fullScanConversations(conversationsDir, spaceId)

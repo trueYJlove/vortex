@@ -122,6 +122,11 @@ export function ProviderSelector({
   const [modelSearchQuery, setModelSearchQuery] = useState('')
   const [showModelDropdown, setShowModelDropdown] = useState(false)
 
+  // Tracks whether auto-fetch has already been attempted with the current apiKey.
+  // When the key changes, auto-fetch retries on the next save.
+  const autoFetchedKeyRef = useRef<string>('')
+  const presetAutoFetchedKeyRef = useRef<string>('')
+
   // Preset model fetcher — race-safe AbortController, fallback handling,
   // unmount cleanup. Inert when neither preset path is active. Initial
   // fallback list is taken from the edit source (preset edit) or the preset
@@ -224,6 +229,7 @@ export function ProviderSelector({
     setApiKey('')
     setValidationResult(null)
     setFetchedModels([])
+    autoFetchedKeyRef.current = ''
     setShowCustomModel(false)
     setCustomModelInput('')
     setShowProviderDropdown(false)
@@ -271,6 +277,7 @@ export function ProviderSelector({
       const { models } = response.data as { models: ModelOption[] }
 
       setFetchedModels(models)
+      autoFetchedKeyRef.current = apiKey.trim()
 
       if (!selectedModel || !models.some(m => m.id === selectedModel)) {
         setSelectedModel(models[0].id)
@@ -292,7 +299,7 @@ export function ProviderSelector({
       return
     }
 
-    const finalModel = showCustomModel && customModelInput ? customModelInput : selectedModel
+    let finalModel = showCustomModel && customModelInput ? customModelInput : selectedModel
 
     if (!finalModel) {
       setValidationResult({ valid: false, message: t('Please select a model') })
@@ -303,13 +310,45 @@ export function ProviderSelector({
     setValidationResult(null)
 
     try {
-      // Prefer the live list (generic editor's fetched list, or the preset
-      // hook's current models). Fall back to the builtin provider's static
-      // catalog (generic) or a single-entry list seeded with `finalModel`
-      // (preset with empty fetch). The unshift below guarantees the chosen
-      // model is always present in the persisted list.
-      const availableModels: ModelOption[] = effectiveModelList.length > 0
-        ? [...effectiveModelList]
+      // ── Auto-fetch models if user hasn't fetched yet ──────────────
+      // Users commonly forget to click "Fetch Models" before saving.
+      // We try a one-shot fetch here so the persisted availableModels
+      // contains the live gateway model list rather than static defaults.
+      // Best-effort: silence errors to avoid confusing the user.
+      let liveModels: ModelOption[] = effectiveModelList
+
+      if (!showCustomModel) {
+        if (isPresetAdd || isPresetEdit) {
+          if (presetAutoFetchedKeyRef.current !== apiKey.trim() && apiKey.trim()) {
+            presetAutoFetchedKeyRef.current = apiKey.trim()
+            try {
+              const fetched = await presetModelsHook.fetchModels()
+              if (fetched.length > 0) liveModels = fetched
+            } catch { /* best-effort */ }
+          }
+        } else {
+          if (autoFetchedKeyRef.current !== apiKey.trim() && apiUrl) {
+            autoFetchedKeyRef.current = apiKey.trim()
+            try {
+              const response = await api.fetchModels(apiKey, apiUrl)
+              if (response.success && response.data) {
+                const { models } = response.data as { models: ModelOption[] }
+                setFetchedModels(models)
+                liveModels = models
+              }
+            } catch { /* best-effort */ }
+          }
+        }
+      }
+
+      // If auto-fetch returned models and the current selection isn't in the
+      // live list, auto-select the first one so the user gets a usable model.
+      if (liveModels.length > 0 && !liveModels.some(m => m.id === finalModel)) {
+        finalModel = liveModels[0].id
+      }
+
+      const availableModels: ModelOption[] = liveModels.length > 0
+        ? [...liveModels]
         : (currentProvider?.models ? [...currentProvider.models] : [{ id: finalModel, name: finalModel }])
 
       if (!availableModels.some(m => m.id === finalModel)) {
@@ -552,7 +591,7 @@ export function ProviderSelector({
               </label>
               <button
                 type="button"
-                onClick={() => { void presetModelsHook.fetchModels() }}
+                onClick={() => { presetAutoFetchedKeyRef.current = ''; void presetModelsHook.fetchModels() }}
                 disabled={presetModelsHook.isFetching || !apiKey.trim()}
                 className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={t('Fetch the latest model list from the gateway')}
