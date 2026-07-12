@@ -55,9 +55,22 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import { mkdir } from 'fs/promises'
 
+import type { DatabaseManager } from '../store/types'
+import { knowledgeMigrations } from './knowledge/migrations'
+
 // Re-export types for consumers
 export type { MemoryService, MemoryCallerScope, MemoryScopeType }
 export { COMPACTION_THRESHOLD_BYTES }
+
+// Re-export KnowledgeService types
+export type {
+  KnowledgeService,
+  SearchResult as KnowledgeSearchResult,
+  KnowledgeDocument,
+  KnowledgeSearchParams,
+  DocumentFileType as KnowledgeDocumentFileType,
+} from './knowledge/types'
+export { initKnowledgeService, getKnowledgeService } from './knowledge/index'
 
 // ============================================================================
 // MemoryService Implementation
@@ -262,12 +275,30 @@ function sanitizeSlug(slug: string): string {
  * V1: No initialization work needed (no database, no cache).
  * Returns a MemoryService instance ready for use.
  *
+ * When a databaseManager is provided, runs database migrations for the
+ * knowledge module (FTS5-based document indexing and search).
+ *
+ * @param opts - Optional. When provided, runs knowledge database migrations.
  * @returns A configured MemoryService instance
  */
-export async function initMemory(): Promise<MemoryService> {
+export async function initMemory(opts?: { db: DatabaseManager }): Promise<MemoryService> {
   const start = performance.now()
 
   const service = createMemoryService()
+
+  // Run knowledge module migrations if a database manager is provided
+  if (opts?.db) {
+    try {
+      const appDb = opts.db.getAppDatabase()
+      opts.db.runMigrations(appDb, 'knowledge', knowledgeMigrations)
+      // Initialize KnowledgeService singleton so it's ready for Agent integration
+      const { initKnowledgeService } = await import('./knowledge/index')
+      initKnowledgeService(appDb)
+      console.log('[Memory] Knowledge database migrations complete')
+    } catch (err) {
+      console.error('[Memory] Knowledge database migration failed:', err)
+    }
+  }
 
   const duration = performance.now() - start
   console.log(`[Memory] Memory service initialized in ${duration.toFixed(1)}ms`)

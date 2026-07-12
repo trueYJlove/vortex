@@ -30,6 +30,8 @@ import { gitRpc } from '../shared/rpc/contracts/git.contract'
 import { overlayRpc } from '../shared/rpc/contracts/overlay.contract'
 import { appRpc } from '../shared/rpc/contracts/app.contract'
 import { backupRpc } from '../shared/rpc/contracts/backup.contract'
+import { knowledgeRpc } from '../shared/rpc/contracts/knowledge.contract'
+import { workflowRpc } from '../shared/rpc/contracts/workflow.contract'
 import type {
   HealthStatusResponse,
   HealthStateResponse,
@@ -469,6 +471,19 @@ export interface HaloAPI {
   onImSessionUpdated: (callback: (data: unknown) => void) => () => void
   onImChannelInstanceUpdated: (callback: (data: unknown) => void) => () => void
 
+  // Knowledge Base
+  knowledgeList: (spaceId: string) => Promise<IpcResponse>
+  knowledgeSearch: (params: { spaceId: string; query: string; topK?: number }) => Promise<IpcResponse>
+  knowledgeDelete: (params: { spaceId: string; sourcePath: string }) => Promise<IpcResponse>
+  knowledgeUpload: (params: { spaceId: string }) => Promise<IpcResponse>
+  knowledgeReindex: (spaceId: string) => Promise<IpcResponse>
+  onKnowledgeStatus: (callback: (data: { spaceId: string; type: 'indexing' | 'complete' | 'error'; message: string; sourcePath?: string }) => void) => () => void
+
+  // Workflow Execution History
+  workflowListRuns: (appId: string, limit?: number) => Promise<IpcResponse>
+  workflowGetRun: (runId: string) => Promise<IpcResponse>
+  workflowGetNodeRuns: (runId: string) => Promise<IpcResponse>
+
   // Notification (in-app toast)
   onNotificationToast: (callback: (data: unknown) => void) => () => void
 
@@ -752,6 +767,13 @@ const api: HaloAPI = {
 
   // Apps Management + Import/Export + Chat (all derived from appRpc contract)
   ...bindRpc(appRpc),
+
+  // Knowledge Base (derived from knowledgeRpc contract)
+  ...bindRpc(knowledgeRpc),
+  onKnowledgeStatus: (callback) => createEventListener('knowledge:status', callback),
+
+  // Workflow Execution History (derived from workflowRpc contract)
+  ...bindRpc(workflowRpc),
 
   // App Event Listeners
   onAppStatusChanged: (callback) => createEventListener('app:status_changed', callback),

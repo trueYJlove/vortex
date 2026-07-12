@@ -335,6 +335,51 @@ export const BrowserLoginEntrySchema = z.object({
 })
 
 // ============================================
+// Workflow Steps Schema
+// ============================================
+
+const LlmCallStepSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('llm_call'),
+  prompt: z.string().min(1),
+  tools: z.array(z.string()).optional(),
+  output: z.record(z.string()).optional(),
+})
+
+const ToolCallStepSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('tool_call'),
+  tool: z.string().min(1),
+  params: z.record(z.unknown()).optional(),
+})
+
+const ConditionStepSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('condition'),
+  input: z.string().min(1),
+  cases: z.array(z.object({
+    when: z.object({
+      eq: z.unknown().optional(),
+      neq: z.unknown().optional(),
+      contains: z.unknown().optional(),
+      matches: z.string().optional(),
+      gt: z.number().optional(),
+      lt: z.number().optional(),
+      gte: z.number().optional(),
+      lte: z.number().optional(),
+    }),
+    goto: z.string().min(1),
+  })).min(1),
+  default: z.string().optional(),
+})
+
+export const WorkflowStepSchema = z.discriminatedUnion('type', [
+  LlmCallStepSchema,
+  ToolCallStepSchema,
+  ConditionStepSchema,
+])
+
+// ============================================
 // Escalation Config
 // ============================================
 
@@ -466,6 +511,8 @@ export const AutomationSpecSchema = AppSpecCommonSchema.extend({
   recommended_model: z.string().optional(),
   /** Websites the user needs to log into before the automation can run */
   browser_login: z.array(BrowserLoginEntrySchema).optional(),
+  /** Workflow step definitions — enables multi-step automation DAG */
+  steps: z.array(WorkflowStepSchema).optional(),
 })
 
 /**
@@ -578,3 +625,9 @@ export type ExtensionSpec = z.infer<typeof ExtensionSpecSchema>
 // i18n derived types (re-exported for convenience)
 export type I18nConfigFieldOverride = NonNullable<NonNullable<AutomationSpec['i18n']>[string]['config_schema']>[string]
 export type I18nLocaleBlock = NonNullable<AutomationSpec['i18n']>[string]
+
+// Workflow step types
+export type WorkflowStep = z.infer<typeof WorkflowStepSchema>
+export type LlmCallStep = z.infer<typeof LlmCallStepSchema>
+export type ToolCallStep = z.infer<typeof ToolCallStepSchema>
+export type ConditionStep = z.infer<typeof ConditionStepSchema>

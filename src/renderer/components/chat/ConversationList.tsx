@@ -18,6 +18,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog'
 import { api } from '../../api'
 import { TaskStatusDot } from '../pulse/TaskStatusDot'
 import { PulseSidebarSection } from '../pulse/PulseSidebarSection'
+import { KnowledgeBasePanel } from '../knowledge/KnowledgeBasePanel'
 import { AutomationBadge } from '../apps/AutomationBadge'
 import { EngineBadge } from './EngineBadge'
 import { PersistentTaskPlanPanel } from './PersistentTaskPlanPanel'
@@ -351,10 +352,11 @@ export const ConversationList = memo(function ConversationList({
       className={`${side === 'right' ? 'border-l' : 'border-r'} border-border flex flex-col bg-card/50 relative`}
       style={{ width, transition: isDragging ? 'none' : 'width 0.2s ease' }}
     >
-      {/* Top section: close button + automation badge + pinned conversations */}
+      {/* Top section: close button + automation badge + pinned conversations + knowledge base */}
       <div className="flex flex-col">
         <AutomationBadge onClose={onClose} side={side} />
         {visible && <PulseSidebarSection />}
+        {visible && <KnowledgeBasePanel />}
       </div>
 
       {/* Content area: Sessions + Task plan */}

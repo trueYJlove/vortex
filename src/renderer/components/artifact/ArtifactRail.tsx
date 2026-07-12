@@ -128,6 +128,21 @@ export function ArtifactRail({
   const { isActive: isOnboarding, currentStep, completeOnboarding } = useOnboardingStore()
   const isMobile = useIsMobile()
 
+  // Track whether a dialog/modal is open (mobile only)
+  // When a dialog is open, hide the floating button to prevent it from
+  // blocking dialog close buttons or other interactive elements.
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isMobile) return
+    const observer = new MutationObserver(() => {
+      const hasDialog = document.querySelector('.fixed.inset-0.z-50') !== null
+      setIsDialogOpen(hasDialog)
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    return () => observer.disconnect()
+  }, [isMobile])
+
   // ── Callbacks ──
 
   const handleOpenFolder = useCallback(() => {
@@ -455,11 +470,11 @@ export function ArtifactRail({
   if (isMobile) {
     return (
       <>
-        {/* Floating trigger button - z-[60] to stay above Canvas overlay (z-50) */}
+        {/* Floating trigger button - hidden when dialog is open to avoid blocking close buttons */}
         <button
           onClick={() => setMobileOverlayOpen(true)}
-          className="
-            fixed right-0 top-1/3 z-[60]
+          className={`
+            fixed right-0 top-1/3 z-40
             w-10 h-14
             bg-card
             border-l border-y border-border
@@ -469,7 +484,8 @@ export function ArtifactRail({
             hover:bg-card
             active:scale-95
             transition-all duration-200
-          "
+            ${isDialogOpen ? 'invisible pointer-events-none' : ''}
+          `}
           aria-label={t('Open artifacts panel')}
         >
           <FolderOpen className="w-4 h-4 text-amber-500" />

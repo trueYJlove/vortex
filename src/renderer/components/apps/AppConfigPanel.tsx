@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
-import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle, RefreshCw, X } from 'lucide-react'
+import { Save, RotateCcw, Unplug, Loader2, FileCode, Settings, Workflow, Code, AlertTriangle, Globe, Bell, Download, ExternalLink, FolderOpen, Wrench, Send, Trash2, Mail, HelpCircle, RefreshCw, X, Plus, Server } from 'lucide-react'
 import { stringify as stringifyYaml, parse as parseYaml } from 'yaml'
 import { useAppsStore } from '../../stores/apps.store'
 import { useAppStore } from '../../stores/app.store'
@@ -37,16 +37,19 @@ import {
   type ScheduleValue,
 } from './schedule-utils'
 
-// Lazy-load CodeMirrorEditor to keep initial bundle small
+// Lazy-load CodeMirrorEditor and WorkflowEditor to keep initial bundle small
 const CodeMirrorEditor = lazy(() =>
   import('../canvas/viewers/CodeMirrorEditor').then(m => ({ default: m.CodeMirrorEditor }))
+)
+const WorkflowEditor = lazy(() =>
+  import('../workflow/WorkflowEditor').then(m => ({ default: m.WorkflowEditor }))
 )
 
 // ============================================
 // Types
 // ============================================
 
-type ConfigTab = 'settings' | 'yaml'
+type ConfigTab = 'settings' | 'yaml' | 'workflow'
 
 // ============================================
 // Helpers
@@ -309,6 +312,166 @@ function UpgradeSection({ app, appId, t }: UpgradeSectionProps) {
           </p>
         )}
       </div>
+    </div>
+  )
+}
+
+// ============================================
+// MCP Dependencies Editor
+// ============================================
+
+interface McpDepsEditorProps {
+  app: InstalledApp
+  appId: string
+  onUpdateAppSpec: (appId: string, patch: Record<string, unknown>) => Promise<boolean>
+  t: (s: string, opts?: Record<string, unknown>) => string
+}
+
+function McpDepsEditor({ app, appId, onUpdateAppSpec, t }: McpDepsEditorProps) {
+  const [deps, setDeps] = useState<Array<{ id: string; reason?: string; bundled?: boolean }>>(
+    () => app.spec.requires?.mcps ?? [],
+  )
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Sync when app changes externally
+  useEffect(() => {
+    setDeps(app.spec.requires?.mcps ?? [])
+    setSaveSuccess(false)
+    setError(null)
+  }, [app.id, app.spec])
+
+  const hasChanges = JSON.stringify(deps) !== JSON.stringify(app.spec.requires?.mcps ?? [])
+
+  const addDep = () => {
+    setDeps([...deps, { id: '', reason: '' }])
+    setError(null)
+  }
+
+  const removeDep = (index: number) => {
+    setDeps(deps.filter((_, i) => i !== index))
+    setError(null)
+  }
+
+  const updateDep = (index: number, patch: { id?: string; reason?: string; bundled?: boolean }) => {
+    const updated = deps.map((d, i) => (i === index ? { ...d, ...patch } : d))
+    setDeps(updated)
+    setError(null)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError(null)
+    const ok = await onUpdateAppSpec(appId, {
+      requires: { ...(app.spec.requires ?? {}), mcps: deps },
+    })
+    setSaving(false)
+    if (ok) {
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 2000)
+    } else {
+      setError(t('Failed to save MCP dependencies'))
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+          <Server className="w-3.5 h-3.5" />
+          {t('MCP Dependencies')}
+        </h3>
+        <button
+          onClick={addDep}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:text-primary/80 border border-primary/30 hover:border-primary/60 rounded-md transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+          {t('Add')}
+        </button>
+      </div>
+
+      {error && (
+        <p className="text-xs text-red-400">{error}</p>
+      )}
+
+      {deps.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">
+          {t('No MCP dependencies. Add MCP servers that this digital human needs, such as "ai-browser" for web browsing.')}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {deps.map((dep, i) => (
+            <div key={i} className="bg-secondary rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 space-y-1.5">
+                  {/* MCP Server ID */}
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      {t('Server ID')}
+                    </label>
+                    <input
+                      type="text"
+                      value={dep.id}
+                      onChange={(e) => updateDep(i, { id: e.target.value })}
+                      className="w-full text-xs font-mono bg-background border border-border rounded px-2 py-1.5 text-foreground focus:outline-none focus:border-primary"
+                      placeholder={t('e.g. ai-browser, filesystem')}
+                    />
+                  </div>
+                  {/* Reason (optional) */}
+                  <div>
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                      {t('Reason')}
+                    </label>
+                    <input
+                      type="text"
+                      value={dep.reason ?? ''}
+                      onChange={(e) => updateDep(i, { reason: e.target.value || undefined })}
+                      className="w-full text-xs font-mono bg-background border border-border rounded px-2 py-1.5 text-foreground focus:outline-none focus:border-primary"
+                      placeholder={t('What this MCP server is used for (optional)')}
+                    />
+                  </div>
+                  {/* Bundled toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!dep.bundled}
+                      onChange={(e) => updateDep(i, { bundled: e.target.checked || undefined })}
+                      className="rounded border-border text-primary focus:ring-primary"
+                    />
+                    <span className="text-[10px] text-muted-foreground">{t('Bundled')}</span>
+                  </label>
+                </div>
+                <button
+                  onClick={() => removeDep(i)}
+                  className="p-1 text-muted-foreground hover:text-destructive flex-shrink-0 self-start mt-1 rounded transition-colors"
+                  title={t('Remove')}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hasChanges && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-40"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {t('Save')}
+          </button>
+          {saveSuccess && <span className="text-xs text-green-500">{t('Saved')}</span>}
+        </div>
+      )}
+
+      <p className="text-[10px] text-muted-foreground leading-relaxed">
+        {t('MCP servers provide tools that AI can call at runtime. For example, "ai-browser" enables web browsing, "filesystem" enables file read/write. Adding a dependency lets the digital human automatically load and use these tools during execution.')}
+      </p>
     </div>
   )
 }
@@ -898,6 +1061,14 @@ function SettingsTab({ app, appId, spaceName, t, onRequireRestart }: SettingsTab
 
         <UpgradeSection app={app} appId={appId} t={t} />
 
+        {/* ── MCP Dependencies ── */}
+        <McpDepsEditor
+          app={app}
+          appId={appId}
+          onUpdateAppSpec={updateAppSpec}
+          t={t}
+        />
+
         {/* ── Spec Info (read-only summary + data directory) ── */}
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
@@ -1062,8 +1233,8 @@ function YamlTab({ app, appId, t, onRequireRestart }: YamlTabProps) {
   }
 
   return (
-    <div className="space-y-3 flex flex-col" style={{ minHeight: 0 }}>
-      <p className="text-xs text-muted-foreground">
+    <div className="space-y-3 flex flex-col">
+      <p className="text-xs text-muted-foreground flex-shrink-0">
         {t('Edit the full app spec as YAML. Changes are validated by the server before saving.')}
       </p>
 
@@ -1072,7 +1243,7 @@ function YamlTab({ app, appId, t, onRequireRestart }: YamlTabProps) {
           <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       }>
-        <div className="border border-border rounded-lg overflow-hidden h-[45vh] sm:h-[60vh] min-h-[280px] sm:min-h-[320px]">
+        <div className="h-[45vh] sm:h-[60vh] min-h-[280px] border border-border rounded-lg overflow-hidden">
           <CodeMirrorEditor
             content={yamlContent}
             language="yaml"
@@ -1083,10 +1254,10 @@ function YamlTab({ app, appId, t, onRequireRestart }: YamlTabProps) {
       </Suspense>
 
       {error && (
-        <p className="text-xs text-red-400">{error}</p>
+        <p className="text-xs text-red-400 flex-shrink-0">{error}</p>
       )}
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <button
           onClick={handleSave}
           disabled={!hasChanges || saving}
@@ -1191,7 +1362,7 @@ export function AppConfigPanel({ appId, spaceName }: AppConfigPanelProps) {
   const { name, description } = resolveSpecI18n(app.spec, getCurrentLanguage())
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+    <div className="flex-1 flex flex-col overflow-y-auto p-6 gap-4">
       {/* App identity (always visible) */}
       <div>
         <h2 className="text-base font-semibold text-foreground">{name}</h2>
@@ -1217,6 +1388,19 @@ export function AppConfigPanel({ appId, spaceName }: AppConfigPanelProps) {
           <Settings className="w-3.5 h-3.5" />
           {t('Settings')}
         </button>
+        {app.spec.type === 'automation' && (
+          <button
+            onClick={() => setActiveTab('workflow')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
+              activeTab === 'workflow'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Workflow className="w-3.5 h-3.5" />
+            {t('Workflow')}
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('yaml')}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors ${
@@ -1282,6 +1466,17 @@ export function AppConfigPanel({ appId, spaceName }: AppConfigPanelProps) {
           t={t}
           onRequireRestart={() => setRestartHinted(true)}
         />
+      )}
+      {activeTab === 'workflow' && (
+        <div className="flex-1 border border-border rounded-lg overflow-hidden" style={{ minHeight: 0 }}>
+          <Suspense fallback={
+            <div className="h-64 flex items-center justify-center bg-secondary">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          }>
+            <WorkflowEditor appId={appId} />
+          </Suspense>
+        </div>
       )}
       {activeTab === 'yaml' && (
         <YamlTab

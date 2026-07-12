@@ -22,6 +22,7 @@ import { AutomationHeader } from '../components/apps/AutomationHeader'
 import { LoginNoticeBar } from '../components/apps/LoginNoticeBar'
 import { ActivityThread } from '../components/apps/ActivityThread'
 import { SessionDetailView } from '../components/apps/SessionDetailView'
+import { WorkflowReplay } from '../components/apps/WorkflowReplay'
 import { AppChatView } from '../components/apps/AppChatView'
 import { AppChatContainer } from '../components/apps/AppChatContainer'
 import { AppConfigPanel } from '../components/apps/AppConfigPanel'
@@ -203,6 +204,8 @@ export function AppsPage() {
     switch (detailView.type) {
       case 'activity-thread':
         return <ActivityThread appId={detailView.appId} />
+      case 'workflow-replay':
+        return <WorkflowReplay appId={detailView.appId} />
       case 'session-detail':
         return (
           <SessionDetailView
@@ -346,7 +349,7 @@ export function AppsPage() {
             )}
 
             {/* Detail content — app-chat manages its own scroll + flex layout */}
-            <div className={`flex-1 ${isAppChat || isSessionDetail ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+            <div className={`flex-1 flex flex-col ${isAppChat || isSessionDetail ? 'overflow-hidden' : 'overflow-y-auto'}`}>
               {renderDetail()}
             </div>
           </div>
@@ -397,7 +400,7 @@ export function AppsPage() {
               )}
 
               {/* Detail content */}
-              <div className={`flex-1 ${isAppChat || isSessionDetail ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+              <div className={`flex-1 flex flex-col ${isAppChat || isSessionDetail ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                 {renderDetail()}
               </div>
             </>

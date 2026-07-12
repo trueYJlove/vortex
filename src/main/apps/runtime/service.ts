@@ -47,6 +47,18 @@ import type { ImSessionRecord } from '../../../shared/types/im-channel'
 import { broadcastToAll } from '../../http/websocket'
 import { sendToRenderer } from '../../foundation/window.service'
 import { notifyAppEvent } from '../../services/notification.service'
+import { getWorkflowStore } from './index'
+import type { LlmCallDeps } from './workflow/nodes/llm-call'
+import type { ToolCallDeps, ToolHandler } from './workflow/nodes/tool-call'
+import { createSession } from '../../services/agent/resolved-sdk'
+import { buildBaseSdkOptions, resolveCredentialsForSdk } from '../../services/agent/sdk-config'
+import { getApiCredentials, getHeadlessElectronPath, getWorkingDir, getMcpServersForRequires } from '../../services/agent/helpers'
+import { getConfig } from '../../foundation/config.service'
+import { resolvePermission } from '../../../shared/apps/app-types'
+import { buildAppSystemPrompt } from './prompt'
+import { mergeConfigWithDefaults } from './config-defaults'
+import { createWebSearchMcpServer } from '../../services/web-search'
+import { createAIBrowserMcpServer, createScopedBrowserContext } from '../../services/ai-browser'
 
 // ============================================
 // Constants
@@ -112,6 +124,83 @@ export function createAppRuntimeService(deps: AppRuntimeDeps): AppRuntimeService
         console.error('[Runtime] onRunFinished handler error:', err)
       }
     }
+  }
+
+  // ── Workflow dependency builders ───────────────────────
+  // Lazily constructed per-run so autonomous-AI apps (no spec.steps) never pay
+  // the cost of spinning up SDK sessions or tool handlers.
+  function specHasSteps(app: InstalledApp): boolean {
+    return app.spec.type === 'automation'
+      && !!app.spec.steps
+      && app.spec.steps.length > 0
+  }
+
+  function buildWorkflowLlmDeps(app: InstalledApp): LlmCallDeps {
+    const config = getConfig()
+    const usesAIBrowser = resolvePermission(app, 'ai-browser')
+    const workDir = getWorkingDir(app.spaceId!)
+
+    // Build a system prompt for workflow LLM nodes. Workflow steps carry their
+    // own prompt templates, so this base prompt only provides the minimal
+    // operational context (app identity + working dir).
+    const systemPrompt = buildAppSystemPrompt({
+      appSpec: app.spec,
+      memoryInstructions: memory.getPromptInstructions(),
+      triggerContext: '',
+      userConfig: mergeConfigWithDefaults(app.userConfig, app.spec.config_schema),
+      usesAIBrowser,
+      workDir,
+      modelInfo: '',
+      autoSyncSessions: [],
+    })
+
+    return {
+      createSession: async (options) => {
+        const credentials = app.userOverrides?.modelSourceId
+          ? await getApiCredentials(config, app.userOverrides.modelSourceId, app.userOverrides.modelId)
+          : await getApiCredentials(config)
+        const resolvedCreds = await resolveCredentialsForSdk(credentials)
+        const electronPath = getHeadlessElectronPath()
+        const requiredMcpServers = getMcpServersForRequires(
+          (app.spec.requires?.mcps as Array<{ id: string }> | undefined),
+          app.spaceId!,
+        )
+        const scopedBrowserCtx = usesAIBrowser ? createScopedBrowserContext(null) : undefined
+        const sdkOptions = buildBaseSdkOptions({
+          credentials: resolvedCreds,
+          workDir,
+          electronPath,
+          spaceId: app.spaceId!,
+          conversationId: `wf-${app.id}`,
+          stderrHandler: (data: string) => console.error(`[Workflow][${app.id}] CLI stderr:`, data),
+          mcpServers: {
+            ...requiredMcpServers,
+            ...options.mcpServers,
+            'web-search': createWebSearchMcpServer(),
+            ...(usesAIBrowser ? { 'ai-browser': createAIBrowserMcpServer(scopedBrowserCtx, workDir) } : {}),
+          },
+        })
+        sdkOptions.systemPrompt = options.systemPrompt ?? systemPrompt
+        sdkOptions.maxTurns = options.maxTurns ?? 10
+        sdkOptions.includePartialMessages = false
+        return createSession(sdkOptions)
+      },
+      systemPrompt,
+      mcpServers: {},
+    }
+  }
+
+  function buildWorkflowToolDeps(): ToolCallDeps {
+    // Register built-in MCP tools that workflow tool_call nodes can reference.
+    // The tool handler map is keyed by tool name, matching the `tool` field in
+    // a ToolCallStep. External MCP tools from installed MCP apps are resolved
+    // on demand by name via the halo-apps MCP server.
+    const tools: Record<string, ToolHandler> = {}
+
+    // Built-in tools can be added here as static handlers. For now, workflow
+    // tool_call nodes target MCP tools registered in the LLM deps; this map
+    // is the extension point for direct handlers.
+    return { tools }
   }
 
   /** Map RunOutcome -> the DB-aligned status used in RunFinishedEvent. */
@@ -398,6 +487,13 @@ export function createAppRuntimeService(deps: AppRuntimeDeps): AppRuntimeService
         emitEntry: emitActivityEntry,
         existingRunId: continueOptions?.existingRunId,
         existingSessionKey: continueOptions?.existingSessionKey,
+        // Workflow execution dependencies. These stay undefined for non-workflow
+        // apps, and executeRun() only requires them when spec.steps is present.
+        // The deps are built lazily per-run to avoid spawning sessions/tools
+        // for the common autonomous-AI path.
+        workflowStore: getWorkflowStore() ?? undefined,
+        llmDeps: specHasSteps(app) ? buildWorkflowLlmDeps(app) : undefined,
+        toolDeps: specHasSteps(app) ? buildWorkflowToolDeps() : undefined,
         // Fire the `onRunStarted` lifecycle event at the *real* start of the
         // run (after DB row insertion, before AI session build). This keeps
         // the started/finished event pair semantically meaningful for

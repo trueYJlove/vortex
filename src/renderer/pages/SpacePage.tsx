@@ -366,8 +366,8 @@ export function SpacePage() {
               <span className="hidden sm:inline">{t('New conversation')}</span>
             </button>
 
-            {/* Search Icon - hidden on mobile, accessible via shortcut */}
-            <div className="hidden sm:block">
+            {/* Search Icon */}
+            <div>
               <SearchIcon onClick={openSearch} isInSpace={true} />
             </div>
 

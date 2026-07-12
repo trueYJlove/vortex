@@ -15,6 +15,8 @@ import {
   Loader2,
   Braces,
   Pin,
+  List,
+  GitBranch,
 } from 'lucide-react'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
@@ -26,6 +28,8 @@ import {
   getThoughtLabelKey,
   getToolFriendlyFormat,
 } from './thought-utils'
+import { thoughtsToSteps, type FlowStep } from './thoughts-to-steps'
+import { StepCard } from './StepCard'
 import { useSmartScroll } from '../../hooks/useSmartScroll'
 import { useLazyVisible } from '../../hooks/useLazyVisible'
 import type { Thought } from '../../types'
@@ -361,12 +365,44 @@ function LazyThoughtItem({
   )
 }
 
+// Lazy wrapper for StepCard — same pattern as LazyThoughtItem. Defers mounting
+// until the placeholder enters the scroll viewport to keep step view smooth for
+// long reasoning chains.
+const STEP_CARD_ESTIMATED_HEIGHT = 80
+
+function LazyStepCard({
+  step,
+  isLast,
+  scrollContainerRef,
+  eager = false,
+  allThoughts,
+  isThinking,
+}: {
+  step: FlowStep
+  isLast: boolean
+  scrollContainerRef: RefObject<HTMLDivElement | null>
+  eager?: boolean
+  allThoughts?: Thought[]
+  isThinking?: boolean
+}) {
+  const [ref, isVisible] = useLazyVisible('200px', scrollContainerRef, eager)
+
+  if (isVisible) {
+    return <StepCard step={step} isLast={isLast} allThoughts={allThoughts} isThinking={isThinking} />
+  }
+
+  return (
+    <div ref={ref} style={{ minHeight: STEP_CARD_ESTIMATED_HEIGHT }} />
+  )
+}
+
 export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
   // Start collapsed, but auto-expand when streaming starts
   const [isExpanded, setIsExpanded] = useState(false)
   const [hasAutoExpanded, setHasAutoExpanded] = useState(false)
   const [isMaximized, setIsMaximized] = useState(false)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [viewMode, setViewMode] = useState<'list' | 'steps'>('list')
   const contentRef = useRef<HTMLDivElement>(null)
   const { t } = useTranslation()
 
@@ -409,6 +445,14 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
       return true
     })
   }, [thoughts])
+
+  // Convert filtered thoughts to grouped FlowSteps for step view mode.
+  // Only compute when step view is active — thoughtsToSteps is O(n) and
+  // would otherwise run on every streaming chunk even in list view.
+  const steps = useMemo(
+    () => viewMode === 'steps' ? thoughtsToSteps(displayThoughts) : [],
+    [displayThoughts, viewMode],
+  )
 
   // Auto-scroll follows streaming content with instant scroll — smooth animation
   // conflicts with rapid content updates and layout reflows (expand/collapse),
@@ -522,6 +566,40 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
             </button>
           )}
 
+          {/* View mode toggle — only when expanded */}
+          {isExpanded && (
+            <div className="flex items-center gap-0.5 mr-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setViewMode('list')
+                }}
+                className={`p-1 rounded transition-colors ${
+                  viewMode === 'list'
+                    ? 'text-primary bg-primary/10'
+                    : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
+                }`}
+                title={t('List view')}
+              >
+                <List size={14} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setViewMode('steps')
+                }}
+                className={`p-1 rounded transition-colors ${
+                  viewMode === 'steps'
+                    ? 'text-primary bg-primary/10'
+                    : 'text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/50'
+                }`}
+                title={t('Step view')}
+              >
+                <GitBranch size={14} />
+              </button>
+            </div>
+          )}
+
           {/* Expand icon */}
           <ChevronDown
             size={16}
@@ -539,28 +617,41 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
                 onScroll={handleScroll}
                 className={`px-4 pt-3 ${isMaximized ? 'max-h-[80vh]' : 'max-h-[300px]'} overflow-auto scrollbar-overlay transition-all duration-200`}
               >
-                {displayThoughts.map((thought, index) => {
-                  const isLast = index === displayThoughts.length - 1 && !isThinking
-                  // Last 3 items render eagerly (near the scroll bottom where the
-                  // user is watching during streaming). The rest lazy-load via IO.
-                  // Using a single component type for all items avoids React
-                  // unmount/remount when an item shifts from "recent" to "old"
-                  // as new thoughts arrive — which previously caused 1-2 frame flicker.
-                  const isRecentItem = index >= displayThoughts.length - 3
-                  // Task/Agent thoughts need the full thoughts array for SubAgentTimeline
-                  const isTaskThought = thought.type === 'tool_use' && (thought.toolName === 'Task' || thought.toolName === 'Agent')
-                  return (
-                    <LazyThoughtItem
-                      key={thought.id}
-                      thought={thought}
-                      isLast={isLast}
-                      scrollContainerRef={contentRef}
-                      eager={isRecentItem}
-                      allThoughts={isTaskThought ? thoughts : undefined}
-                      isThinking={isTaskThought ? isThinking : undefined}
-                    />
-                  )
-                })}
+                {viewMode === 'list' ? (
+                  displayThoughts.map((thought, index) => {
+                    const isLast = index === displayThoughts.length - 1 && !isThinking
+                    const isRecentItem = index >= displayThoughts.length - 3
+                    const isTaskThought = thought.type === 'tool_use' && (thought.toolName === 'Task' || thought.toolName === 'Agent')
+                    return (
+                      <LazyThoughtItem
+                        key={thought.id}
+                        thought={thought}
+                        isLast={isLast}
+                        scrollContainerRef={contentRef}
+                        eager={isRecentItem}
+                        allThoughts={isTaskThought ? thoughts : undefined}
+                        isThinking={isTaskThought ? isThinking : undefined}
+                      />
+                    )
+                  })
+                ) : (
+                  steps.map((step, index) => {
+                    const isLast = index === steps.length - 1 && !isThinking
+                    const isTaskStep = step.kind === 'tool_call' && (step.toolName === 'Task' || step.toolName === 'Agent')
+                    const isRecentStep = index >= steps.length - 3
+                    return (
+                      <LazyStepCard
+                        key={step.id}
+                        step={step}
+                        isLast={isLast}
+                        scrollContainerRef={contentRef}
+                        eager={isRecentStep}
+                        allThoughts={isTaskStep ? thoughts : undefined}
+                        isThinking={isTaskStep ? isThinking : undefined}
+                      />
+                    )
+                  })
+                )}
               </div>
             )}
 
@@ -573,7 +664,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
                   title={isMaximized ? t('Compact view') : t('Full view')}
                 >
                   {isMaximized ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  {isMaximized ? 'Compact' : 'Full'}
+                  {isMaximized ? t('Compact') : t('Full')}
                 </button>
               </div>
             )}
@@ -582,4 +673,10 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
       </div>
     </div>
   )
+}
+
+// i18n static keys for extraction (DO NOT REMOVE)
+// prettier-ignore
+void function _i18nStepKeys(t: (k: string) => string) {
+  t('List view'); t('Step view');
 }

@@ -52,6 +52,7 @@ import type { DatabaseManager } from '../platform/store'
 import { initScheduler, shutdownScheduler } from '../platform/scheduler'
 import { initMemory } from '../platform/memory'
 import { setMemorySdk } from '../platform/memory/sdk'
+import { startKnowledgeArtifactBridge } from '../services/knowledge-artifact-bridge'
 import { tool as sdkTool, createSdkMcpServer as sdkCreateMcpServer } from '../services/agent/resolved-sdk'
 import { initAppManager, shutdownAppManager } from '../apps/manager'
 import { initAppRuntime, shutdownAppRuntime } from '../apps/runtime'
@@ -69,6 +70,8 @@ import { registerCliConfigHandlers } from '../ipc/cli-config'
 import { registerModelCapabilitiesHandlers } from '../ipc/model-capabilities'
 import { registerWeixinIlinkHandlers } from '../ipc/weixin-ilink'
 import { registerBackupHandlers } from '../ipc/backup'
+import { registerKnowledgeHandlers } from '../ipc/knowledge'
+import { registerWorkflowHandlers } from '../ipc/workflow'
 import { initRegistryService, shutdownRegistryService } from '../store'
 import { startUpgradeScheduler, stopUpgradeScheduler } from '../store/upgrade.service'
 import { cleanupImChannelTempFiles } from '../apps/runtime/im-channels'
@@ -76,8 +79,9 @@ import { registerIdleTask, startIdleDrain } from './idle-queue'
 import { seedDefaultAppIfNeeded } from '../apps/manager/seed'
 import { loadBuiltinApps } from '../apps/manager/builtin-loader'
 
-// Module-level reference to db for cleanup
+// Module-level references for cleanup
 let platformDb: DatabaseManager | null = null
+let stopKnowledgeBridge: (() => void) | null = null
 
 /**
  * Initialize platform (store, scheduler, memory) and apps
@@ -110,7 +114,7 @@ async function initPlatformAndApps(): Promise<void> {
   // ── Phase 1: Platform services (parallel) ───────────────────────────────
   const [scheduler, memory] = await Promise.all([
     initScheduler({ db }),
-    initMemory(),
+    initMemory({ db }),
   ])
 
   // Inject the resolved agent-SDK MCP primitives into the memory tier, so
@@ -118,6 +122,12 @@ async function initPlatformAndApps(): Promise<void> {
   // tier. The SDK is already initialized (see index.ts) and these refs are
   // only invoked later, when a session's memory MCP server is built.
   setMemorySdk({ tool: sdkTool, createSdkMcpServer: sdkCreateMcpServer })
+
+  // Start the knowledge-artifact bridge: subscribes to file watcher events
+  // and indexes supported files into the knowledge base.
+  // Must come after initMemory (which creates KnowledgeService) and before
+  // scheduler.start() so that timers run correctly.
+  stopKnowledgeBridge = startKnowledgeArtifactBridge()
 
   // Get the background service singleton (already initialized by initBackground())
   const background = getBackgroundService()
@@ -326,6 +336,12 @@ export function initializeExtendedServices(): void {
   // Backup & Restore: export/import full data archive IPC handlers
   registerBackupHandlers()
 
+  // Knowledge Base: document indexing and search IPC handlers
+  registerKnowledgeHandlers()
+
+  // Workflow: execution history and node detail IPC handlers
+  registerWorkflowHandlers()
+
   // Windows-specific: Initialize Git Bash in background
   if (process.platform === 'win32') {
     initializeGitBashOnStartup()
@@ -378,6 +394,12 @@ export function initializeExtendedServices(): void {
 export async function cleanupExtendedServices(): Promise<void> {
   // Space: Flush any throttled activity timestamps to disk before teardown
   flushSpaceActivity()
+
+  // Knowledge Bridge: Stop artifact watcher subscription and cancel pending timers
+  if (stopKnowledgeBridge) {
+    stopKnowledgeBridge()
+    stopKnowledgeBridge = null
+  }
 
   // Store: Stop upgrade scheduler before tearing down registry / app manager
   stopUpgradeScheduler()
