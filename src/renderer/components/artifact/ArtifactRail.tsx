@@ -419,8 +419,8 @@ export function ArtifactRail({
       {viewMode === 'tree' ? (
         <ArtifactTree
           spaceId={spaceId}
-          onOpenBrowser={handleOpenBrowser}
-          onOpenFolder={handleOpenFolder}
+          onOpenBrowser={isWebMode ? undefined : handleOpenBrowser}
+          onOpenFolder={isWebMode ? undefined : handleOpenFolder}
         />
       ) : (
         <div className="h-full overflow-auto p-2">
@@ -587,8 +587,8 @@ export function ArtifactRail({
           {viewMode === 'tree' ? (
             <ArtifactTree
               spaceId={spaceId}
-              onOpenBrowser={handleOpenBrowser}
-              onOpenFolder={handleOpenFolder}
+              onOpenBrowser={isWebMode ? undefined : handleOpenBrowser}
+              onOpenFolder={isWebMode ? undefined : handleOpenFolder}
             />
           ) : (
             <div className="h-full overflow-auto p-2">

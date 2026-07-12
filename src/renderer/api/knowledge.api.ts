@@ -53,11 +53,11 @@ export const knowledgeApi = {
     return httpRequest('DELETE', `/api/knowledge/${params.spaceId}`, params)
   },
 
-  knowledgeUpload: async (params: { spaceId: string }): Promise<ApiResponse<UploadResult>> => {
+  knowledgeUpload: async (params: { spaceId: string; files?: Array<{ name: string; content: string; type: string }> }): Promise<ApiResponse<UploadResult>> => {
     if (isElectron()) {
-      return window.halo.knowledgeUpload(params)
+      return window.halo.knowledgeUpload({ spaceId: params.spaceId })
     }
-    return httpRequest('POST', `/api/knowledge/${params.spaceId}/upload`)
+    return httpRequest('POST', `/api/knowledge/${params.spaceId}/upload`, { files: params.files })
   },
 
   knowledgeReindex: async (spaceId: string): Promise<ApiResponse> => {

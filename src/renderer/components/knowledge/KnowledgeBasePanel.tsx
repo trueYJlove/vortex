@@ -4,11 +4,12 @@
  * Renders as a collapsible section inside the ConversationList sidebar.
  * Shows uploaded documents with search, upload, and delete capabilities.
  */
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { BookOpen, ChevronDown, ChevronRight, Search, Trash2, Upload, X, FileText, AlertCircle } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useKnowledgeStore } from '../../stores/knowledge.store'
 import { useSpaceStore } from '../../stores/space.store'
+import { isElectron } from '../../api/transport'
 
 export function KnowledgeBasePanel() {
   const { t } = useTranslation()
@@ -16,6 +17,7 @@ export function KnowledgeBasePanel() {
   const [collapsed, setCollapsed] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     documents,
@@ -42,9 +44,32 @@ export function KnowledgeBasePanel() {
     setCollapsed(prev => !prev)
   }, [])
 
-  const handleUpload = useCallback(async () => {
+  const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files
+    if (!fileList || fileList.length === 0 || !currentSpace?.id) return
+
+    const files: Array<{ name: string; content: string; type: string }> = []
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i]
+      const content = await file.arrayBuffer()
+      files.push({
+        name: file.name,
+        content: btoa(String.fromCharCode(...new Uint8Array(content))),
+        type: file.type,
+      })
+    }
+
+    await uploadDocuments(currentSpace.id, files)
+    e.target.value = ''
+  }, [currentSpace?.id, uploadDocuments])
+
+  const handleUpload = useCallback(() => {
     if (!currentSpace?.id) return
-    await uploadDocuments(currentSpace.id)
+    if (isElectron()) {
+      uploadDocuments(currentSpace.id)
+    } else {
+      fileInputRef.current?.click()
+    }
   }, [currentSpace?.id, uploadDocuments])
 
   const handleDelete = useCallback(async (sourcePath: string) => {
@@ -76,6 +101,16 @@ export function KnowledgeBasePanel() {
 
   return (
     <div className="border-b border-border">
+      {/* Hidden file input for remote mode upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".txt,.md,.json,.csv,.pdf"
+        className="hidden"
+        onChange={handleFileSelected}
+      />
+
       {/* Header */}
       <button
         onClick={handleToggle}

@@ -3,6 +3,7 @@
  */
 import { create } from 'zustand'
 import { api } from '../api'
+import { onEvent } from '../api/transport'
 import type { KnowledgeDocument, KnowledgeSearchResult, UploadResult } from '../api/knowledge.api'
 
 export interface IndexingStatus {
@@ -26,7 +27,7 @@ interface KnowledgeState {
   searchDocuments: (spaceId: string, query: string, topK?: number) => Promise<void>
   clearSearch: () => void
   deleteDocument: (spaceId: string, sourcePath: string) => Promise<void>
-  uploadDocuments: (spaceId: string) => Promise<UploadResult | undefined>
+  uploadDocuments: (spaceId: string, files?: Array<{ name: string; content: string; type: string }>) => Promise<UploadResult | undefined>
   reindexDocuments: (spaceId: string) => Promise<void>
   subscribeToStatus: () => () => void
 }
@@ -92,10 +93,10 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
     }
   },
 
-  uploadDocuments: async (spaceId: string) => {
+  uploadDocuments: async (spaceId: string, files?: Array<{ name: string; content: string; type: string }>) => {
     set({ isUploading: true, error: null })
     try {
-      const res = await api.knowledgeUpload({ spaceId })
+      const res = await api.knowledgeUpload({ spaceId, files })
       if (res.success && res.data) {
         const result = res.data as UploadResult
         if (result.indexed === 0 && result.skipped > 0) {
@@ -131,12 +132,8 @@ export const useKnowledgeStore = create<KnowledgeState>((set, get) => ({
   },
 
   subscribeToStatus: () => {
-    if (typeof window === 'undefined' || !window.halo?.onKnowledgeStatus) {
-      return () => {}
-    }
-    const unsubscribe = window.halo.onKnowledgeStatus((status) => {
-      set({ indexingStatus: status })
+    return onEvent('knowledge:status', (status) => {
+      set({ indexingStatus: status as IndexingStatus })
     })
-    return unsubscribe
   },
 }))

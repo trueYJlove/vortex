@@ -450,6 +450,7 @@ export function onEvent(channel: string, callback: (data: unknown) => void): () 
       'notification:toast': 'onNotificationToast',
       'store:sync-status-changed': 'onStoreSyncStatusChanged',
       'store:upgrade-available': 'onStoreUpgradeAvailable',
+      'knowledge:status': 'onKnowledgeStatus',
     }
 
     const method = methodMap[channel]
