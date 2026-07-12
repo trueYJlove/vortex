@@ -394,80 +394,103 @@ function getRemoteLoginPage(): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Vortex Remote Access</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
+      padding: 0;
     }
     .container {
       text-align: center;
-      padding: 2rem;
+      padding: 2rem 1.5rem;
+      width: 100%;
+      max-width: 400px;
+      min-width: 0;
     }
     .logo {
-      width: 80px;
-      height: 80px;
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
       background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-      margin: 0 auto 1.5rem;
+      margin: 0 auto 1.25rem;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2rem;
+      font-size: 1.8rem;
       box-shadow: 0 0 30px rgba(139, 92, 246, 0.4);
     }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    p { color: #888; margin-bottom: 2rem; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; word-break: break-word; }
+    .subtitle { color: #888; margin-bottom: 2rem; font-size: 0.85rem; }
     .input-group {
       display: flex;
-      gap: 0.5rem;
-      max-width: 300px;
-      margin: 0 auto;
+      flex-direction: column;
+      gap: 0.75rem;
+      width: 100%;
     }
     input {
-      flex: 1;
-      padding: 1rem;
+      width: 100%;
+      padding: 0.9rem;
       border: 1px solid #333;
       border-radius: 12px;
       background: rgba(255,255,255,0.05);
       color: #fff;
-      font-size: 1.5rem;
+      font-size: 1.25rem;
       text-align: center;
-      letter-spacing: 0.5em;
+      letter-spacing: 0.4em;
     }
     input:focus { outline: none; border-color: #8b5cf6; }
     button {
-      padding: 1rem 2rem;
+      width: 100%;
+      padding: 0.9rem 1.5rem;
       border: none;
       border-radius: 12px;
       background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
       color: #fff;
-      font-size: 1rem;
+      font-size: 0.95rem;
       cursor: pointer;
-      transition: transform 0.2s;
+      transition: opacity 0.2s;
     }
-    button:hover { transform: scale(1.05); }
-    .error { color: #ff6b6b; margin-top: 1rem; }
+    button:active { opacity: 0.8; }
+    .error { color: #ff6b6b; margin-top: 1rem; font-size: 0.85rem; }
     .success { color: #4ade80; }
+    @media (max-width: 480px) {
+      body { padding: 1rem; align-items: flex-start; padding-top: 20vh; }
+      .container { padding: 1.5rem 1rem; max-width: 100%; }
+      .logo { width: 56px; height: 56px; font-size: 1.4rem; margin-bottom: 1rem; }
+      h1 { font-size: 1.15rem; }
+      .subtitle { font-size: 0.75rem; margin-bottom: 1.5rem; }
+      input { padding: 0.8rem; font-size: 1.1rem; letter-spacing: 0.3em; }
+      button { padding: 0.8rem; font-size: 0.9rem; }
+    }
+    /* iOS safe area and standalone mode */
+    @media all and (display-mode: standalone) {
+      body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="logo">◯</div>
+    <div class="logo">&#x25CB;</div>
     <h1>Vortex Remote Access</h1>
-
-    <p>Enter access code to connect to your desktop</p>
+    <p class="subtitle">Enter access code to connect to your desktop</p>
     <div class="input-group">
       <input type="password" id="token" maxlength="64" placeholder="Access Code" autocomplete="off">
+      <button onclick="login()">Connect</button>
     </div>
-    <button onclick="login()" style="margin-top: 1rem; width: 100%; max-width: 300px;">Connect</button>
     <p id="error" class="error"></p>
   </div>
   <script>
