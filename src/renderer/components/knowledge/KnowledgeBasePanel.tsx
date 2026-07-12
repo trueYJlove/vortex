@@ -228,7 +228,7 @@ export function KnowledgeBasePanel() {
           {displayResults === null && documents.length > 0 && (
             <div className="space-y-0.5">
               {documents.map(doc => (
-                <div key={doc.id} className="group flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-secondary/50">
+                <div key={doc.id} className="group flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-secondary/50" title={doc.sourcePath}>
                   <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <span className="truncate block">{doc.fileName}</span>

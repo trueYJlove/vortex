@@ -15,8 +15,9 @@
  * events are debounced per file path.
  */
 
-import { extname } from 'path'
+import { extname, sep } from 'path'
 import { getKnowledgeService } from '../platform/memory'
+import { getSpace } from './space.service'
 import { subscribeToArtifactChanges } from './artifact.service'
 import type { ArtifactChangeEvent } from './artifact.service'
 
@@ -26,6 +27,27 @@ const SUPPORTED_EXTENSIONS = new Set(['.txt', '.md', '.json', '.csv', '.pdf'])
 // 500ms matches the design spec — short enough to feel responsive,
 // long enough to coalesce a burst of rapid writes.
 const DEBOUNCE_MS = 500
+
+/**
+ * Check if a file path is within the artifacts directory for a given space.
+ *
+ * - Temp spaces: watcher root IS the artifacts dir, so all files qualify.
+ * - Regular spaces with workingDir: watcher root IS the working dir,
+ *   and all files in it are considered artifacts.
+ * - Regular spaces without workingDir: watcher root is space.path,
+ *   but only files inside the `artifacts/` subdirectory should be indexed.
+ */
+function isInArtifactsDir(filePath: string, spaceId: string): boolean {
+  const space = getSpace(spaceId)
+  if (!space) return false
+
+  if (space.isTemp) return true
+  if (space.workingDir) return true
+
+  // Regular space without workingDir: only index files under {space.path}/artifacts/
+  const artifactsPrefix = space.path + sep + 'artifacts' + sep
+  return filePath.startsWith(artifactsPrefix) || filePath === space.path + sep + 'artifacts'
+}
 
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -40,6 +62,9 @@ const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
 function handleArtifactEvent(event: ArtifactChangeEvent): void {
   // Directory events are not applicable — skip.
   if (event.type === 'addDir' || event.type === 'unlinkDir') return
+
+  // Only index files within the artifacts directory
+  if (!isInArtifactsDir(event.path, event.spaceId)) return
 
   const ext = extname(event.path).toLowerCase()
   if (!SUPPORTED_EXTENSIONS.has(ext)) return
