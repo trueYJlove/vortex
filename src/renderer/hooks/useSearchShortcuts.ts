@@ -1,14 +1,16 @@
 /**
  * useSearchShortcuts Hook
  *
- * Manages keyboard shortcuts for search:
- * - Cmd+K / Ctrl+K: Global search
+ * Manages keyboard shortcuts for search and the command palette:
+ * - Cmd+K / Ctrl+K: Command palette (fused command + content search)
+ * - Cmd+Shift+K / Ctrl+Shift+K: Global content search
  * - Cmd+F / Ctrl+F: Conversation search (or space search if on space page)
  * - Cmd+Shift+F / Ctrl+Shift+F: Space search
  */
 
 import { useEffect } from 'react'
 import { SearchScope } from '@/components/search'
+import { useCommandPanelStore } from '@/stores/command-panel.store'
 
 interface UseSearchShortcutsOptions {
   enabled?: boolean
@@ -32,8 +34,15 @@ export function useSearchShortcuts({
 
       const metaKey = isMac ? e.metaKey : e.ctrlKey
 
-      // Cmd+K / Ctrl+K - Global search
-      if (metaKey && e.key === 'k' && !e.shiftKey) {
+      // Cmd+K / Ctrl+K - Command palette
+      if (metaKey && (e.key === 'k' || e.key === 'K') && !e.shiftKey) {
+        e.preventDefault()
+        useCommandPanelStore.getState().open()
+        return
+      }
+
+      // Cmd+Shift+K / Ctrl+Shift+K - Global content search
+      if (metaKey && e.shiftKey && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault()
         onSearch('global')
         return

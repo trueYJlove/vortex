@@ -10,6 +10,7 @@ import { initAIBrowserStoreListeners } from './stores/ai-browser.store'
 import { initPerfStoreListeners } from './stores/perf.store'
 import { useSpaceStore } from './stores/space.store'
 import { useSearchStore } from './stores/search.store'
+import { useCommandPanelStore } from './stores/command-panel.store'
 import { useAppsStore } from './stores/apps.store'
 import { useAppsPageStore } from './stores/apps-page.store'
 import { SplashPage } from './pages/SplashPage'
@@ -23,6 +24,8 @@ import type { ServerEntry } from './stores/server.store'
 import { clearPendingServerUrl, setAuthToken } from './api/transport'
 import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
+import { CommandPanel } from './components/ui/CommandPanel'
+import { registerAllCommands } from './commands'
 import { StatusBar } from './components/layout/StatusBar'
 import { OnboardingOverlay } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
@@ -116,6 +119,21 @@ export default function App() {
   } = useChatStore()
   const { initialize: initializeOnboarding } = useOnboardingStore()
   const { isSearchOpen, closeSearch, isHighlightBarVisible, hideHighlightBar, goToPreviousResult, goToNextResult, openSearch } = useSearchStore()
+
+  // Register command palette commands once on mount. Returns cleanup for
+  // hot-reload; in production the registry lives for the app lifetime.
+  useEffect(() => {
+    return registerAllCommands()
+  }, [])
+
+  // Wire command palette tool actions to existing UI flows. Commands stay
+  // decoupled from stores by dispatching custom events; App.tsx is the single
+  // place that translates them into concrete store actions.
+  useEffect(() => {
+    const focusSearch = () => useSearchStore.getState().openSearch('global')
+    window.addEventListener('command:focus-search', focusSearch)
+    return () => window.removeEventListener('command:focus-search', focusSearch)
+  }, [])
 
   // Telemetry: session lifecycle + page views (fire-and-forget)
   useTelemetry(view)
@@ -956,6 +974,8 @@ export default function App() {
       )}
       {/* Search panel - full screen edit mode */}
       <SearchPanel isOpen={isSearchOpen} onClose={closeSearch} />
+      {/* Command palette - Ctrl+K spotlight */}
+      <CommandPanel />
       {/* Search highlight bar - floating navigation mode */}
       <SearchHighlightBar />
       {/* Onboarding overlay - renders on top of everything */}
