@@ -747,6 +747,9 @@ const api: HaloAPI = {
   getBootstrapStatus: () => ipcRenderer.invoke('bootstrap:get-status'),
   onBootstrapExtendedReady: (callback) => createEventListener('bootstrap:extended-ready', callback),
 
+  // Config changed event (sync model/data-source changes across desktop/remote)
+  onConfigChanged: (callback) => createEventListener('config:changed', callback),
+
   // Health System
   ...bindRpc(healthRpc),
 

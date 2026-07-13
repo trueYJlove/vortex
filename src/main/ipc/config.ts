@@ -8,6 +8,8 @@ import { decryptString } from '../foundation/secure-storage.service'
 import { maskConfigFields, unmaskSentinels } from '../foundation/config-encryption'
 import { validateApiConnection, fetchModelsFromApi } from '../services/api-validator.service'
 import { runConfigProbe, emitConfigChange } from '../services/health'
+import { sendToRenderer } from '../foundation/window.service'
+import { broadcastToAll } from '../http/websocket'
 import type { AISourcesConfig, AISource } from '../../shared/types'
 import { configRpc } from '../../shared/rpc/contracts/config.contract'
 import { registerRawRpcHandlers } from './rpc'
@@ -171,6 +173,10 @@ export function registerConfigHandlers(): void {
         }
         emitConfigChange(['aiSources.currentId'])
         runConfigProbe().catch(err => console.error('[Settings] ai-sources:switch-source - Probe failed:', err))
+        // Notify all renderers about config change
+        const evData = { changedFields: ['aiSources.currentId'] }
+        sendToRenderer('config:changed', evData)
+        broadcastToAll('config:changed', evData)
         return { success: true, data: result }
       } catch (error: unknown) {
         const err = error as Error
@@ -188,6 +194,10 @@ export function registerConfigHandlers(): void {
         const src = manager.getCurrentSourceConfig()
         console.log(`[Config] model_changed source=${src?.id || ''} provider=${src?.provider || ''} model=${modelId}`)
         emitConfigChange(['aiSources.model'])
+        // Notify all renderers about config change
+        const evData = { changedFields: ['aiSources.model'] }
+        sendToRenderer('config:changed', evData)
+        broadcastToAll('config:changed', evData)
         return { success: true, data: result }
       } catch (error: unknown) {
         const err = error as Error

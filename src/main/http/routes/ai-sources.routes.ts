@@ -7,7 +7,9 @@ import {
   getAISourceManager,
   modelCapabilitiesService,
   resolve,
+  broadcastToAll,
 } from './_shared'
+import { sendToRenderer } from '../../foundation/window.service'
 import type {
   ModelCapabilityOverride,
 } from './_shared'
@@ -25,6 +27,9 @@ export function registerAiSourcesRoutes(app: Express): void {
         res.json({ success: false, error: `Source not found: ${sourceId}` })
         return
       }
+      const evData = { changedFields: ['aiSources.currentId'] }
+      sendToRenderer('config:changed', evData)
+      broadcastToAll('config:changed', evData)
       res.json({ success: true, data: result })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })
@@ -36,6 +41,9 @@ export function registerAiSourcesRoutes(app: Express): void {
       const { modelId } = req.body
       const manager = getAISourceManager()
       const result = manager.setCurrentModel(modelId)
+      const evData = { changedFields: ['aiSources.model'] }
+      sendToRenderer('config:changed', evData)
+      broadcastToAll('config:changed', evData)
       res.json({ success: true, data: result })
     } catch (error) {
       res.json({ success: false, error: (error as Error).message })

@@ -664,6 +664,18 @@ export default function App() {
     }
   }, [setInitialAppId, setView])
 
+  // Listen for config:changed events (model/switch-source sync from remote clients)
+  useEffect(() => {
+    const unsub = api.onConfigChanged(async () => {
+      console.log('[App] Config changed event received, refreshing config...')
+      const result = await api.getConfig()
+      if (result.success && result.data) {
+        useAppStore.getState().setConfig(result.data as any)
+      }
+    })
+    return unsub
+  }, [])
+
   // Register in-app toast listener (notification:toast from main process)
   const showToast = useNotificationStore((s) => s.show)
   useEffect(() => {
