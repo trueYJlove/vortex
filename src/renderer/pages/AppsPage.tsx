@@ -17,6 +17,7 @@ import { useAppsStore } from '../stores/apps.store'
 import { useAppsPageStore, tabForAppType } from '../stores/apps-page.store'
 import type { AppType } from '../../shared/apps/spec-types'
 import { Header } from '../components/layout/Header'
+import { CommandPaletteButton } from '../components/layout/CommandPaletteButton'
 import { AppList } from '../components/apps/AppList'
 import { AutomationHeader } from '../components/apps/AutomationHeader'
 import { LoginNoticeBar } from '../components/apps/LoginNoticeBar'
@@ -252,13 +253,16 @@ export function AppsPage() {
           </button>
         }
         right={
-          <button
-            onClick={() => setView('settings')}
-            className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-            title={t('Settings')}
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <>
+            <CommandPaletteButton />
+            <button
+              onClick={() => setView('settings')}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+              title={t('Settings')}
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </>
         }
       />
 

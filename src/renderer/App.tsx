@@ -135,6 +135,30 @@ export default function App() {
     return () => window.removeEventListener('command:focus-search', focusSearch)
   }, [])
 
+  // Global Ctrl+Shift+P — open command palette from any view (except transient
+  // setup/serverConnect screens where the user hasn't entered the app yet).
+  // useSearchShortcuts in SpacePage still handles Ctrl+Shift+K/F, but
+  // Ctrl+Shift+P is centralized here so every page has it.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = typeof navigator !== 'undefined' &&
+        navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const metaKey = isMac ? e.metaKey : e.ctrlKey
+      if (!metaKey || !e.shiftKey) return
+      if (e.key !== 'P' && e.key !== 'p') return
+      const currentView = useAppStore.getState().view
+      if (currentView === 'splash' || currentView === 'setup' ||
+          currentView === 'serverConnect' || currentView === 'serverList' ||
+          currentView === 'gitBashSetup') {
+        return
+      }
+      e.preventDefault()
+      useCommandPanelStore.getState().open()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Telemetry: session lifecycle + page views (fire-and-forget)
   useTelemetry(view)
 

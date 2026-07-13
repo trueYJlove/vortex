@@ -11,6 +11,7 @@
  */
 
 import type { LucideIcon } from 'lucide-react'
+import i18n from 'i18next'
 
 export type CommandCategory =
   | 'navigation'
@@ -19,7 +20,9 @@ export type CommandCategory =
 
 export interface Command {
   id: string
+  /** i18n key — displayed via t() in the panel. */
   title: string
+  /** i18n key — displayed via t() in the panel. */
   description?: string
   icon?: LucideIcon
   category: CommandCategory
@@ -35,6 +38,11 @@ export const CATEGORY_ORDER: CommandCategory[] = [
   'conversation',
   'tools',
 ]
+
+/** Translate a command title or description key. */
+export function tt(key: string): string {
+  return i18n.t(key)
+}
 
 const registry = new Map<string, Command>()
 
@@ -66,8 +74,12 @@ export function clearCommands(): void {
 export function matchCommand(cmd: Command, q: string): boolean {
   if (!q) return true
   const lower = q.toLowerCase()
-  if (cmd.title.toLowerCase().includes(lower)) return true
-  if (cmd.description?.toLowerCase().includes(lower)) return true
+  const title = i18n.t(cmd.title).toLowerCase()
+  if (title.includes(lower)) return true
+  if (cmd.description) {
+    const desc = i18n.t(cmd.description).toLowerCase()
+    if (desc.includes(lower)) return true
+  }
   if (cmd.keywords?.some((k) => k.toLowerCase().includes(lower))) return true
   return false
 }

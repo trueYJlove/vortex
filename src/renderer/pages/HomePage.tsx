@@ -17,6 +17,7 @@ import {
   Pencil
 } from '../components/icons/ToolIcons'
 import { Header } from '../components/layout/Header'
+import { CommandPaletteButton } from '../components/layout/CommandPaletteButton'
 import { SpaceGuide } from '../components/space/SpaceGuide'
 import { CreateSpaceDialog } from '../components/space/CreateSpaceDialog'
 import { Blocks, ArrowRight, AlertCircle, SendHorizontal, Unplug } from 'lucide-react'
@@ -138,12 +139,15 @@ export function HomePage() {
           </>
         }
         right={
-          <button
-            onClick={() => setView('settings')}
-            className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
-          >
-            <Settings className="w-5 h-5" />
-          </button>
+          <>
+            <CommandPaletteButton />
+            <button
+              onClick={() => setView('settings')}
+              className="p-1.5 hover:bg-secondary rounded-lg transition-colors"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </>
         }
       />
 

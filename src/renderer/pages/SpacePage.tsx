@@ -26,6 +26,7 @@ import { ArtifactRail } from '../components/artifact/ArtifactRail'
 import { ConversationList } from '../components/chat/ConversationList'
 import { ChatHistoryPanel } from '../components/chat/ChatHistoryPanel'
 import { Header } from '../components/layout/Header'
+import { CommandPaletteButton } from '../components/layout/CommandPaletteButton'
 import { SidebarToggle } from '../components/layout/SidebarToggle'
 import { SpaceSelector } from '../components/layout/SpaceSelector'
 import { ModelSelector } from '../components/layout/ModelSelector'
@@ -370,6 +371,9 @@ export function SpacePage() {
             <div>
               <SearchIcon onClick={openSearch} isInSpace={true} />
             </div>
+
+            {/* Command Palette entry */}
+            <CommandPaletteButton />
 
             {/* Model Selector */}
             <ModelSelector />

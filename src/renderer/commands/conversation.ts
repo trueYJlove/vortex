@@ -17,12 +17,17 @@ import { useAppStore } from '../stores/app.store'
 import { registerCommands } from './registry'
 import type { Command } from './registry'
 
+// Identity function: parser extracts `t('...')` keys for i18n, but the stored
+// value is the English key itself. tt() in the panel translates at render time
+// so language switches take effect without re-registration.
+const t = (key: string): string => key
+
 export function registerConversationCommands(): () => void {
   const commands: Command[] = [
     {
       id: 'conv:new',
-      title: 'New Conversation',
-      description: 'Start a new chat in the current space',
+      title: t('New Conversation'),
+      description: t('Start a new chat in the current space'),
       icon: Plus,
       category: 'conversation',
       keywords: ['new', 'create', 'chat', 'conversation', 'start'],
@@ -40,8 +45,8 @@ export function registerConversationCommands(): () => void {
     },
     {
       id: 'conv:goto-current-space',
-      title: 'Open Current Space',
-      description: 'Jump into the space you are in now',
+      title: t('Open Current Space'),
+      description: t('Jump into the space you are in now'),
       icon: Folder,
       category: 'conversation',
       keywords: ['space', 'open', 'current', 'project'],
@@ -52,8 +57,8 @@ export function registerConversationCommands(): () => void {
     },
     {
       id: 'conv:recent',
-      title: 'Recent Conversations',
-      description: 'Jump to the most recent conversation in this space',
+      title: t('Recent Conversations'),
+      description: t('Jump to the most recent conversation in this space'),
       icon: MessageSquare,
       category: 'conversation',
       keywords: ['recent', 'continue', 'last', 'history', 'conversation'],

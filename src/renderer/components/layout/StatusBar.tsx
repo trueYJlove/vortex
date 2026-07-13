@@ -9,11 +9,13 @@
  */
 
 import { useMemo, useState, useEffect, useRef } from 'react'
+import { Command } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chat.store'
 import { usePerfStore } from '../../stores/perf.store'
 import { useAppsStore } from '../../stores/apps.store'
 import { useAppStore } from '../../stores/app.store'
+import { useCommandPanelStore } from '../../stores/command-panel.store'
 import type { Message } from '../../types'
 
 /** Format token count: 1234 → "1,234", 12345 → "12.3K" */
@@ -148,18 +150,19 @@ export function StatusBar() {
   const snapshot = usePerfStore(s => s.latestSnapshot)
   const cpuPercent = snapshot?.cpu?.percentCPU ?? null
   const memoryBytes = snapshot?.memory?.rss ?? null
+  const openCommandPanel = useCommandPanelStore((s) => s.open)
 
   return (
     <div
-      className="fixed bottom-0 inset-x-0 h-6 flex items-center justify-between px-3 border-t border-border bg-background text-[11px] text-muted-foreground select-none z-40 safe-area-bottom"
-      style={{ paddingBottom: 'max(0px, var(--sab))' }}
+      className="fixed bottom-0 inset-x-0 h-6 flex items-center justify-between px-3 border-t border-border bg-background text-[11px] text-muted-foreground select-none z-40"
+      style={{ bottom: 'var(--sab, 0px)' }}
     >
       {/* Left: Context */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 overflow-hidden">
         {contextInfo ? (
           <>
-            <span className="font-medium text-foreground/80">{t('Context')}</span>
-            <span>{formatTokenCount(contextInfo.contextUsed)} tokens</span>
+            <span className="font-medium text-foreground/80 hidden sm:inline">{t('Context')}</span>
+            <span className="truncate">{formatTokenCount(contextInfo.contextUsed)} tokens</span>
             <span>{contextInfo.usagePercent}% {t('used')}</span>
             {contextInfo.ttftSec !== null && (
               <span>{contextInfo.ttftSec.toFixed(1)}s {t('TTFT')}</span>
@@ -173,15 +176,24 @@ export function StatusBar() {
         )}
       </div>
 
-      {/* Right: Resources + Automation */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      {/* Right: Resources + Automation + Command Palette */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        <button
+          onClick={openCommandPanel}
+          className="flex items-center gap-1 hover:bg-secondary/50 px-1 rounded transition-colors"
+          title={t('Command Palette (Ctrl+Shift+P)')}
+          aria-label={t('Command Palette')}
+        >
+          <Command size={12} className="text-muted-foreground" />
+          <span className="hidden lg:inline text-muted-foreground/70">{t('Commands')}</span>
+        </button>
         {cpuPercent !== null && (
           <span className="hidden sm:inline">
             CPU {Math.round(cpuPercent)}%
           </span>
         )}
         {memoryBytes !== null && (
-          <span className="hidden sm:inline">
+          <span className="hidden md:inline">
             {t('Memory')} {formatBytes(memoryBytes)}
           </span>
         )}

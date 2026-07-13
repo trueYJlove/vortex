@@ -40,6 +40,13 @@ export function KnowledgeBasePanel() {
     }
   }, [currentSpace?.id, loadDocuments])
 
+  // Listen for command:open-knowledge to expand the panel
+  useEffect(() => {
+    const handleOpen = () => setCollapsed(false)
+    window.addEventListener('command:open-knowledge', handleOpen)
+    return () => window.removeEventListener('command:open-knowledge', handleOpen)
+  }, [])
+
   const handleToggle = useCallback(() => {
     setCollapsed(prev => !prev)
   }, [])

@@ -31,6 +31,7 @@ import {
   getCommands,
   matchCommand,
   CATEGORY_ORDER,
+  tt,
 } from '@/commands/registry'
 import type { Command, CommandCategory } from '@/commands/registry'
 
@@ -58,14 +59,16 @@ interface Row {
   category?: CommandCategory
 }
 
-const CATEGORY_LABELS: Record<CommandCategory, string> = {
-  navigation: 'Navigation',
-  conversation: 'Conversation',
-  tools: 'Tools',
-}
-
 export function CommandPanel() {
   const { t } = useTranslation()
+  const categoryLabels: Record<CommandCategory, string> = useMemo(
+    () => ({
+      navigation: t('Navigation'),
+      conversation: t('Conversation'),
+      tools: t('Tools'),
+    }),
+    [t]
+  )
   const { isOpen, query, selectedIndex, close, setQuery, setSelectedIndex } =
     useCommandPanelStore()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -340,7 +343,7 @@ export function CommandPanel() {
                 <div key={`cmd-${row.command.id}`}>
                   {showHeader && (
                     <div className="px-4 pt-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {t(CATEGORY_LABELS[row.category!])}
+                      {categoryLabels[row.category!]}
                     </div>
                   )}
                   <button
@@ -355,10 +358,10 @@ export function CommandPanel() {
                   >
                     {Icon && <Icon size={16} className="text-muted-foreground flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
-                      <div className="truncate">{t(row.command!.title)}</div>
+                      <div className="truncate">{tt(row.command!.title)}</div>
                       {row.command!.description && (
                         <div className="truncate text-xs text-muted-foreground">
-                          {t(row.command!.description)}
+                          {tt(row.command!.description)}
                         </div>
                       )}
                     </div>

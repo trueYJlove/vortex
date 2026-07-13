@@ -19,6 +19,9 @@ interface SearchIconProps {
 export function SearchIcon({ onClick, isInSpace = false }: SearchIconProps) {
   const { t } = useTranslation()
 
+  const isMac = typeof navigator !== 'undefined' &&
+    navigator.platform.toUpperCase().indexOf('MAC') >= 0
+
   const handleClick = () => {
     // Default scope based on current context
     const scope: SearchScope = isInSpace ? 'space' : 'conversation'
@@ -29,7 +32,7 @@ export function SearchIcon({ onClick, isInSpace = false }: SearchIconProps) {
     <button
       onClick={handleClick}
       className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted"
-      title={t('Search (Cmd+K)')}
+      title={isMac ? t('Search (Cmd+K)') : t('Search (Ctrl+F)')}
       aria-label={t('Search')}
     >
       <Search size={18} />
