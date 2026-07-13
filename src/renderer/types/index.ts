@@ -44,6 +44,7 @@ export {
   AVAILABLE_MODELS,
   createEmptyAISourcesConfig,
   getCurrentSource,
+  getModelDisplayName,
   getSourceById,
   isSourceConfigured,
   createSource,
@@ -376,6 +377,14 @@ export interface Conversation extends ConversationMeta {
   messages: Message[];
   sessionId?: string;
   version?: number;  // Format version: 2 = thoughts separated into .thoughts.json
+  /**
+   * Per-conversation model pin (Cursor-style): the AI source + model this
+   * conversation uses, independent of the global selection. Stamped at creation
+   * from the active selection; read with a fallback to the global selection.
+   * `modelSourceId` is the AISource.id, `modelId` the wire model id.
+   */
+  modelSourceId?: string;
+  modelId?: string;
 }
 
 // ============================================
@@ -407,7 +416,7 @@ export interface EngineCapabilities {
   subAgent: { model: 'declarative' | 'imperative' | 'none'; visibleLifecycle: boolean };
   features: {
     skills: boolean; mcp: boolean; hooks: boolean;
-    sessionResume: boolean; midTurnInjection: boolean; interrupt: boolean;
+    sessionResume: boolean; interrupt: boolean;
     multimodalImage: boolean; contextCompaction: boolean; askUserQuestion: boolean;
   };
 }
@@ -612,16 +621,18 @@ export interface CanvasContext {
   isOpen: boolean;
   tabCount: number;
   activeTab: {
-    type: string;  // 'browser' | 'code' | 'markdown' | 'image' | 'pdf' | 'text' | 'json' | 'csv'
+    type: string;  // 'browser' | 'code' | 'markdown' | 'image' | 'pdf' | 'text' | 'json' | 'csv' | 'terminal'
     title: string;
     url?: string;   // For browser/pdf tabs
     path?: string;  // For file tabs
+    terminalSessionId?: string;  // For terminal tabs - the pty session id the AI drives via terminal_* tools
   } | null;
   tabs: Array<{
     type: string;
     title: string;
     url?: string;
     path?: string;
+    terminalSessionId?: string;  // For terminal tabs - the pty session id the AI drives via terminal_* tools
     isActive: boolean;
   }>;
 }
