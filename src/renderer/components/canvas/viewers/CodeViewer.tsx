@@ -24,6 +24,7 @@ import {
 import { api } from '../../../api'
 import type { CanvasTab } from '../../../stores/canvas.store'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import { CodeMirrorEditor, type CodeMirrorEditorRef } from './CodeMirrorEditor'
 
 // ============================================
@@ -66,7 +67,7 @@ export function CodeViewer({ tab, onScrollChange, onContentChange, onSaveComplet
     if (!content) return
 
     try {
-      await navigator.clipboard.writeText(content)
+      await copyToClipboard(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

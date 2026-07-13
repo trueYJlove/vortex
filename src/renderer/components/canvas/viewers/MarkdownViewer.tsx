@@ -17,6 +17,7 @@ import { useCodePlugin } from '../../../lib/streamdown-plugins'
 import { api } from '../../../api'
 import type { CanvasTab } from '../../../stores/canvas.store'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 
 /**
  * Resolve relative image paths to halo-file:// protocol URLs
@@ -90,7 +91,7 @@ export function MarkdownViewer({ tab, onScrollChange, onEditRequest }: MarkdownV
   const handleCopy = async () => {
     if (!tab.content) return
     try {
-      await navigator.clipboard.writeText(tab.content)
+      await copyToClipboard(tab.content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

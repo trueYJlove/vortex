@@ -14,6 +14,7 @@ import { useState, useRef, useMemo } from 'react'
 import { Copy, Check, Code, Eye, ExternalLink, Globe } from 'lucide-react'
 import { highlightCodeSync } from '../../../lib/highlight-loader'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import { api } from '../../../api'
 import { useCanvasStore, type CanvasTab } from '../../../stores/canvas.store'
 
@@ -39,7 +40,7 @@ export function HtmlViewer({ tab }: HtmlViewerProps) {
   const handleCopy = async () => {
     if (!content) return
     try {
-      await navigator.clipboard.writeText(content)
+      await copyToClipboard(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

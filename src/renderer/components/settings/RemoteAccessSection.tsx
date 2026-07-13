@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { Globe } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { api } from '../../api'
 import { useSecurityPolicy } from '../../hooks/useSecurityPolicy'
 import {
@@ -153,8 +154,8 @@ export function RemoteAccessSection() {
     loadRemoteStatus()
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+  const handleCopyToClipboard = (text: string) => {
+    copyToClipboard(text)
   }
 
   return (
@@ -222,7 +223,7 @@ export function RemoteAccessSection() {
                     {remoteStatus.server.localUrl}
                   </code>
                   <button
-                    onClick={() => copyToClipboard(remoteStatus.server.localUrl || '')}
+                    onClick={() => handleCopyToClipboard(remoteStatus.server.localUrl || '')}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     {t('Copy')}
@@ -238,7 +239,7 @@ export function RemoteAccessSection() {
                       {remoteStatus.server.lanUrl}
                     </code>
                     <button
-                      onClick={() => copyToClipboard(remoteStatus.server.lanUrl || '')}
+                      onClick={() => handleCopyToClipboard(remoteStatus.server.lanUrl || '')}
                       className="text-xs text-muted-foreground hover:text-foreground"
                     >
                       {t('Copy')}
@@ -262,7 +263,7 @@ export function RemoteAccessSection() {
                         {showPassword ? t('Hide') : t('Show')}
                       </button>
                       <button
-                        onClick={() => copyToClipboard(remoteStatus.server.token || '')}
+                        onClick={() => handleCopyToClipboard(remoteStatus.server.token || '')}
                         className="text-xs text-muted-foreground hover:text-foreground"
                       >
                         {t('Copy')}
@@ -386,7 +387,7 @@ export function RemoteAccessSection() {
                           {remoteStatus.tunnel.url}
                         </code>
                         <button
-                          onClick={() => copyToClipboard(remoteStatus.tunnel.url || '')}
+                          onClick={() => handleCopyToClipboard(remoteStatus.tunnel.url || '')}
                           className="text-xs text-green-500/80 hover:text-green-500"
                         >
                           {t('Copy')}

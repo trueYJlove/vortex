@@ -15,6 +15,7 @@ import { Copy, Check, ExternalLink, Table, Code2 } from 'lucide-react'
 import { api } from '../../../api'
 import type { CanvasTab } from '../../../stores/canvas.store'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 
 interface CsvViewerProps {
   tab: CanvasTab
@@ -123,7 +124,7 @@ export function CsvViewer({ tab, onScrollChange }: CsvViewerProps) {
   const handleCopy = async () => {
     if (!content) return
     try {
-      await navigator.clipboard.writeText(content)
+      await copyToClipboard(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

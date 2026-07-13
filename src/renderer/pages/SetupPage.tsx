@@ -11,6 +11,7 @@ import { LoginSelector, type AuthProviderConfig } from '../components/setup/Logi
 import { ApiSetup } from '../components/setup/ApiSetup'
 import { PreferencesStep } from '../components/setup/PreferencesStep'
 import { useTranslation } from '../i18n'
+import { copyToClipboard } from '../utils/clipboard'
 import { Loader2, Brain, ExternalLink, Copy, Check } from 'lucide-react'
 import iconUrl from '../../../resources/icon.svg?url'
 
@@ -203,7 +204,7 @@ export function SetupPage() {
   const handleClaudeCopyUrl = async () => {
     if (!claudeLogin) return
     try {
-      await navigator.clipboard.writeText(claudeLogin.loginUrl)
+      await copyToClipboard(claudeLogin.loginUrl)
       setClaudeLogin(prev => prev ? { ...prev, copied: true } : null)
       setTimeout(() => {
         setClaudeLogin(prev => prev ? { ...prev, copied: false } : null)
@@ -457,7 +458,7 @@ export function SetupPage() {
                   {deviceCodeInfo.userCode}
                 </code>
                 <button
-                  onClick={() => navigator.clipboard.writeText(deviceCodeInfo.userCode)}
+                  onClick={() => copyToClipboard(deviceCodeInfo.userCode)}
                   className="p-2 text-muted-foreground hover:text-foreground transition-colors"
                   title={t('Copy code')}
                 >

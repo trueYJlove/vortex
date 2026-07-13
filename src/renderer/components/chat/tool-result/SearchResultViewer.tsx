@@ -12,6 +12,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Copy, Check, ChevronDown, ChevronUp, Search, FileText, Folder } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import type { ViewerBaseProps } from './types'
 import { parseGrepOutput } from './detection'
 
@@ -67,7 +68,7 @@ export function SearchResultViewer({
   // Copy handler
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(output)
+      await copyToClipboard(output)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

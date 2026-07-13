@@ -34,6 +34,7 @@ import { TokenUsageIndicator } from './TokenUsageIndicator'
 import { truncateText, getToolFriendlyFormat } from './thought-utils'
 import type { Message, Thought, ThoughtsSummary } from '../../types'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { useChatStore } from '../../stores/chat.store'
 
 interface MessageItemProps {
@@ -280,10 +281,12 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
   )
 
   // Handle copying message content to clipboard
+  // Uses copyToClipboard helper which falls back to execCommand for HTTP remote
+  // (navigator.clipboard requires a secure context — HTTPS or localhost).
   const handleCopyMessage = useCallback(async () => {
     if (!message.content) return
     try {
-      await navigator.clipboard.writeText(message.content)
+      await copyToClipboard(message.content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

@@ -9,6 +9,7 @@ import {
   XOctagon, ChevronRight, Copy, FileText, RotateCcw, RefreshCw, Save, Power, Settings, Shield
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { api } from '../../api'
 import type { HaloConfig } from '../../types'
 import type { HealthCheckResult, HealthReport } from './types'
@@ -149,7 +150,7 @@ export function SystemSection({ config, setConfig }: SystemSectionProps) {
     try {
       const result = await api.generateHealthReportText()
       if (result.success && result.data) {
-        await navigator.clipboard.writeText(result.data)
+        await copyToClipboard(result.data)
         setReportCopied(true)
         setTimeout(() => setReportCopied(false), 2000)
       }
