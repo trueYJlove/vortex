@@ -1474,6 +1474,8 @@
   "Version": "Version",
   "Version must be greater than the store version v{{version}}": "Version must be greater than the store version v{{version}}",
   "View": "View",
+  "View all ({{count}})_one": "View all ({{count}})",
+  "View all ({{count}})_other": "View all ({{count}})",
   "View live feed": "View live feed",
   "View process": "View process",
   "View thought process": "View thought process",

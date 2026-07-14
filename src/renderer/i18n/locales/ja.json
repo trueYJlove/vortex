@@ -1375,6 +1375,8 @@
   "Version": "バージョン",
   "Version must be greater than the store version v{{version}}": "バージョンはストアバージョン v{{version}} より大きくする必要があります。",
   "View": "表示",
+  "View all ({{count}})_one": "すべて表示（{{count}}）",
+  "View all ({{count}})_other": "すべて表示（{{count}}）",
   "View live feed": "ライブフィードを表示",
   "View process": "プロセスを表示",
   "View thought process": "思考プロセスを表示",

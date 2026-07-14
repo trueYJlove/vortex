@@ -1375,6 +1375,8 @@
   "Version": "Version",
   "Version must be greater than the store version v{{version}}": "Die Version muss größer sein als die Store-Version v{{version}}",
   "View": "Ansicht",
+  "View all ({{count}})_one": "Alle anzeigen ({{count}})",
+  "View all ({{count}})_other": "Alle anzeigen ({{count}})",
   "View live feed": "Live-Feed anzeigen",
   "View process": "Prozess anzeigen",
   "View thought process": "Denkprozess anzeigen",

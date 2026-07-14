@@ -1375,6 +1375,8 @@
   "Version": "版本",
   "Version must be greater than the store version v{{version}}": "版本號碼必須大於商店版本 v{{version}}",
   "View": "檢視",
+  "View all ({{count}})_one": "查看全部 ({{count}})",
+  "View all ({{count}})_other": "查看全部 ({{count}})",
   "View live feed": "檢視即時動態",
   "View process": "檢視程序",
   "View thought process": "檢視思考過程",

@@ -9,11 +9,13 @@ import { BookOpen, ChevronDown, ChevronRight, Search, Trash2, Upload, X, FileTex
 import { useTranslation } from '../../i18n'
 import { useKnowledgeStore } from '../../stores/knowledge.store'
 import { useSpaceStore } from '../../stores/space.store'
+import { useCanvasStore } from '../../stores/canvas.store'
 import { isElectron } from '../../api/transport'
 
 export function KnowledgeBasePanel() {
   const { t } = useTranslation()
   const currentSpace = useSpaceStore(state => state.currentSpace)
+  const openKnowledgeBase = useCanvasStore(state => state.openKnowledgeBase)
   const [collapsed, setCollapsed] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
@@ -234,7 +236,7 @@ export function KnowledgeBasePanel() {
           {/* Document list */}
           {displayResults === null && documents.length > 0 && (
             <div className="space-y-0.5">
-              {documents.map(doc => (
+              {documents.slice(0, 3).map(doc => (
                 <div key={doc.id} className="group flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-secondary/50" title={doc.sourcePath}>
                   <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -252,6 +254,14 @@ export function KnowledgeBasePanel() {
                   </button>
                 </div>
               ))}
+              {documents.length > 3 && (
+                <button
+                  onClick={() => openKnowledgeBase()}
+                  className="w-full flex items-center justify-center gap-1 px-2 py-1 text-xs text-primary hover:bg-primary/5 rounded transition-colors"
+                >
+                  {t('View all ({{count}})', { count: documents.length })}
+                </button>
+              )}
             </div>
           )}
 

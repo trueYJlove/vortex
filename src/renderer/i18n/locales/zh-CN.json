@@ -1375,6 +1375,8 @@
   "Version": "版本",
   "Version must be greater than the store version v{{version}}": "版本号必须大于商店版本 v{{version}}",
   "View": "查看",
+  "View all ({{count}})_one": "查看全部（{{count}}）",
+  "View all ({{count}})_other": "查看全部（{{count}}）",
   "View live feed": "查看实时动态",
   "View process": "查看进程",
   "View thought process": "查看思考过程",
