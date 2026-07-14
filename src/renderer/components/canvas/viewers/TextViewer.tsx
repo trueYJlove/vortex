@@ -148,7 +148,7 @@ export function TextViewer({ tab, onScrollChange }: TextViewerProps) {
 
           {/* Content */}
           <pre
-            className={`flex-1 py-4 pl-4 pr-4 leading-6 m-0 ${
+            className={`flex-1 py-4 pl-4 pr-4 leading-6 m-0 selectable-text ${
               wordWrap ? 'whitespace-pre-wrap break-words' : 'overflow-x-auto'
             }`}
           >
