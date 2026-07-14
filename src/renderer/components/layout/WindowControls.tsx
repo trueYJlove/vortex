@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { isElectron } from '../../api/transport'
 import { api } from '../../api'
 
@@ -28,6 +29,7 @@ type WinState = 'normal' | 'maximized'
 export function WindowControls() {
   const [winState, setWinState] = useState<WinState>('normal')
   const platform = getPlatform()
+  const { t } = useTranslation()
 
   // Only render on Windows/Linux Electron
   if (!isElectron() || platform.isMac) {
@@ -53,7 +55,8 @@ export function WindowControls() {
       <button
         className="window-control-btn"
         onClick={() => api.minimizeWindow()}
-        aria-label="最小化"
+        aria-label={t('Minimize')}
+        title={t('Minimize')}
       >
         <svg width="12" height="12" viewBox="0 0 12 12">
           <rect x="2" y="5.5" width="8" height="1" fill="currentColor" />
@@ -63,7 +66,8 @@ export function WindowControls() {
       <button
         className="window-control-btn"
         onClick={() => api.toggleMaximizeWindow()}
-        aria-label={winState === 'maximized' ? '还原' : '最大化'}
+        aria-label={winState === 'maximized' ? t('Restore') : t('Maximize')}
+        title={winState === 'maximized' ? t('Restore') : t('Maximize')}
       >
         {winState === 'maximized' ? (
           <svg width="12" height="12" viewBox="0 0 12 12">
@@ -80,7 +84,8 @@ export function WindowControls() {
       <button
         className="window-control-btn window-control-btn-close"
         onClick={() => api.closeWindow()}
-        aria-label="关闭"
+        aria-label={t('Close')}
+        title={t('Close')}
       >
         <svg width="12" height="12" viewBox="0 0 12 12">
           <line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" strokeWidth="1.2" />

@@ -105,7 +105,9 @@ export function Header({ left, right, className = '' }: HeaderProps) {
           )}
         </div>
         {/* Windows/Linux: custom window controls */}
-        <WindowControls />
+        <div className="self-stretch">
+          <WindowControls />
+        </div>
       </div>
     </header>
   )

@@ -174,10 +174,11 @@ body {
  * themed via CSS variables.
  * ============================================ */
 .window-controls {
-  margin-right: -0.25rem; /* pull flush to right edge */
+  margin-right: -1rem; /* pull flush to right edge,抵消 header 的 pr-4 */
 }
 
 .window-control-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -191,18 +192,27 @@ body {
   outline: none;
 }
 
+.window-control-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
 .window-control-btn:hover {
   background: hsl(var(--secondary));
   color: hsl(var(--foreground));
 }
 
-.window-control-btn:active {
-  background: hsl(var(--muted));
-}
-
 .window-control-btn-close:hover {
   background: hsl(var(--destructive));
   color: hsl(var(--destructive-foreground));
+}
+
+.window-control-btn:active {
+  background: hsl(var(--muted));
 }
 
 /* Smooth scrollbar for tabs */
