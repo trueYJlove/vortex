@@ -86,14 +86,6 @@ function applyTheme(themeId: ThemeMode) {
     root.style.setProperty(`--${key}`, value)
   }
   root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
-
-  // Update titleBarOverlay colors (Windows/Linux only)
-  api.setTitleBarOverlay({
-    color: theme.preview.background,
-    symbolColor: theme.preview.foreground,
-  }).catch(() => {
-    // Ignore errors - may not be supported on current platform
-  })
 }
 
 export default function App() {

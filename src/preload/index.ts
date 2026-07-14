@@ -261,6 +261,8 @@ export interface HaloAPI {
   setTitleBarOverlay: (options: { color: string; symbolColor: string }) => Promise<IpcResponse>
   maximizeWindow: () => Promise<IpcResponse>
   unmaximizeWindow: () => Promise<IpcResponse>
+  minimizeWindow: () => Promise<IpcResponse>
+  closeWindow: () => Promise<IpcResponse>
   isWindowMaximized: () => Promise<IpcResponse<boolean>>
   toggleMaximizeWindow: () => Promise<IpcResponse<boolean>>
   onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void

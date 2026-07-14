@@ -10,6 +10,8 @@ export const systemRpc = {
   setTitleBarOverlay: rawRpcMethod('window:set-title-bar-overlay'),
   maximizeWindow: rawRpcMethod('window:maximize'),
   unmaximizeWindow: rawRpcMethod('window:unmaximize'),
+  minimizeWindow: rawRpcMethod('window:minimize'),
+  closeWindow: rawRpcMethod('window:close'),
   isWindowMaximized: rawRpcMethod('window:is-maximized'),
   toggleMaximizeWindow: rawRpcMethod('window:toggle-maximize'),
   openLogFolder: rawRpcMethod('system:open-log-folder'),

@@ -168,6 +168,43 @@ body {
   -webkit-app-region: no-drag;
 }
 
+/* ============================================
+ * Window Controls (Windows/Linux) — custom
+ * minimize/maximize/close buttons that are fully
+ * themed via CSS variables.
+ * ============================================ */
+.window-controls {
+  margin-right: -0.25rem; /* pull flush to right edge */
+}
+
+.window-control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  color: hsl(var(--foreground) / 0.7);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  outline: none;
+}
+
+.window-control-btn:hover {
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+}
+
+.window-control-btn:active {
+  background: hsl(var(--muted));
+}
+
+.window-control-btn-close:hover {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+}
+
 /* Smooth scrollbar for tabs */
 .scrollbar-none {
   scrollbar-width: none;
