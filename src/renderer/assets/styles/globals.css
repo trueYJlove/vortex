@@ -187,7 +187,7 @@ body {
   color: hsl(var(--foreground) / 0.7);
   background: transparent;
   border: none;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.12s ease, color 0.12s ease;
   outline: none;
 }

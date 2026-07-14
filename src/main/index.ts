@@ -366,8 +366,10 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     icon: iconPath,
-    // macOS: hiddenInset for native traffic lights in content area
-    // Windows/Linux: hidden + custom React window controls
+    // macOS: use native frame for traffic lights
+    // Windows/Linux: completely frameless — prevents Windows 11 Snap Layout dimension tooltip
+    //   that fires on native maximize/unmaximize even with custom controls
+    frame: isMac,
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
     // macOS: position native traffic lights
     trafficLightPosition: isMac ? { x: 15, y: 11 } : undefined,
