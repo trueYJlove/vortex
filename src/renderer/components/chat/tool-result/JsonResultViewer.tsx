@@ -12,6 +12,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { Copy, Check, ChevronDown, ChevronUp, Braces } from 'lucide-react'
 import { useAsyncHighlight } from '../../../hooks/useAsyncHighlight'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import type { ViewerBaseProps } from './types'
 import { truncateToLines } from './detection'
 
@@ -50,7 +51,7 @@ export function JsonResultViewer({
   // Copy handler
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(formattedJson)
+      await copyToClipboard(formattedJson)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

@@ -49,6 +49,8 @@ export const eventsApi = {
     onEvent('agent:token-usage', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
+  onConfigChanged: (callback: (data: unknown) => void) =>
+    onEvent('config:changed', callback),
 
   // ===== Server URL Management (Capacitor) =====
   setServerUrl,

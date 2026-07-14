@@ -11,6 +11,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Copy, Check, ChevronDown, ChevronUp, FileText } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import type { ViewerBaseProps } from './types'
 import { truncateToLines } from './detection'
 
@@ -35,7 +36,7 @@ export function PlainTextViewer({
   // Copy handler
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(output)
+      await copyToClipboard(output)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

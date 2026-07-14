@@ -366,18 +366,16 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     icon: iconPath,
-    // macOS: hiddenInset for traffic lights in content area
-    // Windows/Linux: hidden + titleBarOverlay for native buttons overlay
+    // macOS: use native frame for traffic lights
+    // Windows/Linux: completely frameless — prevents Windows 11 Snap Layout dimension tooltip
+    //   that fires on native maximize/unmaximize even with custom controls
+    frame: isMac,
     titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
-    // Fine-tuned for visual alignment with 40px header
+    // macOS: position native traffic lights
     trafficLightPosition: isMac ? { x: 15, y: 11 } : undefined,
-    // Windows/Linux: native window controls overlay in content area
-    titleBarOverlay: !isMac ? {
-      color: '#0a0a0a',
-      symbolColor: '#ffffff',
-      height: 40
-    } : undefined,
-    backgroundColor: '#0a0a0a',
+    // Windows/Linux: use custom React window controls, no native overlay
+    titleBarOverlay: undefined,
+    backgroundColor: isMac ? undefined : '#0a0a0a',
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       sandbox: false,

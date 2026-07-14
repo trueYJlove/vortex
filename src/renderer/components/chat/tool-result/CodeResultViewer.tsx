@@ -12,6 +12,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { Copy, Check, ChevronDown, ChevronUp, FileText } from 'lucide-react'
 import { useAsyncHighlight } from '../../../hooks/useAsyncHighlight'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import type { ViewerBaseProps } from './types'
 import { countLines, truncateToLines, removeLineNumberPrefix } from './detection'
 
@@ -51,7 +52,7 @@ export function CodeResultViewer({
   // Copy handler - copy cleaned content
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(cleanedOutput)
+      await copyToClipboard(cleanedOutput)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

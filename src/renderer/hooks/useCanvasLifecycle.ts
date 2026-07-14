@@ -70,6 +70,11 @@ export function useCanvasLifecycle() {
     []
   )
 
+  const openKnowledgeBase = useCallback(
+    () => canvasLifecycle.openKnowledgeBase(),
+    []
+  )
+
   const closeTab = useCallback(
     (tabId: string) => canvasLifecycle.closeTab(tabId),
     []
@@ -169,6 +174,7 @@ export function useCanvasLifecycle() {
     openUrl,
     attachAIBrowserView,
     openContent,
+    openKnowledgeBase,
     closeTab,
     closeAllTabs,
     switchTab,

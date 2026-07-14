@@ -22,6 +22,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { MessageSquare, Radio, Users, User, Trash2, Pencil, Copy, Check } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { api } from '../../api'
 import type { ImSessionRecord } from '../../../shared/types/im-channel'
 
@@ -176,7 +177,7 @@ export function ImSessionsSection({ appId, appName, compact }: ImSessionsSection
     const displayName = session.customName ?? session.displayName
     const text = `Name: ${displayName} ID: ${session.instanceId}:${session.chatId}`
     try {
-      await navigator.clipboard.writeText(text)
+      await copyToClipboard(text)
       const key = `${session.appId}:${session.channel}:${session.chatId}`
       setCopiedKey(key)
       setTimeout(() => setCopiedKey(null), 2000)

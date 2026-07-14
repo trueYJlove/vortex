@@ -14,6 +14,7 @@ import { Copy, Check, ExternalLink, WrapText } from 'lucide-react'
 import { api } from '../../../api'
 import type { CanvasTab } from '../../../stores/canvas.store'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 
 interface TextViewerProps {
   tab: CanvasTab
@@ -46,7 +47,7 @@ export function TextViewer({ tab, onScrollChange }: TextViewerProps) {
   const handleCopy = async () => {
     if (!content) return
     try {
-      await navigator.clipboard.writeText(content)
+      await copyToClipboard(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -147,7 +148,7 @@ export function TextViewer({ tab, onScrollChange }: TextViewerProps) {
 
           {/* Content */}
           <pre
-            className={`flex-1 py-4 pl-4 pr-4 leading-6 m-0 ${
+            className={`flex-1 py-4 pl-4 pr-4 leading-6 m-0 selectable-text ${
               wordWrap ? 'whitespace-pre-wrap break-words' : 'overflow-x-auto'
             }`}
           >

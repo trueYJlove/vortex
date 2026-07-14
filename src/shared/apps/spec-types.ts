@@ -297,6 +297,51 @@ export interface BrowserLoginEntry {
 }
 
 // ============================================
+// Workflow Step Types
+// ============================================
+
+export type WorkflowStepType = 'llm_call' | 'tool_call' | 'condition'
+
+export interface LlmCallStep {
+  id: string
+  type: 'llm_call'
+  prompt: string
+  tools?: string[]
+  output?: Record<string, string>
+}
+
+export interface ToolCallStep {
+  id: string
+  type: 'tool_call'
+  tool: string
+  params?: Record<string, unknown>
+}
+
+export interface ConditionCase {
+  when: {
+    eq?: unknown
+    neq?: unknown
+    contains?: unknown
+    matches?: string
+    gt?: number
+    lt?: number
+    gte?: number
+    lte?: number
+  }
+  goto: string
+}
+
+export interface ConditionStep {
+  id: string
+  type: 'condition'
+  input: string
+  cases: ConditionCase[]
+  default?: string
+}
+
+export type WorkflowStep = LlmCallStep | ToolCallStep | ConditionStep
+
+// ============================================
 // Full App Spec (Discriminated Union by type)
 // ============================================
 
@@ -328,6 +373,8 @@ export interface AutomationSpec extends AppSpecCommon {
   recommended_model?: string
   /** Websites the user needs to log into before the automation can run */
   browser_login?: BrowserLoginEntry[]
+  /** Workflow step definitions — enables multi-step automation DAG */
+  steps?: WorkflowStep[]
 }
 
 /** MCP Server — external community format */

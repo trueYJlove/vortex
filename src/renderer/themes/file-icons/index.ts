@@ -1,16 +1,16 @@
 export type { IconThemeDefinition } from './types'
 
 import { materialIconTheme } from './material-icon-theme'
-import { setiTheme } from './seti-theme'
-import { vscodeIconsTheme } from './vscode-icons-theme'
 import { classicTheme } from './classic-theme'
+import { symbolsTheme } from './symbols-theme'
+import { catppuccinIconsTheme } from './catppuccin-icons-theme'
 import type { IconThemeDefinition } from './types'
 
 export const BUILTIN_ICON_THEMES: IconThemeDefinition[] = [
   materialIconTheme,
-  setiTheme,
-  vscodeIconsTheme,
   classicTheme,
+  symbolsTheme,
+  catppuccinIconsTheme,
 ]
 
 export type IconThemeId = typeof BUILTIN_ICON_THEMES[number]['id']

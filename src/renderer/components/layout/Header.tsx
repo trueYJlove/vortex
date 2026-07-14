@@ -3,7 +3,7 @@
  *
  * Handles platform-specific padding for window controls:
  * - macOS Electron: traffic lights on the left (pl-20)
- * - Windows/Linux Electron: titleBarOverlay buttons on the right (pr-36)
+ * - Windows/Linux Electron: custom WindowControls component on the right
  * - Capacitor: safe area padding on top (status bar)
  * - Browser/Mobile: no extra padding needed (pl-4)
  *
@@ -16,6 +16,7 @@ import { Monitor } from 'lucide-react'
 import { isElectron, isCapacitor } from '../../api/transport'
 import { useAppStore } from '../../stores/app.store'
 import { useServerStore } from '../../stores/server.store'
+import { WindowControls } from './WindowControls'
 
 interface HeaderProps {
   /** Left side content (after platform padding) */
@@ -27,7 +28,7 @@ interface HeaderProps {
 }
 
 // Get platform info with fallback for SSR/browser
-const getPlatform = () => {
+export const getPlatform = () => {
   if (typeof window !== 'undefined' && window.platform) {
     return window.platform
   }
@@ -51,13 +52,13 @@ export function Header({ left, right, className = '' }: HeaderProps) {
 
   // Platform-specific padding classes
   // macOS: traffic lights overlay on the left
-  // Windows/Linux: titleBarOverlay buttons overlay on the right
+  // Windows/Linux: custom React window controls in the right area
   // Capacitor: safe area left/right padding, no drag region
   // Browser/Mobile: no overlay, use normal padding
   const platformPadding = isInElectron
     ? platform.isMac
       ? 'pl-20 pr-4'   // Electron macOS: 80px left for traffic lights
-      : 'pl-4 pr-36'   // Electron Windows/Linux: 140px right for titleBarOverlay buttons
+      : 'pl-4 pr-4'     // Electron Windows/Linux: custom controls in header, no overlay padding
     : isInCapacitor
       ? 'pl-4 pr-4'    // Capacitor: standard padding, safe area handled by globals.css
       : 'pl-4 pr-4'    // Browser/Mobile: normal padding
@@ -102,6 +103,10 @@ export function Header({ left, right, className = '' }: HeaderProps) {
               </span>
             </button>
           )}
+        </div>
+        {/* Windows/Linux: custom window controls */}
+        <div className="self-stretch">
+          <WindowControls />
         </div>
       </div>
     </header>

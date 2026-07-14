@@ -45,6 +45,7 @@ export type ContentType =
   | 'csv'
   | 'browser'
   | 'terminal'
+  | 'knowledge-base'
 
 export interface BrowserState {
   isLoading: boolean
@@ -516,7 +517,11 @@ class CanvasLifecycle {
     const tabId = generateTabId()
     // BrowserView has no cross-origin restrictions, use file:// directly
     // Encode path to handle non-ASCII characters and spaces
-    const pdfUrl = `file://${encodeURI(path)}`
+    // Normalize Windows backslashes — file:// URLs require forward slashes.
+    // On Windows the result is file:///C:/path/file.pdf (3 slashes + drive letter).
+    // On Unix the result is file:///home/user/file.pdf (3 slashes + absolute path).
+    const normalizedPath = path.replace(/\\/g, '/')
+    const pdfUrl = `file://${normalizedPath.startsWith('/') ? '' : '/'}${encodeURI(normalizedPath)}`
 
     const tab: TabState = {
       id: tabId,
@@ -700,6 +705,37 @@ class CanvasLifecycle {
       title,
       content,
       language,
+      isDirty: false,
+      isLoading: false,
+    }
+
+    this.tabs.set(tabId, tab)
+    this.setOpen(true)
+    this.notifyTabsChange()
+
+    await this.switchTab(tabId)
+
+    return tabId
+  }
+
+  /**
+   * Open knowledge base detail tab (deduplicated by type).
+   * If a knowledge-base tab already exists, switch to it instead of creating a new one.
+   */
+  async openKnowledgeBase(): Promise<string> {
+    // Dedup: reuse existing knowledge-base tab
+    for (const [tabId, tab] of this.tabs) {
+      if (tab.type === 'knowledge-base') {
+        await this.switchTab(tabId)
+        return tabId
+      }
+    }
+
+    const tabId = generateTabId()
+    const tab: TabState = {
+      id: tabId,
+      type: 'knowledge-base',
+      title: 'Knowledge Base',
       isDirty: false,
       isLoading: false,
     }

@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react'
 import { Star, Copy, Check, X, Heart } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { api } from '../../api'
 
 /** GitHub repository URL */
@@ -60,7 +61,7 @@ export function RecommendSection() {
   // Handle copy link
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(GITHUB_URL)
+      await copyToClipboard(GITHUB_URL)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
@@ -101,7 +102,7 @@ export function RecommendSection() {
   // Handle copy in modal
   const handleModalCopy = async () => {
     try {
-      await navigator.clipboard.writeText(getShareContent())
+      await copyToClipboard(getShareContent())
       setModalCopied(true)
       setTimeout(() => setModalCopied(false), 2000)
     } catch (error) {

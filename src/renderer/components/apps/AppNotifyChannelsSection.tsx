@@ -24,6 +24,7 @@ import {
   ExternalLink, Users, User, Pencil, Trash2, Copy, Check,
 } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
 import type { HaloConfig } from '../../types'
@@ -281,7 +282,7 @@ function ContactsSection({ appId }: { appId: string }) {
     const displayName = session.customName ?? session.displayName
     const text = `Name: ${displayName} ID: ${session.instanceId}:${session.chatId}`
     try {
-      await navigator.clipboard.writeText(text)
+      await copyToClipboard(text)
       const key = `${session.appId}:${session.channel}:${session.chatId}`
       setCopiedKey(key)
       setTimeout(() => setCopiedKey(null), 2000)

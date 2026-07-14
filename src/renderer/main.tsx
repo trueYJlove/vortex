@@ -26,6 +26,12 @@ void initCapacitorMobileShell()
 // i18n configuration - must be imported before App
 import './i18n'
 
+// Clipboard polyfill — installs navigator.clipboard.writeText fallback for
+// non-secure contexts (HTTP remote access). Libraries like Streamdown call
+// navigator.clipboard directly, so this must run before any rendering.
+import { installClipboardPolyfill } from './utils/clipboard'
+installClipboardPolyfill()
+
 // CSS imports - order matters for cascade
 import './assets/styles/globals.css'       // Theme, base styles, shared animations
 import './assets/styles/syntax-theme.css'  // Code syntax highlighting (highlight.js)

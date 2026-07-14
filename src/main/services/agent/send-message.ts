@@ -45,6 +45,9 @@ import { resolveCredentialsForSdk, buildBaseSdkOptions } from './sdk-config'
 import { flushToolStats } from './stream-processor'
 import { analytics } from '../analytics/analytics.service'
 import { AnalyticsEvents } from '../analytics/types'
+import { getKnowledgeService } from '../../platform/memory/'
+import { buildKnowledgeSummary } from '../../platform/memory/knowledge/prompt'
+import { createKnowledgeSearchMcpServer } from '../../platform/memory/knowledge/mcp-tool'
 
 // ============================================
 // Send Message
@@ -119,6 +122,23 @@ export async function sendMessage(
       if (haloApps) mcpServers['halo-apps'] = haloApps
     }
     mcpServers['web-search'] = createWebSearchMcpServer()
+    // Knowledge-search MCP server (RAG — only when docs exist in the space)
+    const knowledgeService = getKnowledgeService()
+    let knowledgeContextPrefix = ''
+    if (knowledgeService && spaceId) {
+      try {
+        const docs = await knowledgeService.listDocuments(spaceId)
+        if (docs.length > 0) {
+          knowledgeContextPrefix = '\n\n' + buildKnowledgeSummary(docs)
+          mcpServers['knowledge-search'] = createKnowledgeSearchMcpServer({
+            spaceId,
+            knowledgeService,
+          })
+        }
+      } catch (err) {
+        console.warn('[Agent][sendMessage] Failed to build knowledge context:', err)
+      }
+    }
 
     // Build base SDK options
     const sdkOptions = buildBaseSdkOptions({
@@ -187,9 +207,9 @@ export async function sendMessage(
     }
     console.log(`[Agent][${conversationId}] ⏱️ V2 session ready: ${Date.now() - t0}ms`)
 
-    // Prepare message content (canvas context prefix + multi-modal images)
+    // Prepare message content (knowledge context prefix + canvas context + images)
     const canvasPrefix = formatCanvasContext(canvasContext)
-    const messageWithContext = canvasPrefix + message
+    const messageWithContext = canvasPrefix + knowledgeContextPrefix + '\n\n' + message
     const messageContent = buildMessageContent(messageWithContext, images)
 
     // Send to CC's REPL — consumer handles the response

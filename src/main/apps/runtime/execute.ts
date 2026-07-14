@@ -46,6 +46,11 @@ import { getConfig, resolveClaudeConfigDir } from '../../foundation/config.servi
 import { getSpace, getSpaceDir } from '../../services/space.service'
 import { openSessionWriter, type SessionWriter } from './session-store'
 import { registerActiveRun, unregisterActiveRun } from './active-runs'
+import { getKnowledgeService } from '../../platform/memory/'
+import { buildKnowledgeSummary } from '../../platform/memory/knowledge/prompt'
+import { createKnowledgeSearchMcpServer } from '../../platform/memory/knowledge/mcp-tool'
+import { executeWorkflow, type ExecuteWorkflowOptions } from './workflow/executor'
+import type { WorkflowStore } from './workflow/store'
 
 // ============================================
 // Types
@@ -59,35 +64,29 @@ export interface ExecuteRunOptions {
   trigger: TriggerContext
   /** Activity store for recording results */
   store: ActivityStore
+  /** Workflow store for recording DAG execution (required if app has workflow steps) */
+  workflowStore?: WorkflowStore
   /** Memory service for AI memory tools and prompt instructions */
   memory: MemoryService
   /** Abort signal for cancellation */
   abortSignal?: AbortSignal
   /** Insert an activity entry and broadcast it to renderer + remote clients */
   emitEntry?: (entry: ActivityEntry) => void
-  /**
-   * Existing run ID to reopen (user-initiated continue).
-   *
-   * When provided, `executeRun` skips `store.insertRun()` and reuses this run
-   * record instead of creating a new one. Used by `continueFailedRun` so the
-   * Activity Thread entry updates in-place (error → running → completed) rather
-   * than spawning a second timeline entry.
-   */
+  /** Existing run ID to reopen (user-initiated continue). */
   existingRunId?: string
   /** Existing session key matching the run record (required when existingRunId is set). */
   existingSessionKey?: string
-  /**
-   * Fired exactly once, after the run record is inserted/reopened and before
-   * the AI session is built. Used by the runtime service to dispatch the
-   * `onRunStarted` lifecycle event with the authoritative runId. Errors in
-   * the callback are swallowed by the caller — must never throw.
-   */
+  /** Fired once after the run record is inserted/reopened, before the AI session is built. */
   onRunStarted?: (info: {
     runId: string
     sessionKey: string
     startedAt: number
     isResuming: boolean
   }) => void
+  /** Dependencies for workflow LLM call nodes (required if app has workflow steps) */
+  llmDeps?: import('./workflow/nodes/llm-call').LlmCallDeps
+  /** Dependencies for workflow tool call nodes (required if app has workflow steps) */
+  toolDeps?: import('./workflow/nodes/tool-call').ToolCallDeps
 }
 
 /** Internal result from stream processing */
@@ -172,6 +171,32 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
   // This narrows app.spec to AutomationSpec for the rest of the function.
   if (app.spec.type !== 'automation') {
     throw new RunExecutionError('unknown', 'unknown', `executeRun called for non-automation app type: ${app.spec.type}`)
+  }
+
+  // Branch: if app has workflow steps, delegate to the workflow DAG executor.
+  // Workflow execution uses its own store and node executors, not the V2 session.
+  const spec = app.spec
+  if (spec.steps && spec.steps.length > 0) {
+    const { workflowStore, llmDeps, toolDeps } = options
+    if (!workflowStore || !llmDeps || !toolDeps) {
+      throw new RunExecutionError(
+        app.id, 'unknown',
+        'workflowStore, llmDeps, and toolDeps are required when app has workflow steps'
+      )
+    }
+    console.log(
+      `[Runtime] Delegating to workflow executor: app=${app.id}, ` +
+      `steps=${spec.steps.length}, trigger=${trigger.type}`
+    )
+    return executeWorkflow({
+      app,
+      trigger,
+      workflowStore,
+      memory,
+      abortSignal,
+      llmDeps,
+      toolDeps,
+    })
   }
 
   // For continue_followup and escalation_followup (with existingRunId), reuse the
@@ -305,7 +330,27 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     //    Reuses rawContent from the snapshot to avoid a redundant file read.
     const runTimestamp = formatRunTimestamp(new Date())
     await preInsertHistoryHeading(memorySnapshot.memoryFilePath, runTimestamp, memorySnapshot.rawContent)
-    console.log(`[Runtime][${runTag}] Pre-inserted History heading: ## ${runTimestamp}`)
+    console.log('[Runtime][' + runTag + '] Pre-inserted History heading: ## ' + runTimestamp)
+
+    // -- 3b. Knowledge Base summary -----------------------------------
+    //    Fetch document list and build summary for the initial message.
+    //    Registers knowledge-search MCP server for AI-driven RAG queries.
+    let knowledgeSummary = ''
+    let knowledgeMcpServer: any = null
+    const knowledgeService = getKnowledgeService()
+    if (knowledgeService && app.spaceId) {
+      try {
+        const docs = await knowledgeService.listDocuments(app.spaceId)
+        knowledgeSummary = buildKnowledgeSummary(docs)
+        knowledgeMcpServer = createKnowledgeSearchMcpServer({
+          spaceId: app.spaceId,
+          knowledgeService,
+        })
+        console.log('[Runtime][' + runTag + '] Knowledge summary: ' + docs.length + ' documents')
+      } catch (err) {
+        console.warn('[Runtime][' + runTag + '] Failed to build knowledge summary:', err)
+      }
+    }
 
     // Resuming runs (continue or escalation follow-up) send minimal messages
     // so the model can resume naturally from its restored session context.
@@ -319,6 +364,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
             userConfig: mergedConfig,
             appName: app.spec.name,
             memorySnapshot,
+            knowledgeSummary,
           })
 
     console.log(
@@ -417,6 +463,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
         'halo-report': reportMcpServer,     // built-in: completion signal
         'halo-notify': notifyMcpServer,     // built-in: user notification
         'web-search': createWebSearchMcpServer(), // built-in: web search
+        ...(knowledgeMcpServer ? { 'knowledge-search': knowledgeMcpServer } : {}),
         ...(usesAIBrowser ? { 'ai-browser': createAIBrowserMcpServer(scopedBrowserCtx, workDir) } : {}),
         ...(usesEmail && config.notificationChannels?.email?.enabled
           ? { 'halo-email': createEmailMcpServer(config.notificationChannels.email) }

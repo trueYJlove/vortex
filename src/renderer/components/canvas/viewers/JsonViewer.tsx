@@ -14,6 +14,7 @@ import { Copy, Check, ExternalLink, WrapText } from 'lucide-react'
 import { highlightCodeSync } from '../../../lib/highlight-loader'
 import { api } from '../../../api'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import type { CanvasTab } from '../../../stores/canvas.store'
 
 interface JsonViewerProps {
@@ -67,7 +68,7 @@ export function JsonViewer({ tab, onScrollChange }: JsonViewerProps) {
   const handleCopy = async () => {
     if (!content) return
     try {
-      await navigator.clipboard.writeText(displayContent)
+      await copyToClipboard(displayContent)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

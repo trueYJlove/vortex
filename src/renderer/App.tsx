@@ -10,6 +10,7 @@ import { initAIBrowserStoreListeners } from './stores/ai-browser.store'
 import { initPerfStoreListeners } from './stores/perf.store'
 import { useSpaceStore } from './stores/space.store'
 import { useSearchStore } from './stores/search.store'
+import { useCommandPanelStore } from './stores/command-panel.store'
 import { useAppsStore } from './stores/apps.store'
 import { useAppsPageStore } from './stores/apps-page.store'
 import { SplashPage } from './pages/SplashPage'
@@ -23,6 +24,8 @@ import type { ServerEntry } from './stores/server.store'
 import { clearPendingServerUrl, setAuthToken } from './api/transport'
 import { SearchPanel } from './components/search/SearchPanel'
 import { SearchHighlightBar } from './components/search/SearchHighlightBar'
+import { CommandPanel } from './components/ui/CommandPanel'
+import { registerAllCommands } from './commands'
 import { StatusBar } from './components/layout/StatusBar'
 import { OnboardingOverlay } from './components/onboarding'
 import { UpdateNotification } from './components/updater/UpdateNotification'
@@ -83,14 +86,6 @@ function applyTheme(themeId: ThemeMode) {
     root.style.setProperty(`--${key}`, value)
   }
   root.style.setProperty('color-scheme', isDark ? 'dark' : 'light')
-
-  // Update titleBarOverlay colors (Windows/Linux only)
-  api.setTitleBarOverlay({
-    color: theme.preview.background,
-    symbolColor: theme.preview.foreground,
-  }).catch(() => {
-    // Ignore errors - may not be supported on current platform
-  })
 }
 
 export default function App() {
@@ -116,6 +111,57 @@ export default function App() {
   } = useChatStore()
   const { initialize: initializeOnboarding } = useOnboardingStore()
   const { isSearchOpen, closeSearch, isHighlightBarVisible, hideHighlightBar, goToPreviousResult, goToNextResult, openSearch } = useSearchStore()
+
+  // Register command palette commands once on mount. Returns cleanup for
+  // hot-reload; in production the registry lives for the app lifetime.
+  useEffect(() => {
+    return registerAllCommands()
+  }, [])
+
+  // Wire command palette tool actions to existing UI flows. Commands stay
+  // decoupled from stores by dispatching custom events; App.tsx is the single
+  // place that translates them into concrete store actions.
+  useEffect(() => {
+    const focusSearch = () => useSearchStore.getState().openSearch('global')
+    window.addEventListener('command:focus-search', focusSearch)
+    return () => window.removeEventListener('command:focus-search', focusSearch)
+  }, [])
+
+  // Global Ctrl+Shift+P — open command palette from any view (except transient
+  // setup/serverConnect screens where the user hasn't entered the app yet).
+  // useSearchShortcuts in SpacePage still handles Ctrl+Shift+K/F, but
+  // Ctrl+Shift+P is centralized here so every page has it.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = typeof navigator !== 'undefined' &&
+        navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const metaKey = isMac ? e.metaKey : e.ctrlKey
+
+      // Ctrl+A: only allow in text editing elements and canvas viewers, prevent full-page text selection
+      if (metaKey && (e.key === 'a' || e.key === 'A')) {
+        const tag = document.activeElement?.tagName
+        const editable = document.activeElement?.closest('[contenteditable]')
+        const selectable = document.activeElement?.closest('.selectable-text')
+        if (tag !== 'TEXTAREA' && tag !== 'INPUT' && !editable && !selectable) {
+          e.preventDefault()
+          return
+        }
+      }
+
+      if (!metaKey || !e.shiftKey) return
+      if (e.key !== 'P' && e.key !== 'p') return
+      const currentView = useAppStore.getState().view
+      if (currentView === 'splash' || currentView === 'setup' ||
+          currentView === 'serverConnect' || currentView === 'serverList' ||
+          currentView === 'gitBashSetup') {
+        return
+      }
+      e.preventDefault()
+      useCommandPanelStore.getState().open()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Telemetry: session lifecycle + page views (fire-and-forget)
   useTelemetry(view)
@@ -664,6 +710,18 @@ export default function App() {
     }
   }, [setInitialAppId, setView])
 
+  // Listen for config:changed events (model/switch-source sync from remote clients)
+  useEffect(() => {
+    const unsub = api.onConfigChanged(async () => {
+      console.log('[App] Config changed event received, refreshing config...')
+      const result = await api.getConfig()
+      if (result.success && result.data) {
+        useAppStore.getState().setConfig(result.data as any)
+      }
+    })
+    return unsub
+  }, [])
+
   // Register in-app toast listener (notification:toast from main process)
   const showToast = useNotificationStore((s) => s.show)
   useEffect(() => {
@@ -944,6 +1002,8 @@ export default function App() {
       )}
       {/* Search panel - full screen edit mode */}
       <SearchPanel isOpen={isSearchOpen} onClose={closeSearch} />
+      {/* Command palette - Ctrl+K spotlight */}
+      <CommandPanel />
       {/* Search highlight bar - floating navigation mode */}
       <SearchHighlightBar />
       {/* Onboarding overlay - renders on top of everything */}

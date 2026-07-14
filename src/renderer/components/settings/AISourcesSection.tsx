@@ -28,6 +28,7 @@ import type {
 } from '../../types'
 import { getBuiltinProvider, isOAuthProvider as isOAuthProviderFn } from '../../types'
 import { useTranslation, getCurrentLanguage } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { api } from '../../api'
 import { ProviderSelector } from './ProviderSelector'
 import { resolveLocalizedText, type LocalizedText, type AuthProviderConfig } from '../../../shared/types'
@@ -356,7 +357,7 @@ export function AISourcesSection({ config, setConfig }: AISourcesSectionProps) {
   const handleClaudeCopyUrl = async () => {
     if (!claudeLogin) return
     try {
-      await navigator.clipboard.writeText(claudeLogin.loginUrl)
+      await copyToClipboard(claudeLogin.loginUrl)
       setClaudeLogin(prev => prev ? { ...prev, copied: true } : null)
       setTimeout(() => {
         setClaudeLogin(prev => prev ? { ...prev, copied: false } : null)

@@ -19,6 +19,7 @@ import { ToolIcon } from '../icons/ToolIcons'
 import { useChatStore } from '../../stores/chat.store'
 import type { ToolCall } from '../../types'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 
 interface ToolCardProps {
   toolCall: ToolCall
@@ -126,7 +127,7 @@ export function ToolCard({ toolCall, conversationId }: ToolCardProps) {
   // Handle copy
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(toolCall.output || '')
+      await copyToClipboard(toolCall.output || '')
       setIsCopied(true)
       setTimeout(() => setIsCopied(false), 2000)
     } catch (err) {

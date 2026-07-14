@@ -128,6 +128,28 @@ export function registerSystemHandlers(): void {
       }
     },
 
+    // Minimize window
+    minimizeWindow: async () => {
+      try {
+        mainWindow?.minimize()
+        return { success: true }
+      } catch (error) {
+        const err = error as Error
+        return { success: false, error: err.message }
+      }
+    },
+
+    // Close window
+    closeWindow: async () => {
+      try {
+        mainWindow?.close()
+        return { success: true }
+      } catch (error) {
+        const err = error as Error
+        return { success: false, error: err.message }
+      }
+    },
+
     // Open log folder in system file manager
     openLogFolder: async () => {
       console.log('[Settings] system:open-log-folder - Opening log folder')

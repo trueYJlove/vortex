@@ -42,8 +42,10 @@ import { getSpace } from '../../services/space.service'
 import { getExpressApp } from '../../http/server'
 import * as watcherHost from '../../services/watcher-host.service'
 import { ActivityStore } from './store'
+import { WorkflowStore } from './workflow/store'
 import { createAppRuntimeService } from './service'
 import { MIGRATION_NAMESPACE, migrations } from './migrations'
+import { WORKFLOW_MIGRATION_NAMESPACE, workflowMigrations } from './workflow/migrations'
 import { createEventRouter, type EventRouter } from './event-router'
 import { FileWatcherSource } from './sources/file-watcher.source'
 import { WebhookSource, type WebhookSecretResolver } from './sources/webhook.source'
@@ -135,6 +137,7 @@ export { ImChannelManager } from './im-channels'
 let runtimeService: AppRuntimeService | null = null
 let memoryServiceRef: MemoryService | null = null
 let activityStoreRef: ActivityStore | null = null
+let workflowStoreRef: WorkflowStore | null = null
 let eventRouterInstance: EventRouter | null = null
 let imChannelManagerInstance: ImChannelManager | null = null
 let imSessionRegistryInstance: ImSessionRegistry | null = null
@@ -207,9 +210,11 @@ export async function initAppRuntime(
 
   // Run migrations
   deps.db.runMigrations(appDb, MIGRATION_NAMESPACE, migrations)
+  deps.db.runMigrations(appDb, WORKFLOW_MIGRATION_NAMESPACE, workflowMigrations)
 
-  // Create the activity store
+  // Create the activity store and workflow store
   const store = new ActivityStore(appDb)
+  const workflowStore = new WorkflowStore(appDb)
 
   // ── Create and wire EventRouter ──────────────────────────────────────
   const eventRouter = createEventRouter()
@@ -318,6 +323,7 @@ export async function initAppRuntime(
   runtimeService = service
   memoryServiceRef = deps.memory
   activityStoreRef = store
+  workflowStoreRef = workflowStore
 
   const duration = performance.now() - start
   console.log(`[Runtime] App Runtime initialized in ${duration.toFixed(1)}ms`)
@@ -350,6 +356,13 @@ export function getActivityStore(): ActivityStore | null {
 }
 
 /**
+ * Get the workflow store instance captured during init.
+ */
+export function getWorkflowStore(): WorkflowStore | null {
+  return workflowStoreRef
+}
+
+/**
  * Get the ImChannelManager instance for external use
  * (e.g., status queries, reconnect, config reload from IPC/HTTP).
  */
@@ -373,6 +386,7 @@ export async function shutdownAppRuntime(): Promise<void> {
     runtimeService = null
     memoryServiceRef = null
     activityStoreRef = null
+    workflowStoreRef = null
   }
 
   if (eventRouterInstance) {

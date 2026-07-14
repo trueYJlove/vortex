@@ -17,6 +17,8 @@ import { registerImRoutes } from './im.routes'
 import { registerSystemRoutes } from './system.routes'
 import { registerAppsRoutes } from './apps.routes'
 import { registerStoreRoutes } from './store.routes'
+import { registerWorkflowRoutes } from './workflow.routes'
+import { registerKnowledgeRoutes } from './knowledge.routes'
 
 /**
  * Register all API routes.
@@ -32,6 +34,8 @@ export function registerApiRoutes(app: Express): void {
   registerSystemRoutes(app)
   registerAppsRoutes(app)
   registerStoreRoutes(app)
+  registerWorkflowRoutes(app)
+  registerKnowledgeRoutes(app)
 
   console.log('[HTTP] API routes registered')
 }

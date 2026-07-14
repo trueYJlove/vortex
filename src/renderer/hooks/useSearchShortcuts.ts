@@ -1,10 +1,12 @@
 /**
  * useSearchShortcuts Hook
  *
- * Manages keyboard shortcuts for search:
- * - Cmd+K / Ctrl+K: Global search
- * - Cmd+F / Ctrl+F: Conversation search (or space search if on space page)
- * - Cmd+Shift+F / Ctrl+Shift+F: Space search
+ * Manages keyboard shortcuts for content search:
+ * - macOS: Cmd+K — Global content search
+ * - Windows/Linux: Ctrl+F — Space search
+ *
+ * Note: Ctrl+Shift+P (command palette) is handled globally in App.tsx so it works
+ * on every page, not just where this hook is mounted.
  */
 
 import { useEffect } from 'react'
@@ -32,30 +34,20 @@ export function useSearchShortcuts({
 
       const metaKey = isMac ? e.metaKey : e.ctrlKey
 
-      // Cmd+K / Ctrl+K - Global search
-      if (metaKey && e.key === 'k' && !e.shiftKey) {
-        e.preventDefault()
-        onSearch('global')
-        return
-      }
-
-      // Cmd+Shift+F / Ctrl+Shift+F - Space search
-      if (metaKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
-        e.preventDefault()
-        onSearch('space')
-        return
-      }
-
-      // Cmd+F / Ctrl+F - Conversation search
-      // Note: This may conflict with browser Find dialog in web mode,
-      // which is why we recommend Cmd+K for global as the primary shortcut
-      if (metaKey && (e.key === 'f' || e.key === 'F') && !e.shiftKey) {
-        // Only handle in Electron mode to avoid browser Find conflict
-        if (typeof window !== 'undefined' && 'halo' in window) {
+      if (isMac) {
+        // macOS: Cmd+K — Global content search
+        if (metaKey && e.shiftKey && (e.key === 'k' || e.key === 'K')) {
           e.preventDefault()
-          onSearch('conversation')
+          onSearch('global')
+          return
         }
-        return
+      } else {
+        // Windows/Linux: Ctrl+F — Space search
+        if (metaKey && (e.key === 'f' || e.key === 'F') && !e.shiftKey) {
+          e.preventDefault()
+          onSearch('space')
+          return
+        }
       }
     }
 

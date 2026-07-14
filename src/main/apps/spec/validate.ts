@@ -7,7 +7,7 @@
 
 import { ZodError } from 'zod'
 import { AppSpecSchema } from './schema'
-import type { AppSpec } from './schema'
+import type { AppSpec, WorkflowStep, ConditionStep } from './schema'
 import { AppSpecValidationError } from './errors'
 import type { ValidationIssue } from './errors'
 
@@ -102,4 +102,124 @@ function buildErrorSummary(issues: ValidationIssue[]): string {
   })
 
   return `App spec validation failed with ${issues.length} issues:\n${lines.join('\n')}`
+}
+
+// ============================================================================
+// Workflow DAG Validation
+// ============================================================================
+
+export interface WorkflowValidationIssue {
+  path: string
+  message: string
+}
+
+export interface WorkflowValidationResult {
+  valid: boolean
+  issues: WorkflowValidationIssue[]
+}
+
+/**
+ * Validate a workflow step array for structural integrity:
+ *  1. All goto/default references point to existing step ids.
+ *  2. No cycles reachable from the entry node.
+ *  3. At least one terminal node (no outgoing reference).
+ *  4. condition nodes have at least one case or default.
+ *  5. Duplicate node IDs.
+ */
+export function validateWorkflowSteps(steps: WorkflowStep[]): WorkflowValidationResult {
+  const issues: WorkflowValidationIssue[] = []
+
+  if (steps.length === 0) {
+    return { valid: true, issues: [] }
+  }
+
+  const nodeIds = new Set(steps.map(s => s.id))
+
+  // 1. Check duplicate node IDs
+  const seen = new Set<string>()
+  for (const step of steps) {
+    if (seen.has(step.id)) {
+      issues.push({ path: 'steps', message: `Duplicate node id: "${step.id}"` })
+    }
+    seen.add(step.id)
+  }
+
+  // 2. Check all goto/default references exist
+  for (const step of steps) {
+    if (step.type === 'condition') {
+      for (const c of step.cases) {
+        if (!nodeIds.has(c.goto)) {
+          issues.push({ path: `steps.${step.id}.cases`, message: `goto references non-existent node: "${c.goto}"` })
+        }
+      }
+      if (step.default && !nodeIds.has(step.default)) {
+        issues.push({ path: `steps.${step.id}`, message: `default references non-existent node: "${step.default}"` })
+      }
+    }
+  }
+
+  // 3. Find terminal nodes (nodes with no outgoing edges)
+  const hasOutgoingEdge = new Set<string>()
+  for (const step of steps) {
+    if (step.type === 'condition') {
+      for (const c of step.cases) {
+        hasOutgoingEdge.add(c.goto)
+      }
+      if (step.default) {
+        hasOutgoingEdge.add(step.default)
+      }
+    }
+  }
+  const terminalNodes = steps.filter(s => !hasOutgoingEdge.has(s.id))
+  if (terminalNodes.length === 0) {
+    issues.push({ path: 'steps', message: 'No terminal node found — at least one step must have no outgoing edges' })
+  }
+
+  // 4. Check condition nodes have cases or default
+  for (const step of steps) {
+    if (step.type === 'condition') {
+      if (step.cases.length === 0 && !step.default) {
+        issues.push({ path: `steps.${step.id}`, message: 'Condition node must have at least one case or a default' })
+      }
+    }
+  }
+
+  // 5. Cycle detection (DFS from first node)
+  const adjacency = new Map<string, string[]>()
+  for (const step of steps) {
+    if (step.type === 'condition') {
+      const targets = [...step.cases.map(c => c.goto)]
+      if (step.default) targets.push(step.default)
+      adjacency.set(step.id, targets)
+    } else {
+      adjacency.set(step.id, [])
+    }
+  }
+
+  const visited = new Set<string>()
+  const inStack = new Set<string>()
+
+  function detectCycle(nodeId: string): boolean {
+    if (inStack.has(nodeId)) return true
+    if (visited.has(nodeId)) return false
+    visited.add(nodeId)
+    inStack.add(nodeId)
+    for (const neighbor of adjacency.get(nodeId) ?? []) {
+      if (detectCycle(neighbor)) return true
+    }
+    inStack.delete(nodeId)
+    return false
+  }
+
+  if (steps.length > 0) {
+    const entryNode = steps[0].id
+    if (detectCycle(entryNode)) {
+      issues.push({ path: 'steps', message: 'Cycle detected in workflow — no cycles allowed' })
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues,
+  }
 }

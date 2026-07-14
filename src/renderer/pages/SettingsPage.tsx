@@ -9,6 +9,7 @@ import { useAppStore } from '../stores/app.store'
 import { api } from '../api'
 import type { HaloConfig } from '../types'
 import { Header } from '../components/layout/Header'
+import { CommandPaletteButton } from '../components/layout/CommandPaletteButton'
 import { useTranslation } from '../i18n'
 import { useIsMobile } from '../hooks/useIsMobile'
 
@@ -66,6 +67,7 @@ export function SettingsPage() {
             <span className="font-medium text-sm">{t('Settings')}</span>
           </>
         }
+        right={<CommandPaletteButton />}
       />
 
       {/* Main Content Area */}

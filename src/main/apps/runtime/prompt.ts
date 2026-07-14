@@ -290,6 +290,7 @@ export function buildInitialMessage(options: {
   userConfig?: Record<string, unknown>
   appName: string
   memorySnapshot: MemorySnapshot
+  knowledgeSummary?: string
 }): string {
   const parts: string[] = []
 
@@ -298,6 +299,11 @@ export function buildInitialMessage(options: {
 
   // ── Memory ─────────────────────────────────────────────────────────────
   parts.push(buildMemorySection(options.memorySnapshot))
+
+  // ── Knowledge Base Summary ─────────────────────────────────────────────
+  if (options.knowledgeSummary) {
+    parts.push(options.knowledgeSummary)
+  }
 
   // ── User Configuration ─────────────────────────────────────────────────
   if (options.userConfig && Object.keys(options.userConfig).length > 0) {

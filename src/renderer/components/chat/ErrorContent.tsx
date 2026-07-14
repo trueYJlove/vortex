@@ -16,6 +16,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 
 /** Show up to this many characters before offering an expand toggle. */
 const PREVIEW_CHAR_LIMIT = 600
@@ -81,7 +82,7 @@ export function ErrorContent({ content, compact }: ErrorContentProps) {
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(trimmed)
+      await copyToClipboard(trimmed)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1600)
     } catch (err) {

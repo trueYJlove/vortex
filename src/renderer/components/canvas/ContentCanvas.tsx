@@ -34,6 +34,7 @@ import { HtmlViewer } from './viewers/HtmlViewer'
 import { JsonViewer } from './viewers/JsonViewer'
 import { CsvViewer } from './viewers/CsvViewer'
 import { TextViewer } from './viewers/TextViewer'
+import { KnowledgeBaseViewer } from './viewers/KnowledgeBaseViewer'
 import { BrowserViewer, BrowserViewerFallback } from './viewers/BrowserViewer'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
@@ -282,6 +283,9 @@ function TabContent({ tab, onScrollChange, onContentChange, onSaveComplete, onEd
           onSaveComplete={onSaveComplete}
         />
       )
+
+    case 'knowledge-base':
+      return <KnowledgeBaseViewer tab={tab} />
 
     case 'terminal':
       // Terminal view placeholder (future feature)

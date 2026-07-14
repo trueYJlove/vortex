@@ -32,6 +32,7 @@ import { useWindowMaximize } from './viewers/useWindowMaximize'
 import { FileIcon } from '../icons/ToolIcons'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 import { getBrowserHomepage } from '../../utils/browser-homepage'
 
 interface CanvasTabsProps {
@@ -165,7 +166,7 @@ export function CanvasTabs({
   // Copy path handler
   const handleCopyPath = useCallback(async (path: string) => {
     try {
-      await navigator.clipboard.writeText(path)
+      await copyToClipboard(path)
     } catch (err) {
       console.error('Failed to copy path:', err)
     }

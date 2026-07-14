@@ -24,6 +24,7 @@ import { useState } from 'react'
 import { DiffContent } from './DiffContent'
 import type { FileChange } from './types'
 import { useTranslation } from '../../i18n'
+import { copyToClipboard } from '../../utils/clipboard'
 
 interface DiffModalProps {
   isOpen: boolean
@@ -88,7 +89,7 @@ export function DiffModal({
       : file.newString
 
     if (content) {
-      await navigator.clipboard.writeText(content)
+      await copyToClipboard(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }

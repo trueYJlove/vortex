@@ -26,7 +26,7 @@ let storeDetailRequestSeq = 0
 // Types
 // ============================================
 
-export type AppsDetailViewType = 'activity-thread' | 'session-detail' | 'app-chat' | 'app-config' | 'mcp-status' | 'skill-info' | 'uninstalled-detail'
+export type AppsDetailViewType = 'activity-thread' | 'session-detail' | 'app-chat' | 'app-config' | 'mcp-status' | 'skill-info' | 'uninstalled-detail' | 'workflow-replay'
 
 export type AppsDetailView =
   | { type: 'activity-thread'; appId: string }
@@ -36,6 +36,7 @@ export type AppsDetailView =
   | { type: 'mcp-status'; appId: string }
   | { type: 'skill-info'; appId: string }
   | { type: 'uninstalled-detail'; appId: string }
+  | { type: 'workflow-replay'; appId: string }
   | null
 
 export type AppsPageTab = 'my-digital-humans' | 'my-skills' | 'my-mcp' | 'store'
@@ -110,6 +111,7 @@ interface AppsPageState {
   selectApp: (appId: string, appType?: string, spaceId?: string) => void
   clearSelection: () => void
   openActivityThread: (appId: string) => void
+  openWorkflowReplay: (appId: string) => void
   openSessionDetail: (appId: string, runId: string, sessionKey: string) => void
   openAppChat: (appId: string, spaceId: string) => void
   openAppConfig: (appId: string) => void
@@ -201,6 +203,9 @@ export const useAppsPageStore = create<AppsPageState>()(
 
   openActivityThread: (appId) =>
     set({ selectedAppId: appId, detailView: { type: 'activity-thread', appId }, lastAutomationTab: 'activity' }),
+
+  openWorkflowReplay: (appId) =>
+    set({ selectedAppId: appId, detailView: { type: 'workflow-replay', appId }, lastAutomationTab: 'activity' }),
 
   openSessionDetail: (appId, runId, sessionKey) =>
     set({ selectedAppId: appId, detailView: { type: 'session-detail', appId, runId, sessionKey } }),

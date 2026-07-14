@@ -9,7 +9,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Play, Pause, RotateCcw, RefreshCw, Globe, ExternalLink, MessageSquare, Activity, Cog, ChevronRight, Share2 } from 'lucide-react'
+import { Play, Pause, RotateCcw, RefreshCw, Globe, ExternalLink, MessageSquare, Activity, Cog, ChevronRight, Share2, History } from 'lucide-react'
 import Avatar from 'boring-avatars'
 import { useAppsStore } from '../../stores/apps.store'
 import { useAppsPageStore } from '../../stores/apps-page.store'
@@ -45,12 +45,12 @@ function statusLabel(s: string, t: (key: string) => string): string {
   }
 }
 
-export type AutomationTab = 'chat' | 'activity' | 'config'
+export type AutomationTab = 'chat' | 'activity' | 'config' | 'history'
 
 export function AutomationHeader({ appId, spaceName }: AutomationHeaderProps) {
   const { t } = useTranslation()
   const { apps, appStates, pauseApp, resumeApp, triggerApp } = useAppsStore()
-  const { openAppConfig, openAppChat, openActivityThread, detailView } = useAppsPageStore()
+  const { openAppConfig, openAppChat, openActivityThread, openWorkflowReplay, detailView } = useAppsPageStore()
   const app = apps.find(a => a.id === appId)
   const runtimeState = appStates[appId]
 
@@ -82,6 +82,7 @@ export function AutomationHeader({ appId, spaceName }: AutomationHeaderProps) {
   const currentTab: AutomationTab = useMemo(() => {
     if (detailView?.type === 'app-chat') return 'chat'
     if (detailView?.type === 'app-config') return 'config'
+    if (detailView?.type === 'workflow-replay') return 'history'
     return 'activity'
   }, [detailView])
 
@@ -143,11 +144,13 @@ export function AutomationHeader({ appId, spaceName }: AutomationHeaderProps) {
     }
   }
   const handleTabActivity = () => openActivityThread(appId)
+  const handleTabHistory = () => openWorkflowReplay(appId)
   const handleTabConfig = () => openAppConfig(appId)
 
   const tabs: { key: AutomationTab; label: string; icon: typeof MessageSquare; onClick: () => void }[] = [
     { key: 'chat', label: t('Chat'), icon: MessageSquare, onClick: handleTabChat },
     { key: 'activity', label: t('Activity'), icon: Activity, onClick: handleTabActivity },
+    { key: 'history', label: t('Run History'), icon: History, onClick: handleTabHistory },
     { key: 'config', label: t('Settings'), icon: Cog, onClick: handleTabConfig },
   ]
 

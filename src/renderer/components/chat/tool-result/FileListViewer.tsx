@@ -11,6 +11,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { Copy, Check, ChevronDown, ChevronUp, FileText, Folder, FolderOpen } from 'lucide-react'
 import { useTranslation } from '../../../i18n'
+import { copyToClipboard } from '../../../utils/clipboard'
 import type { ViewerBaseProps } from './types'
 import { parseGlobOutput } from './detection'
 
@@ -37,7 +38,7 @@ export function FileListViewer({
   // Copy handler
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(output)
+      await copyToClipboard(output)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {

@@ -15,17 +15,15 @@ import { tokyoNightDayTheme } from './builtins/tokyo-night-day'
 import { oneDarkProTheme } from './builtins/one-dark-pro'
 import { githubDarkHighContrastTheme } from './builtins/github-dark-high-contrast'
 import { monokaiTheme } from './builtins/monokai'
-import { gruvboxTheme } from './builtins/gruvbox'
 import { solarizedDarkTheme } from './builtins/solarized-dark'
 // New dark themes
-import { rosePineTheme } from './builtins/rose-pine'
 import { catppuccinMochaTheme } from './builtins/catppuccin'
 import { everforestTheme } from './builtins/everforest'
 import { kanagawaTheme } from './builtins/kanagawa'
-import { materialPalenightTheme } from './builtins/material-palenight'
 import { ayuMirageTheme } from './builtins/ayu-mirage'
 import { nightOwlTheme } from './builtins/night-owl'
 // New light themes
+import { lightOwlTheme } from './builtins/light-owl'
 import { githubLightTheme } from './builtins/github-light'
 import { catppuccinLatteTheme } from './builtins/catppuccin-latte'
 import { solarizedLightTheme } from './builtins/solarized-light'
@@ -90,18 +88,16 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   tokyoNightTheme,
   oneDarkProTheme,
   monokaiTheme,
-  gruvboxTheme,
   solarizedDarkTheme,
-  rosePineTheme,
   catppuccinMochaTheme,
   everforestTheme,
   kanagawaTheme,
-  materialPalenightTheme,
   ayuMirageTheme,
   nightOwlTheme,
   githubDarkHighContrastTheme,
   // Light
   lightTheme,
+  lightOwlTheme,
   tokyoNightDayTheme,
   githubLightTheme,
   catppuccinLatteTheme,

@@ -102,6 +102,20 @@ export const systemApi = {
     return window.halo.toggleMaximizeWindow()
   },
 
+  minimizeWindow: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.halo.minimizeWindow()
+  },
+
+  closeWindow: async (): Promise<ApiResponse> => {
+    if (!isElectron()) {
+      return { success: false, error: 'Only available in desktop app' }
+    }
+    return window.halo.closeWindow()
+  },
+
   onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => {
     if (!isElectron()) {
       return () => { } // No-op in remote mode

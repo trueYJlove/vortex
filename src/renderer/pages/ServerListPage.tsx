@@ -263,7 +263,7 @@ export function ServerListPage({ onServerSelected, onAddServer }: ServerListPage
       </div>
 
       {/* Add server button — fixed at bottom */}
-      <div className="flex-shrink-0 px-4 pb-4 safe-area-bottom" style={{ paddingBottom: 'max(16px, var(--sab))' }}>
+      <div className="flex-shrink-0 px-4 pb-4" style={{ paddingBottom: 'max(16px, var(--sab))' }}>
         <button
           onClick={onAddServer}
           className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
