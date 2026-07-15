@@ -10,6 +10,7 @@ import {
   convertAnthropicThinkingToChatReasoningEffort
 } from '../tools'
 import { supportsVisionById, isReasoningModelById } from '../../../../shared/constants/model-capabilities'
+import { buildStreamOptionsIncludeUsage } from './stream-options'
 import { resolveOutputTokenLimit } from './max-tokens'
 
 export interface ConversionResult {
@@ -44,6 +45,12 @@ export function convertAnthropicToOpenAIChat(anthropicRequest: AnthropicRequest)
     model: anthropicRequest.model,
     messages,
     stream: anthropicRequest.stream
+  }
+
+  // Issue #181: opt into chunk.usage so TokenUsageIndicator is not zero.
+  // See `stream-options.ts` for the gateway-compat rationale.
+  if (openaiRequest.stream) {
+    openaiRequest.stream_options = buildStreamOptionsIncludeUsage()
   }
 
   // OpenAI reasoning models (o1/o3/o4-mini, gpt-5 thinking variants) reject
