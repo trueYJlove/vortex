@@ -44,8 +44,17 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
   /* Prevent pull-to-refresh on mobile */
   overscroll-behavior: none;
+}
+
+/* Re-enable text selection on editable elements, chat content, and canvas viewers */
+input, textarea, [contenteditable], [data-message-content],
+.selectable-text, .markdown-body, .code-viewer-content {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Safe area inset variables.
@@ -187,7 +196,7 @@ body {
   color: hsl(var(--foreground) / 0.7);
   background: transparent;
   border: none;
-  cursor: pointer;
+  cursor: default;
   transition: background-color 0.12s ease, color 0.12s ease;
   outline: none;
 }

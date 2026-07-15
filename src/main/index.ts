@@ -368,7 +368,8 @@ function createWindow(): void {
     icon: iconPath,
     // macOS: hiddenInset for native traffic lights in content area
     // Windows/Linux: hidden + custom React window controls
-    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',   // macOS 拿红黄绿
+    //frame: isMac ? undefined : false,                   // Windows/Linux 完全无边框 + 自绘
     // macOS: position native traffic lights
     trafficLightPosition: isMac ? { x: 15, y: 11 } : undefined,
     // Windows/Linux: use custom React window controls, no native overlay

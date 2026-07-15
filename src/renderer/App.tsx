@@ -136,6 +136,18 @@ export default function App() {
       const isMac = typeof navigator !== 'undefined' &&
         navigator.platform.toUpperCase().indexOf('MAC') >= 0
       const metaKey = isMac ? e.metaKey : e.ctrlKey
+
+      // Ctrl+A: only allow in text editing elements and canvas viewers, prevent full-page text selection
+      if (metaKey && (e.key === 'a' || e.key === 'A')) {
+        const tag = document.activeElement?.tagName
+        const editable = document.activeElement?.closest('[contenteditable]')
+        const selectable = document.activeElement?.closest('.selectable-text')
+        if (tag !== 'TEXTAREA' && tag !== 'INPUT' && !editable && !selectable) {
+          e.preventDefault()
+          return
+        }
+      }
+
       if (!metaKey || !e.shiftKey) return
       if (e.key !== 'P' && e.key !== 'p') return
       const currentView = useAppStore.getState().view

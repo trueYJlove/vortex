@@ -193,7 +193,7 @@ export function MarkdownViewer({ tab, onScrollChange, onEditRequest }: MarkdownV
         className="flex-1 overflow-auto"
       >
         {viewMode === 'rendered' ? (
-          <div className="prose prose-invert max-w-none p-6 sm:p-8">
+          <div className="prose prose-invert max-w-none p-6 sm:p-8 selectable-text">
             <Streamdown
               mode="static"
               controls={{ code: true }}
