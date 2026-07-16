@@ -77,6 +77,10 @@ function applyTheme(themeId: ThemeMode) {
 
   // Set data-theme attribute
   root.setAttribute('data-theme', theme.id)
+  // data-theme-mode distinguishes light/dark regardless of the concrete theme id,
+  // so light-mode CSS (syntax-theme, globals) applies to all light themes
+  // (tokyo-night-day, github-light, ...), not just the one named "light".
+  root.setAttribute('data-theme-mode', theme.type)
 
   // Remove legacy .light class
   root.classList.remove('light')

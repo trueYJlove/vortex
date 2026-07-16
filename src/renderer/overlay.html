@@ -18,6 +18,7 @@
     <script>
       // Apply theme from main window
       (function() {
+        var LIGHT_IDS = { light: 1, 'light-owl': 1, 'tokyo-night-day': 1, 'github-light': 1, 'catppuccin-latte': 1, 'solarized-light': 1, 'winter-is-coming-light': 1, 'ayu-light': 1 };
         try {
           var stored = localStorage.getItem('vortex-theme');
           var themeId = stored || 'dark';
@@ -25,6 +26,7 @@
             themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
           document.documentElement.setAttribute('data-theme', themeId);
+          document.documentElement.setAttribute('data-theme-mode', LIGHT_IDS[themeId] ? 'light' : 'dark');
         } catch (e) {}
       })();
     </script>

@@ -23,7 +23,10 @@
 /* ============================================
    Theme System
    - CSS color variables are injected at runtime by applyTheme()
-   - Use [data-theme="xxx"] selectors for theme-specific overrides
+   - [data-theme="<id>"] targets a specific theme (e.g. tokyo-night-day).
+   - [data-theme-mode="light|dark"] targets all themes of a mode — use this
+     for light/dark-variant styling so every light theme is covered, not just
+     the one literally named "light".
    ============================================ */
 
 :root {
@@ -263,7 +266,7 @@ input, textarea, [contenteditable], [data-message-content],
 /* Light mode: Shiki themes are ['github-dark', 'github-light'].
    Inline style `color` always uses the first (dark) theme.
    In light themes, override with --shiki-dark which holds the light theme colors. */
-[data-theme="light"] [data-streamdown="code-block-body"] span[style] {
+[data-theme-mode="light"] [data-streamdown="code-block-body"] span[style] {
   color: var(--shiki-dark, inherit) !important;
 }
 
@@ -272,7 +275,7 @@ input, textarea, [contenteditable], [data-message-content],
   filter: saturate(0.6);
 }
 
-[data-theme="light"] .thought-content .hljs {
+[data-theme-mode="light"] .thought-content .hljs {
   filter: none;
 }
 
