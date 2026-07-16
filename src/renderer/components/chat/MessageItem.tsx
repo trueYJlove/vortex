@@ -35,6 +35,7 @@ import { truncateText, getToolFriendlyFormat } from './thought-utils'
 import type { Message, Thought, ThoughtsSummary } from '../../types'
 import { useTranslation } from '../../i18n'
 import { copyToClipboard } from '../../utils/clipboard'
+import { formatMessageTimeShort } from '../../lib/utils'
 import { useChatStore } from '../../stores/chat.store'
 
 interface MessageItemProps {
@@ -241,18 +242,29 @@ function ThoughtItem({ thought }: { thought: Thought }) {
 }
 
 export function MessageAvatar({ isUser }: { isUser: boolean }) {
-  const { t } = useTranslation()
   return (
-    <div className="flex flex-col items-center gap-1 shrink-0">
-      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
-        {isUser
-          ? <User size={12} className="text-primary" />
-          : <Bot size={12} className="text-primary" />
-        }
-      </div>
-      <span className="text-[10px] sm:text-xs text-primary font-medium whitespace-nowrap">
-        {isUser ? t('You') : t('Vortex')}
-      </span>
+    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+      {isUser
+        ? <User size={17} className="text-primary" />
+        : <Bot size={17} className="text-primary" />
+      }
+    </div>
+  )
+}
+
+/**
+ * Name + time header shown above thought process / bubble.
+ * Avatar sits at the same vertical level as this header.
+ */
+export function MessageHeader({ isUser, timestamp }: { isUser: boolean; timestamp?: string }) {
+  const { t } = useTranslation()
+  const name = isUser ? t('You') : t('Vortex')
+  return (
+    <div className="flex items-baseline gap-1.5 h-7 sm:h-8">
+      <span className="text-sm font-semibold text-primary whitespace-nowrap">{name}</span>
+      {timestamp && (
+        <span className="text-xs text-muted-foreground/60 select-none">{formatMessageTimeShort(timestamp)}</span>
+      )}
     </div>
   )
 }
@@ -467,6 +479,7 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
           </button>
         </div>
       )}
+
     </div>
   )
 

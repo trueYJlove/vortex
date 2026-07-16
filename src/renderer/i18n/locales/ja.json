@@ -944,6 +944,7 @@
   "Pick a skill to share": "共有するスキルを選択",
   "Pin": "ピン留めします",
   "Platform": "プラットフォーム",
+  "Please click \"Fetch Models\" first to load available models, then select one": "まず「Fetch Models」をクリックして利用可能なモデルを読み込み、その後モデルを選択してください。",
   "Please complete login in your browser": "ブラウザでログインを完了してください",
   "Please enter API Key": "APIキーを入力してください",
   "Please enter API Key and URL first": "まずAPIキーとURLを入力してください",

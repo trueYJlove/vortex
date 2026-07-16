@@ -26,6 +26,7 @@ import { InterruptedBubble } from './InterruptedBubble'
 import type { Message, Thought, CompactInfo, AgentErrorType, PendingQuestion } from '../../types'
 import { useTranslation } from '../../i18n'
 import { useChatStore } from '../../stores/chat.store'
+import { isSameDay, formatDateSeparatorLabel } from '../../lib/utils'
 
 export interface MessageListProps {
   /**
@@ -284,24 +285,32 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
   // Render a single message item (called by Virtuoso)
   const itemContent = useCallback((index: number, message: Message) => {
     const previousCost = previousCostMap.get(index) ?? 0
+    const prev = index > 0 ? displayMessages[index - 1] : null
+    const showDateSeparator = !prev || !isSameDay(prev.timestamp, message.timestamp)
+
     return (
-      <MessageRow
-        message={message}
-        previousCost={previousCost}
-        defaultThoughtsExpanded={defaultThoughtsExpanded || expandedThoughtIds.current.has(message.id)}
-        defaultThoughtsMaximized={defaultThoughtsMaximized}
-        onLoadThoughts={thoughtsLoader
-          ? (messageId) => {
-              expandedThoughtIds.current.add(messageId)
-              return thoughtsLoader(messageId)
-            }
-          : undefined}
-        hideBrowserViewButton={hideBrowserViewButton}
-        injectionMessages={injectionMap.get(message.id)}
-        className={contentWidthClass}
-      />
+      <>
+        {showDateSeparator && (
+          <DateSeparator timestamp={message.timestamp} className={contentWidthClass} />
+        )}
+        <MessageRow
+          message={message}
+          previousCost={previousCost}
+          defaultThoughtsExpanded={defaultThoughtsExpanded || expandedThoughtIds.current.has(message.id)}
+          defaultThoughtsMaximized={defaultThoughtsMaximized}
+          onLoadThoughts={thoughtsLoader
+            ? (messageId) => {
+                expandedThoughtIds.current.add(messageId)
+                return thoughtsLoader(messageId)
+              }
+            : undefined}
+          hideBrowserViewButton={hideBrowserViewButton}
+          injectionMessages={injectionMap.get(message.id)}
+          className={contentWidthClass}
+        />
+      </>
     )
-  }, [previousCostMap, thoughtsLoader, hideBrowserViewButton, defaultThoughtsExpanded, defaultThoughtsMaximized, injectionMap, contentWidthClass])
+  }, [previousCostMap, thoughtsLoader, hideBrowserViewButton, defaultThoughtsExpanded, defaultThoughtsMaximized, injectionMap, contentWidthClass, displayMessages])
 
   // Ref for onContinue — keeps Footer callback stable when parent re-renders
   const onContinueRef = useRef(onContinue)
@@ -403,3 +412,30 @@ export const MessageList = forwardRef<MessageListHandle, MessageListProps>(funct
     />
   )
 })
+
+// ──────────────────────────────────────────────
+// Date separator — shown between messages on different days
+// ──────────────────────────────────────────────
+
+interface DateSeparatorProps {
+  timestamp: string
+  className?: string
+}
+
+function DateSeparator({ timestamp, className = '' }: DateSeparatorProps) {
+  const { t } = useTranslation()
+  const label = formatDateSeparatorLabel(timestamp)
+  const display = label === 'today'
+    ? t('Today')
+    : label === 'yesterday'
+      ? t('Yesterday')
+      : label
+
+  return (
+    <div className={`flex items-center gap-3 py-1 ${className}`}>
+      <div className="flex-1 h-px bg-border/40" />
+      <span className="text-sm font-semibold text-primary/70 shrink-0 select-none">{display}</span>
+      <div className="flex-1 h-px bg-border/40" />
+    </div>
+  )
+}

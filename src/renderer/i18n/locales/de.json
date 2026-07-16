@@ -944,6 +944,7 @@
   "Pick a skill to share": "Wählen Sie einen Skill zum Teilen aus.",
   "Pin": "Anheften",
   "Platform": "Plattform",
+  "Please click \"Fetch Models\" first to load available models, then select one": "Bitte klicken Sie zuerst auf \"Modelle abrufen\", um verfügbare Modelle zu laden, und wählen Sie dann eines aus.",
   "Please complete login in your browser": "Bitte schließen Sie die Anmeldung in Ihrem Browser ab",
   "Please enter API Key": "Bitte geben Sie den API-Schlüssel ein",
   "Please enter API Key and URL first": "Bitte geben Sie zuerst API-Schlüssel und URL ein",

@@ -8,7 +8,7 @@
  */
 
 import { memo } from 'react'
-import { MessageItem, MessageAvatar } from './MessageItem'
+import { MessageItem, MessageAvatar, MessageHeader } from './MessageItem'
 import { CollapsedThoughtProcess, LazyCollapsedThoughtProcess } from './CollapsedThoughtProcess'
 import { TeamSnapshotPanel } from './TeamPanel'
 import { InjectionAnnotation } from './InjectionAnnotation'
@@ -58,13 +58,14 @@ export const MessageRow = memo(function MessageRow({
   const hasSeparatedThoughts = message.thoughts === null && !!message.thoughtsSummary
 
   // Assistant messages with thoughts: show collapsed thoughts above message bubble.
-  // Avatar is rendered outside the content column so the thinking panel and
-  // reply bubble stay left-aligned with each other.
+  // Avatar + name/time header sit at the same level so the thinking panel and reply
+  // bubble stay left-aligned under the header.
   if (message.role === 'assistant' && (hasInlineThoughts || hasSeparatedThoughts)) {
     return (
       <div className={`flex justify-start items-start gap-2 pb-4 ${className}`}>
         <MessageAvatar isUser={false} />
         <div className="w-[85%]">
+          <MessageHeader isUser={false} timestamp={message.timestamp} />
           {hasInlineThoughts ? (
             <CollapsedThoughtProcess
               thoughts={message.thoughts as Thought[]}
@@ -112,7 +113,7 @@ export const MessageRow = memo(function MessageRow({
   }
 
   // Regular messages (user, or assistant without thoughts)
-  // Assistant messages without thoughts may still have injection annotations
+  // Avatar + header sit at the same level, bubble below.
   const hasInjections = injectionMessages && injectionMessages.length > 0
   if (message.role === 'assistant' && hasInjections) {
     return (
@@ -120,6 +121,7 @@ export const MessageRow = memo(function MessageRow({
         <div className="flex justify-start items-start gap-2">
           <MessageAvatar isUser={false} />
           <div className="w-[85%]">
+            <MessageHeader isUser={false} timestamp={message.timestamp} />
             <MessageItem
               message={message}
               previousCost={previousCost}
@@ -134,13 +136,39 @@ export const MessageRow = memo(function MessageRow({
     )
   }
 
+  // For regular user/assistant messages without thoughts: render avatar+header
+  // above the bubble. MessageItem renders only the bubble (hideAvatar + isInContainer
+  // suppress its own avatar/wrapper) so the row controls alignment consistently.
   return (
     <div className={`pb-4 ${className}`}>
-      <MessageItem
-        message={message}
-        previousCost={previousCost}
-        hideBrowserViewButton={hideBrowserViewButton}
-      />
+      <div className={`flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+        {message.role === 'user' && (
+          <div className="w-[85%] flex flex-col items-end">
+            <MessageHeader isUser={true} timestamp={message.timestamp} />
+            <MessageItem
+              message={message}
+              previousCost={previousCost}
+              hideBrowserViewButton={hideBrowserViewButton}
+              isInContainer
+              hideAvatar
+            />
+          </div>
+        )}
+        {message.role === 'user' && <MessageAvatar isUser={true} />}
+        {message.role === 'assistant' && <MessageAvatar isUser={false} />}
+        {message.role === 'assistant' && (
+          <div className="w-[85%]">
+            <MessageHeader isUser={false} timestamp={message.timestamp} />
+            <MessageItem
+              message={message}
+              previousCost={previousCost}
+              hideBrowserViewButton={hideBrowserViewButton}
+              isInContainer
+              hideAvatar
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 })

@@ -944,6 +944,7 @@
   "Pick a skill to share": "選擇要分享的技能",
   "Pin": "釘選",
   "Platform": "平台",
+  "Please click \"Fetch Models\" first to load available models, then select one": "請先點選「取得模型」以載入可用模型，再選擇一個模型",
   "Please complete login in your browser": "請在瀏覽器中完成登入",
   "Please enter API Key": "請輸入 API Key",
   "Please enter API Key and URL first": "請先輸入 API 金鑰和 URL",
