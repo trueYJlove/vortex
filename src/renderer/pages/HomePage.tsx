@@ -246,7 +246,7 @@ export function HomePage() {
                   space.isMissing ? 'opacity-70 cursor-not-allowed border-dashed' : ''
                 }`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <SpaceIcon iconId={space.icon} size={20} />
                     <span className="font-medium truncate">{space.name}</span>
@@ -257,7 +257,7 @@ export function HomePage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="flex items-center gap-2 sm:gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0">
                     <button
                       onClick={(e) => handleEditSpace(e, space)}
                       className="p-1 hover:bg-secondary rounded transition-all"
