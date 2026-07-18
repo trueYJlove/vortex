@@ -1110,13 +1110,6 @@
   resolved "https://registry.npmmirror.com/@marijn/find-cluster-break/-/find-cluster-break-1.0.2.tgz"
   integrity sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==
 
-"@mimo-ai/sdk@^0.1.4":
-  version "0.1.4"
-  resolved "https://registry.npmmirror.com/@mimo-ai/sdk/-/sdk-0.1.4.tgz"
-  integrity sha512-nZHJthemyVb8iQLh/ZomyvSAKRXM1NouquBdvrDDiGD7euyx3IPeyamwX1uhbPIYzn/P0U1KIAsmk18jMJ/zVg==
-  dependencies:
-    cross-spawn "7.0.6"
-
 "@modelcontextprotocol/sdk@^1.12.0", "@modelcontextprotocol/sdk@^1.27.1", "@modelcontextprotocol/sdk@^1.29.0":
   version "1.29.0"
   resolved "https://registry.npmmirror.com/@modelcontextprotocol/sdk/-/sdk-1.29.0.tgz"
@@ -2937,7 +2930,7 @@ cross-env@^10.1.0:
     "@epic-web/invariant" "^1.0.0"
     cross-spawn "^7.0.6"
 
-cross-spawn@^7.0.1, cross-spawn@^7.0.3, cross-spawn@^7.0.5, cross-spawn@^7.0.6, cross-spawn@7.0.6:
+cross-spawn@^7.0.1, cross-spawn@^7.0.3, cross-spawn@^7.0.5, cross-spawn@^7.0.6:
   version "7.0.6"
   resolved "https://registry.npmmirror.com/cross-spawn/-/cross-spawn-7.0.6.tgz"
   integrity sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==

@@ -28,12 +28,6 @@ test.describe('Settings Page', () => {
     })
     await window.waitForTimeout(300)
 
-    const mimoEngine = await window.waitForSelector(
-      'text=/MiMo Code SDK/i',
-      { timeout: 10000 }
-    )
-    expect(mimoEngine).toBeTruthy()
-
     await window.screenshot({ path: 'tests/e2e/results/settings-ai-section.png' })
   })
 

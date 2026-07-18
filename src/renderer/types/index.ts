@@ -129,7 +129,7 @@ export interface SystemConfig {
 export interface AgentConfig {
   maxTurns: number;         // Maximum tool call turns per message
   promptProfile?: 'official' | 'halo';  // System prompt profile
-  sdkEngine?: 'anthropic' | 'halo' | 'codex' | 'mimo';  // Agent SDK engine (requires restart)
+  sdkEngine?: 'anthropic' | 'halo' | 'codex';  // Agent SDK engine (requires restart)
   configDirMode?: 'halo' | 'cc' | 'custom';  // Claude CLI config directory mode
   customConfigDir?: string;  // Custom config dir path (when configDirMode === 'custom')
   enableTeams?: boolean;    // Enable Agent Teams (multi-agent collaboration)
@@ -331,7 +331,7 @@ export interface CreateSpaceInput {
 // ============================================
 
 /** Agent engine that owns a conversation. Used for the EngineBadge UI. */
-export type EngineId = 'anthropic' | 'halo' | 'codex' | 'mimo';
+export type EngineId = 'anthropic' | 'halo' | 'codex';
 
 // Lightweight metadata for conversation list (no messages)
 // Used by listConversations for fast loading
