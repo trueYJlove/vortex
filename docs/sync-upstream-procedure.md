@@ -197,3 +197,46 @@ git push mine liuwei-dev
 - 验证：`npm run build` 通过；`npm run test:unit` 24 失败 / 1273 通过（与基线 73239bb 的 24 失败一致，新增 54 个测试全部通过）
 - 后续：`npm run i18n` 补齐 4 个 UA key 的 6 个非英语翻译，单独提交 `62ee6ce`
 - 待办：`origin/feature/ai-terminal` 本次未处理，留作下次单独同步
+
+## 本次执行记录（2026-07-18，ai-terminal 分支）
+
+- 基线：`43ea3bc`（`mine/liuwei-dev` HEAD，即上一次 main 同步完成后的状态）
+- 目标：合入 `origin/feature/ai-terminal` 相对于 `origin/main` 的增量提交
+- 工作分支：`sync/ai-terminal-20260718`（基于 `mine/liuwei-dev` HEAD `43ea3bc`）
+- merge-base：`origin/feature/ai-terminal` 与 `liuwei-dev` 的共同祖先为 `1af9c45`（上游 main 历史点）
+- 上游增量提交范围：`git log --oneline --reverse --no-merges 1af9c45..origin/feature/ai-terminal`
+  - 共 3 个非 merge 提交：`5a6a52d`（pre-release changes）、`ab780b9`（i18n pre-release）、`6bec176`（AI terminal + named-tunnel + IM multi-device）
+- 跳过：
+  - `ab780b9`（i18n pre-release）`cherry-pick --skip` 跳过——内容为 i18n key 排序，最终会被第 9 步的 `npm run i18n` 重新生成，cherry-pick 时为空提交
+- cherry-pick 结果：
+  - `12ade07` ← `5a6a52d` (chore: pre-release changes)
+  - `3a86de3` ← `6bec176` (feat: AI terminal + permanent named-tunnel + IM multi-device slot arbitration)
+- 冲突处理：
+  - `package.json` version 字段 → 保留本地 `1.0.0-rc.2`；新增 `@xterm/addon-fit`、`@xterm/headless`、`@xterm/xterm` 依赖合并入
+  - `package-lock.json` / `yarn.lock` → 保留本地 + `npm install --legacy-peer-deps --ignore-scripts` 安装 `@xterm/*` 三个包
+  - `src/main/ipc/browser.ts` → 合并：保留本地 `resolveUserAgent`/`getConfig`/`browserViewManager` 导入并加入上游 `browserContext`
+  - `src/main/ipc/index.ts` → 合并：保留 fork 专用 `registerGitHandlers`、`registerKnowledgeHandlers` 并加入上游 `registerTerminalHandlers, cleanupTerminalHandlers`
+  - `src/main/services/agent/send-message.ts` → 重构为上游 toolsets broker 架构（`buildCreationTimeServers` + `buildToolsetSection`），同时保留 fork 专用的 `knowledge-search` MCP 注入逻辑（始终启用，因 `toolsets/registry.ts` 中无 knowledge 条目）
+  - `src/main/services/agent/session-manager.ts` → 从 `getOrCreateV2Session` 调用中移除 `SessionConfig` 参数，保留 `caps`/pricing 传递
+  - `src/main/services/conversation.service.ts` → `Conversation` 接口合并：保留 `'mimo'` 引擎类型并加入上游 `modelSourceId`/`modelId`/`toolsets` 字段
+  - `src/renderer/components/store/StoreCard.tsx`/`StoreDetail.tsx`/`StoreInstallDialog.tsx` → 保留本地 `StoreIcon` 导入，移除上游 `EntryIcon` 导入；删除上游新增的 `EntryIcon.tsx`（fork 已有等价的 `StoreIcon.tsx`）
+  - `src/renderer/pages/HomePage.tsx` → 保留本地 `SortableSpaceList` 与本地 workspace 文案
+  - `src/renderer/pages/SpacePage.tsx` → 合并：保留上游 `hidden sm:block` 移动端隐藏 + 本地 `CommandPaletteButton` + 上游 `MobileOverflowMenu`
+  - `src/renderer/components/chat/ChatHistoryPanel.tsx` → 保留本地带过渡动画的 History 图标
+  - `src/renderer/components/apps/AppConfigPanel.tsx` → 合并 lucide-react 导入：加入 `TerminalSquare` 同时保留 `Workflow, Plus, Server`
+  - `src/renderer/components/settings/RemoteAccessSection.tsx` → 保留本地 `handleCopyToClipboard` 与本地绿色样式
+  - `src/renderer/hooks/useCanvasLifecycle.ts` → 合并：保留 `openKnowledgeBase` 并加入 `openTerminal`
+  - `src/renderer/stores/chat/conversations.ts` → 合并：保留本地 `toConversationMeta`/`removeConversationRuntimeState`/`clearConversations` slice 键并加入 `setConversationModel`
+  - `src/renderer/api/events.api.ts` + `transport.ts` → 合并：保留 `onAgentTokenUsage`/`agent:token-usage` 并加入 `onToolsetsChanged`/`onToolsetsRequested`/`onTerminalData`/`onTerminalLifecycle`
+  - 7 个 locale JSON（de/en/es/fr/ja/zh-CN/zh-TW）→ Python 脚本合并：保留 HEAD (fork) 值，仅从上游添加新 key，按字母序排序；最终 en=1689, de=1689, es=1733, fr=1733, ja=1688, zh-CN=1688, zh-TW=1688
+- 验证：
+  - `npm run build` 通过（需先 `npm install --legacy-peer-deps --ignore-scripts` 补齐 `@xterm/*` 依赖）
+  - `npm run test:unit` 在 sync 分支：24 失败 / 1376 通过 / 1412 总计；对比 `liuwei-dev` 基线 24 失败 / 1273 通过 / 1309 总计 → 无回归，103 个新测试全部通过（来自 `6bec176` 新增的 10 个测试文件：ai-terminal/available.test.ts、ai-terminal/text-utils.test.ts、connection-arbiter.test.ts、webhook-source.test.ts、credentials-fingerprint.test.ts、message-utils.test.ts、team-lifecycle.test.ts、toolsets-last-used.test.ts、config-encryption.test.ts、device-identity.test.ts）
+- 后续 i18n 提交：`ef68716` i18n: 补齐 #AI terminal 同步相关的非英语 locale 翻译
+  - `npm run i18n` 重新排序 en.json 键并按字母顺序输出，移除上游已废弃的 82 个旧 Halo 品牌文案/Dedicated Spaces 旧概念键，新增 plurals 形式键（`_one`/`_other`）
+  - 为 zh-CN/zh-TW/ja/es/fr/de 补齐约 238 个新键的本地化翻译
+  - 已校验：82 个被移除的键在 `src/**/*.{ts,tsx}` 中均无 `t('...')` 形式引用
+- code review：3 名 agent 成员（架构师 / 回归测试 / 业务缺陷）独立 review 后达成共识——无 P0 阻断问题；P1 警告 2 项属 fork 文件未跟随上游类型演进的遗留问题（`mimo/capabilities.ts:24` 残留 `midTurnInjection`、`apps/runtime/service.ts:160` 的 `getApiCredentials` 3-参数调用应改为 `getApiCredentialsForSource`），留待后续单独修复
+- 合并：`git merge --no-ff sync/ai-terminal-20260718` 合入 `liuwei-dev`，形成 merge commit `80c4622`
+- 推送：`git push mine liuwei-dev` → `43ea3bc..80c4622  liuwei-dev -> liuwei-dev`
+- 备份：`sync/ai-terminal-20260718` 分支保留在本地，可后续删除：`git branch -d sync/ai-terminal-20260718`
