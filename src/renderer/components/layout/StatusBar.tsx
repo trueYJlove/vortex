@@ -154,7 +154,7 @@ export function StatusBar() {
 
   return (
     <div
-      className="fixed bottom-0 inset-x-0 h-6 flex items-center justify-between px-3 border-t border-border bg-background text-[11px] text-muted-foreground select-none z-40"
+      className="fixed bottom-0 inset-x-0 h-6 hidden sm:flex items-center justify-between px-3 border-t border-border bg-background text-[11px] text-muted-foreground select-none z-40"
       style={{ bottom: 'var(--sab, 0px)' }}
     >
       {/* Left: Context */}
@@ -210,13 +210,11 @@ export function StatusBar() {
             }
           >
             <span className={`w-1.5 h-1.5 rounded-full ${
-              waitingApp ? 'bg-orange-400' : runningCount > 0 ? 'bg-green-500/70' : 'bg-muted-foreground/30'
+              waitingApp ? 'bg-orange-400 animate-pulse' : runningCount > 0 ? 'bg-green-500/70 animate-pulse' : 'bg-muted-foreground/30'
             }`} />
-            {(waitingApp || runningCount > 0) && (
-              <span className="hidden sm:inline">
-                {waitingApp ? waitingApp.spec.name : runningCount}
-              </span>
-            )}
+            <span>
+              {waitingApp ? waitingApp.spec.name : runningCount > 0 ? runningCount : t('Apps')}
+            </span>
           </button>
         )}
       </div>
