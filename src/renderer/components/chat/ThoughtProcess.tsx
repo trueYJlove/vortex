@@ -18,7 +18,7 @@ import {
   List,
   GitBranch,
 } from 'lucide-react'
-import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
+import { TodoCard } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { ErrorContent } from './ErrorContent'
@@ -33,6 +33,7 @@ import { thoughtsToSteps, type FlowStep } from './thoughts-to-steps'
 import { StepCard } from './StepCard'
 import { useSmartScroll } from '../../hooks/useSmartScroll'
 import { useLazyVisible } from '../../hooks/useLazyVisible'
+import { useLatestTodos } from '../../hooks/useLatestTodos'
 import type { Thought } from '../../types'
 import { useTranslation } from '../../i18n'
 
@@ -433,7 +434,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
     return null
   }, [thoughts.length > 0 ? thoughts[0]?.timestamp : null])
 
-  const latestTodos = useMemo(() => getLatestTodosFromThoughts(thoughts), [thoughts])
+  const latestTodos = useLatestTodos(thoughts)
 
   // Filter thoughts for display (exclude TodoWrite, tool_result, result, and sub-agent thoughts)
   // tool_result is now merged into tool_use, no need to show separately

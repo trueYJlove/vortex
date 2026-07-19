@@ -43,7 +43,7 @@ interface TodoCardProps {
 }
 
 // Get icon and style for todo status
-function getTodoStatusDisplay(status: TodoStatus) {
+export function getTodoStatusDisplay(status: TodoStatus) {
   switch (status) {
     case 'pending':
       return {

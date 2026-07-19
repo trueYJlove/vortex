@@ -5,7 +5,7 @@
  * TodoWrite is rendered separately at the bottom (only one instance)
  */
 
-import { useState, useMemo, useRef, type RefObject } from 'react'
+import { useState, useMemo, useRef, memo, type RefObject } from 'react'
 import {
   Lightbulb,
   Loader2,
@@ -15,7 +15,7 @@ import {
   ChevronDown,
   Braces,
 } from 'lucide-react'
-import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
+import { TodoCard } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { TeamSnapshotPanel } from './TeamPanel'
@@ -27,6 +27,7 @@ import {
   getToolFriendlyFormat,
 } from './thought-utils'
 import { useLazyVisible } from '../../hooks/useLazyVisible'
+import { useLatestTodos } from '../../hooks/useLatestTodos'
 import type { Thought, ThoughtsSummary } from '../../types'
 import { getCurrentLanguage, useTranslation } from '../../i18n'
 
@@ -39,7 +40,7 @@ interface CollapsedThoughtProcessProps {
 
 
 // Single thought item in expanded view
-function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?: Thought[] }) {
+const ThoughtItem = memo(function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?: Thought[] }) {
   const { t } = useTranslation()
   const [showRawJson, setShowRawJson] = useState(false)
   const [showResult, setShowResult] = useState(true)  // Default show result
@@ -173,7 +174,7 @@ function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?:
       )}
     </div>
   )
-}
+})
 
 // Lazy wrapper for historical thought items — defers rendering until scrolled into view
 const COLLAPSED_THOUGHT_ESTIMATED_HEIGHT = 36
@@ -204,7 +205,7 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
   const [isMaximized, setIsMaximized] = useState(defaultMaximized)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  const latestTodos = useMemo(() => getLatestTodosFromThoughts(thoughts), [thoughts])
+  const latestTodos = useLatestTodos(thoughts)
 
   // Filter thoughts for display (exclude TodoWrite, results, and sub-agent thoughts)
   // Sub-agent thoughts are rendered nested inside their parent Task thought via SubAgentTimeline

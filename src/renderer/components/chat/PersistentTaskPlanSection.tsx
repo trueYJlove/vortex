@@ -1,26 +1,16 @@
-import { CheckCircle2, Circle, ListTodo, Loader2 } from 'lucide-react'
+import { ListTodo } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useTodos, useTodoStats } from '../../hooks/useTodos'
-import type { TodoItem, TodoStatus } from '../tool/TodoCard'
-
-function getTodoStatusIcon(status: TodoStatus) {
-  switch (status) {
-    case 'completed':
-      return { Icon: CheckCircle2, className: 'text-green-500' }
-    case 'in_progress':
-      return { Icon: Loader2, className: 'text-primary animate-spin' }
-    case 'pending':
-      return { Icon: Circle, className: 'text-muted-foreground/50' }
-  }
-}
+import { getTodoStatusDisplay, type TodoItem } from '../tool/TodoCard'
 
 function SidebarTodoRow({ item }: { item: TodoItem }) {
-  const { Icon, className } = getTodoStatusIcon(item.status)
+  const display = getTodoStatusDisplay(item.status)
+  const Icon = display.Icon
   const text = item.status === 'in_progress' && item.activeForm ? item.activeForm : item.content
 
   return (
     <div className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-secondary/30 transition-colors">
-      <Icon size={13} className={`mt-0.5 flex-shrink-0 ${className}`} />
+      <Icon size={13} className={`mt-0.5 flex-shrink-0 ${display.color} ${display.spin ? 'animate-spin' : ''}`} />
       <span
         className={`text-xs leading-relaxed ${item.status === 'completed' ? 'text-muted-foreground line-through' : item.status === 'pending' ? 'text-muted-foreground' : 'text-foreground font-medium'}`}
       >
