@@ -18,6 +18,7 @@ import {
   List,
   GitBranch,
 } from 'lucide-react'
+import { TodoCard, getLatestTodosFromThoughts } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { ErrorContent } from './ErrorContent'
@@ -432,6 +433,8 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
     return null
   }, [thoughts.length > 0 ? thoughts[0]?.timestamp : null])
 
+  const latestTodos = useMemo(() => getLatestTodosFromThoughts(thoughts), [thoughts])
+
   // Filter thoughts for display (exclude TodoWrite, tool_result, result, and sub-agent thoughts)
   // tool_result is now merged into tool_use, no need to show separately
   // Sub-agent thoughts (parentToolUseId set) are rendered nested inside their parent Task thought
@@ -490,7 +493,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
   const errorCount = thoughts.filter(t => t.type === 'error').length
 
   // Check if there's content to show in the scrollable area
-  const hasDisplayContent = displayThoughts.length > 0
+  const hasDisplayContent = displayThoughts.length > 0 || (latestTodos && latestTodos.length > 0)
 
   return (
     <div className="animate-fade-in mb-4">
@@ -619,7 +622,7 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
               >
                 {viewMode === 'list' ? (
                   displayThoughts.map((thought, index) => {
-                    const isLast = index === displayThoughts.length - 1 && !isThinking
+                    const isLast = index === displayThoughts.length - 1 && !latestTodos && !isThinking
                     const isRecentItem = index >= displayThoughts.length - 3
                     const isTaskThought = thought.type === 'tool_use' && (thought.toolName === 'Task' || thought.toolName === 'Agent')
                     return (
@@ -652,6 +655,13 @@ export function ThoughtProcess({ thoughts, isThinking }: ThoughtProcessProps) {
                     )
                   })
                 )}
+              </div>
+            )}
+
+            {/* TodoCard - fixed at bottom, only one instance */}
+            {latestTodos && latestTodos.length > 0 && (
+              <div className={`px-4 ${hasDisplayContent ? 'pt-2' : 'pt-3'} pb-3`}>
+                <TodoCard todos={latestTodos} isAgentActive={isThinking} />
               </div>
             )}
 
