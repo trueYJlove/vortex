@@ -629,6 +629,7 @@
   "Failed to start login": "Failed to start login",
   "Failed to start QR scan": "Failed to start QR scan",
   "Failed to switch model": "Failed to switch model",
+  "Failed to undo delete": "Failed to undo delete",
   "Failed to update allowlist": "Failed to update allowlist",
   "Failed to update registry": "Failed to update registry",
   "Failed to update upgrade strategy: {{error}}": "Failed to update upgrade strategy: {{error}}",

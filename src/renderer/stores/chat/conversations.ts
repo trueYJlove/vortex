@@ -366,6 +366,12 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
               const newConv = await get().createConversation(spaceId)
               if (newConv && meta?.title) {
                 await get().renameConversation(spaceId, newConv.id, meta.title)
+              } else if (!newConv) {
+                useNotificationStore.getState().show({
+                  title: i18n.t('Failed to undo delete'),
+                  variant: 'error',
+                  duration: 5000,
+                })
               }
             }
           }
