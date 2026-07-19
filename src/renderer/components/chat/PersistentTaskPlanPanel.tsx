@@ -36,12 +36,12 @@ export function PersistentTaskPlanPanel() {
   /** Clamp height to [MIN_HEIGHT, MAX_HEIGHT] and prevent squeezing out Sessions */
   const clampHeight = useCallback((raw: number): number => {
     const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw))
-    // If we have a reference to the content section parent, limit max height
-    // to leave room for the Sessions header + minimum content area
     if (containerRef.current) {
-      const contentParent = containerRef.current.parentElement
-      if (contentParent) {
-        const available = contentParent.clientHeight
+      // Walk up to the flex-1 container that holds both Sessions and TaskPlan.
+      // Structure: containerRef → mt-auto wrapper → flex-1 flex-col container
+      const flexContainer = containerRef.current.parentElement?.parentElement
+      if (flexContainer) {
+        const available = flexContainer.clientHeight
         const maxAllowed = Math.max(MIN_HEIGHT, available - SESSIONS_MINIMUM)
         return Math.min(clamped, maxAllowed)
       }
@@ -66,14 +66,14 @@ export function PersistentTaskPlanPanel() {
     setHeight(prev => clampHeight(prev))
     heightRef.current = clampHeight(heightRef.current)
 
-    const parent = containerRef.current.parentElement
-    if (!parent) return
+    const flexContainer = containerRef.current.parentElement?.parentElement
+    if (!flexContainer) return
 
     const observer = new ResizeObserver(() => {
       setHeight(prev => clampHeight(prev))
       heightRef.current = clampHeight(heightRef.current)
     })
-    observer.observe(parent)
+    observer.observe(flexContainer)
 
     return () => observer.disconnect()
   }, [isExpanded, clampHeight])
