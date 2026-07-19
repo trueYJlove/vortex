@@ -15,6 +15,8 @@ import { api } from '../../api'
 const MIN_HEIGHT = 120
 const MAX_HEIGHT = 600
 const DEFAULT_HEIGHT = 320
+/** Minimum vertical space reserved for Sessions area (header + some items) */
+const SESSIONS_MINIMUM = 80
 
 export function PersistentTaskPlanPanel() {
   const { t } = useTranslation()
@@ -29,15 +31,52 @@ export function PersistentTaskPlanPanel() {
   const heightRef = useRef(height)
   const startYRef = useRef(0)
   const startHeightRef = useRef(0)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  /** Clamp height to [MIN_HEIGHT, MAX_HEIGHT] and prevent squeezing out Sessions */
+  const clampHeight = useCallback((raw: number): number => {
+    const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw))
+    // If we have a reference to the content section parent, limit max height
+    // to leave room for the Sessions header + minimum content area
+    if (containerRef.current) {
+      const contentParent = containerRef.current.parentElement
+      if (contentParent) {
+        const available = contentParent.clientHeight
+        const maxAllowed = Math.max(MIN_HEIGHT, available - SESSIONS_MINIMUM)
+        return Math.min(clamped, maxAllowed)
+      }
+    }
+    return clamped
+  }, [])
 
   // Sync persisted height when config arrives asynchronously
   useEffect(() => {
     if (layoutConfig?.taskPlanHeight !== undefined && !isDragging) {
-      const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, layoutConfig.taskPlanHeight))
-      setHeight(clamped)
-      heightRef.current = clamped
+      setHeight(clampHeight(layoutConfig.taskPlanHeight))
+      heightRef.current = clampHeight(layoutConfig.taskPlanHeight)
     }
-  }, [layoutConfig?.taskPlanHeight, isDragging])
+  }, [layoutConfig?.taskPlanHeight, isDragging, clampHeight])
+
+  // Reclamp on container resize (window resize, top panels expand/collapse)
+  // Also reclamp immediately on expand to handle container changes since collapse
+  useEffect(() => {
+    if (!containerRef.current || !isExpanded) return
+
+    // Immediate reclamp on expand
+    setHeight(prev => clampHeight(prev))
+    heightRef.current = clampHeight(heightRef.current)
+
+    const parent = containerRef.current.parentElement
+    if (!parent) return
+
+    const observer = new ResizeObserver(() => {
+      setHeight(prev => clampHeight(prev))
+      heightRef.current = clampHeight(heightRef.current)
+    })
+    observer.observe(parent)
+
+    return () => observer.disconnect()
+  }, [isExpanded, clampHeight])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -52,7 +91,7 @@ export function PersistentTaskPlanPanel() {
     const handleMouseMove = (e: MouseEvent) => {
       // Drag up = larger task plan (cursor delta is negative when moving up)
       const delta = startYRef.current - e.clientY
-      const newHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, startHeightRef.current + delta))
+      const newHeight = clampHeight(startHeightRef.current + delta)
       setHeight(newHeight)
       heightRef.current = newHeight
     }
@@ -79,6 +118,7 @@ export function PersistentTaskPlanPanel() {
 
   return (
     <div
+      ref={containerRef}
       className={`border-t border-border flex-shrink-0 flex flex-col ${isDragging ? '' : 'transition-[height] duration-100'}`}
       style={{ height: isExpanded ? height : 'auto' }}
     >

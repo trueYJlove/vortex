@@ -366,7 +366,7 @@ export const ConversationList = memo(function ConversationList({
           title={t('Sessions')}
           icon={<MessageSquareText size={14} />}
           defaultExpanded={true}
-          className={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
+          className={sessionsExpanded ? 'flex-1 flex flex-col min-h-[80px]' : ''}
           contentClassName={sessionsExpanded ? 'flex-1 flex flex-col min-h-0' : ''}
           onToggle={setSessionsExpanded}
           badge={conversations.length > 0 ? conversations.length : undefined}
