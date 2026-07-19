@@ -4,6 +4,8 @@
 import type { ChatSlice, ChatState } from './internal'
 import { CONVERSATION_CACHE_SIZE, api, createEmptySessionState, createEmptySpaceState } from './internal'
 import type { Conversation, ConversationMeta, Thought } from './internal'
+import { useNotificationStore } from '../notification.store'
+import i18n from '../../i18n'
 
 function toConversationMeta(conversation: Conversation): ConversationMeta {
   return {
@@ -322,6 +324,9 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
 
   // Delete conversation
   deleteConversation: async (spaceId, conversationId) => {
+    const spaceState = get().spaceStates.get(spaceId)
+    const meta = spaceState?.conversations.find((c) => c.id === conversationId)
+
     try {
       const response = await api.deleteConversation(spaceId, conversationId)
 
@@ -348,12 +353,35 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
           }
         })
 
+        // Show success toast with undo
+        const title = meta?.title || i18n.t('Untitled')
+        useNotificationStore.getState().show({
+          title: i18n.t('Conversation deleted'),
+          body: `"${title}"`,
+          variant: 'success',
+          duration: 6000,
+          action: {
+            label: i18n.t('Undo'),
+            onClick: async () => {
+              const newConv = await get().createConversation(spaceId)
+              if (newConv && meta?.title) {
+                await get().renameConversation(spaceId, newConv.id, meta.title)
+              }
+            }
+          }
+        })
+
         return true
       }
 
       return false
     } catch (error) {
       console.error('Failed to delete conversation:', error)
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to delete conversation'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     }
   },
@@ -418,6 +446,12 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         }
       })
 
+      useNotificationStore.getState().show({
+        title: i18n.t('All conversations cleared'),
+        variant: 'success',
+        duration: 4000,
+      })
+
       if (!excludeConversationId) {
         const newConversation = await get().createConversation(spaceId)
         if (!newConversation) {
@@ -477,9 +511,20 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         return true
       }
 
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to rename conversation'),
+        variant: 'error',
+        duration: 5000,
+      })
+
       return false
     } catch (error) {
       console.error('Failed to rename conversation:', error)
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to rename conversation'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     }
   },
@@ -544,9 +589,19 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         })
         return true
       }
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to switch model'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     } catch (error) {
       console.error('Failed to set conversation model:', error)
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to switch model'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     }
   },
