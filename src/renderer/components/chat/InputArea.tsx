@@ -25,6 +25,7 @@ import { useAppStore } from '../../stores/app.store'
 import { useOnboardingStore } from '../../stores/onboarding.store'
 import { getOnboardingPrompt } from '../onboarding/onboardingData'
 import { ToolsetControls } from './ToolsetControls'
+import { ConversationModelPill } from './ConversationModelPill'
 import { NewTerminalMenuItem } from './NewTerminalMenuItem'
 import { LiveSessionsHeader } from './LiveSessionsHeader'
 import { ImageAttachmentPreview } from './ImageAttachmentPreview'
@@ -913,6 +914,9 @@ function InputToolbar({
             <span className="text-xs">{t('Deep Thinking')}</span>
           </button>
         )}
+
+        {/* Session-level model selector pill */}
+        {!isGenerating && !isOnboarding && <ConversationModelPill />}
       </div>
 
       {/* Right section: Stop (when generating) + Send */}

@@ -14,6 +14,7 @@ import { useChatStore } from '../../stores/chat.store'
 import { api } from '../../api'
 import {
   getModelDisplayName,
+  getCurrentModelName,
   getCurrentSource,
   AVAILABLE_MODELS,
   type AISourcesConfig,
@@ -26,7 +27,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { isAnthropicProvider } from '../../types'
 
 /** Read v2 aiSources config with empty fallback */
-function useAiSources(): AISourcesConfig {
+export function useAiSources(): AISourcesConfig {
   const config = useAppStore(s => s.config)
   return config?.aiSources?.version === 2
     ? config.aiSources
@@ -39,7 +40,7 @@ function useAiSources(): AISourcesConfig {
  * is active or it isn't cached yet. Selecting the conversation object by
  * reference keeps this subscription from re-rendering on every streaming token.
  */
-function useCurrentConversation(): Conversation | null {
+export function useCurrentConversation(): Conversation | null {
   return useChatStore(s => {
     const conversationId = s.getCurrentSpaceState().currentConversationId
     return conversationId ? s.conversationCache.get(conversationId) ?? null : null
@@ -51,7 +52,7 @@ function useCurrentConversation(): Conversation | null {
  * Shared by the desktop dropdown and the mobile bottom sheet.
  * Calls onDone when a selection/action should close the container.
  */
-function ModelList({ onDone }: { onDone: () => void }) {
+export function ModelList({ onDone, sessionOnly }: { onDone: () => void; sessionOnly?: boolean }) {
   const { t } = useTranslation()
   const { config, setConfig, setView } = useAppStore()
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -65,8 +66,11 @@ function ModelList({ onDone }: { onDone: () => void }) {
   const pinSourceId = currentConversation?.modelSourceId
   const pinModelId = currentConversation?.modelId
 
-  // State for expanded sections (accordion)
-  const [expandedSection, setExpandedSection] = useState<string | null>(currentSource?.id ?? null)
+  // State for expanded sections (accordion).
+  // In session-only mode, expand to the conversation's pinned source if any.
+  const [expandedSection, setExpandedSection] = useState<string | null>(
+    sessionOnly && pinSourceId ? pinSourceId : (currentSource?.id ?? null)
+  )
 
   const toggleSection = (sourceId: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -76,20 +80,23 @@ function ModelList({ onDone }: { onDone: () => void }) {
   if (!config) return null
 
   // Handle model selection.
-  // 1. Pin the choice to the current conversation (Cursor-style — only this
-  //    conversation is affected; its session rebuilds lazily on next send).
-  // 2. Update the global "last-used" selection so newly created conversations
-  //    inherit this choice and non-pinned surfaces keep a sensible default.
+  // Two modes:
+  //   sessionOnly=true (ConversationModelPill): Pin to current conversation only.
+  //   sessionOnly=false (global ModelSelector):  Update global default only.
   const handleSelectModel = async (sourceId: string, modelId: string) => {
-    // 1. Persist the per-conversation pin
-    const chat = useChatStore.getState()
-    const spaceId = chat.currentSpaceId
-    const conversationId = chat.getCurrentSpaceState().currentConversationId
-    if (spaceId && conversationId) {
-      await chat.setConversationModel(spaceId, conversationId, sourceId, modelId)
+    if (sessionOnly) {
+      // Pin to the current conversation — no global changes
+      const chat = useChatStore.getState()
+      const spaceId = chat.currentSpaceId
+      const conversationId = chat.getCurrentSpaceState().currentConversationId
+      if (spaceId && conversationId) {
+        await chat.setConversationModel(spaceId, conversationId, sourceId, modelId)
+      }
+      onDone()
+      return
     }
 
-    // 2. Update the global last-used selection (source first if needed, then model)
+    // Global mode: update the global default only (affects new conversations)
     if (aiSources.currentId !== sourceId) {
       const switchResult = await api.aiSourcesSwitchSource(sourceId)
       if (!switchResult.success) {
@@ -106,21 +113,28 @@ function ModelList({ onDone }: { onDone: () => void }) {
   }
 
   // Handle switching source only (adopts that source's last selected model).
-  // Pins the current conversation to the target source + its model too, so the
-  // conversation's checkmark and the active-source indicator stay consistent.
+  // Two modes:
+  //   sessionOnly=true:  Pin conversation to the target source, no global change.
+  //   sessionOnly=false: Switch global source (affects new conversations), no pin.
   const handleSwitchSource = async (sourceId: string, e: React.MouseEvent) => {
     e.stopPropagation()
 
     if (aiSources.currentId === sourceId) return
 
-    const targetSource = aiSources.sources.find(s => s.id === sourceId)
-    const chat = useChatStore.getState()
-    const spaceId = chat.currentSpaceId
-    const conversationId = chat.getCurrentSpaceState().currentConversationId
-    if (spaceId && conversationId && targetSource?.model) {
-      await chat.setConversationModel(spaceId, conversationId, sourceId, targetSource.model)
+    if (sessionOnly) {
+      // Pin the conversation to this source's model — no global changes
+      const targetSource = aiSources.sources.find(s => s.id === sourceId)
+      const chat = useChatStore.getState()
+      const spaceId = chat.currentSpaceId
+      const conversationId = chat.getCurrentSpaceState().currentConversationId
+      if (spaceId && conversationId && targetSource?.model) {
+        await chat.setConversationModel(spaceId, conversationId, sourceId, targetSource.model)
+      }
+      onDone()
+      return
     }
 
+    // Global mode: switch global source only
     const result = await api.aiSourcesSwitchSource(sourceId)
     if (result.success && result.data) {
       setConfig({ ...config, aiSources: result.data as AISourcesConfig })
@@ -188,7 +202,12 @@ function ModelList({ onDone }: { onDone: () => void }) {
       {/* Iterate all configured sources */}
       {aiSources.sources.map(source => {
         const isExpanded = expandedSection === source.id
-        const isActiveSource = aiSources.currentId === source.id
+        // In session-only mode, the "active source" follows the conversation's
+        // pin, not the global config. This keeps the source indicator and model
+        // checkmark consistent within the session-pill dropdown.
+        const isActiveSource = sessionOnly
+          ? (pinSourceId ? pinSourceId === source.id : aiSources.currentId === source.id)
+          : aiSources.currentId === source.id
         const models = getModelsForSource(source)
         const displayName = getSourceDisplayName(source)
 
@@ -223,9 +242,10 @@ function ModelList({ onDone }: { onDone: () => void }) {
                 {models.map((model) => {
                   const modelId = typeof model === 'string' ? model : model.id
                   const modelName = typeof model === 'string' ? model : (model.name || model.id)
-                  // When the conversation has a pin, the checkmark follows it;
-                  // otherwise fall back to the global active source + model.
-                  const isSelected = pinSourceId
+                  // Checkmark follows the mode:
+                  //   sessionOnly=true:  follow conversation pin
+                  //   sessionOnly=false: follow global config
+                  const isSelected = sessionOnly
                     ? (pinSourceId === source.id && pinModelId === modelId)
                     : (isActiveSource && source.model === modelId)
 
@@ -285,15 +305,15 @@ function ModelList({ onDone }: { onDone: () => void }) {
  * Mobile bottom sheet for model selection.
  * Manages its own exit animation, then calls onClose.
  */
-export function ModelSelectSheet({ onClose }: { onClose: () => void }) {
+export function ModelSelectSheet({ onClose, sessionOnly }: { onClose: () => void; sessionOnly?: boolean }) {
   const { t } = useTranslation()
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
 
   const aiSources = useAiSources()
   const currentConversation = useCurrentConversation()
-  const currentModelName = getModelDisplayName(
-    aiSources, currentConversation?.modelSourceId, currentConversation?.modelId
-  )
+  const currentModelName = sessionOnly
+    ? getModelDisplayName(aiSources, currentConversation?.modelSourceId, currentConversation?.modelId)
+    : getCurrentModelName(aiSources)
 
   const handleClose = () => {
     setIsAnimatingOut(true)
@@ -350,7 +370,7 @@ export function ModelSelectSheet({ onClose }: { onClose: () => void }) {
 
         {/* Model list */}
         <div className="overflow-auto" style={{ maxHeight: 'calc(60vh - 80px)' }}>
-          <ModelList onDone={handleClose} />
+          <ModelList onDone={handleClose} sessionOnly={sessionOnly} />
         </div>
       </div>
     </>
@@ -364,10 +384,7 @@ export function ModelSelector() {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const aiSources = useAiSources()
-  const currentConversation = useCurrentConversation()
-  const currentModelName = getModelDisplayName(
-    aiSources, currentConversation?.modelSourceId, currentConversation?.modelId
-  )
+  const currentModelName = getCurrentModelName(aiSources)
 
   // Close dropdown when clicking outside (desktop only)
   useEffect(() => {

@@ -530,9 +530,15 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
       if (response.success) {
         set((state) => {
           const newCache = new Map(state.conversationCache)
-          const cached = newCache.get(conversationId)
-          if (cached) {
-            newCache.set(conversationId, { ...cached, modelSourceId, modelId })
+          if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+            // Use the full conversation from the server response (HTTP remote mode)
+            newCache.set(conversationId, response.data as Conversation)
+          } else {
+            // Electron IPC: fall back to local update
+            const cached = newCache.get(conversationId)
+            if (cached) {
+              newCache.set(conversationId, { ...cached, modelSourceId, modelId })
+            }
           }
           return { conversationCache: newCache }
         })
