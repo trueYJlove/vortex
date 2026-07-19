@@ -137,37 +137,22 @@ export const MessageRow = memo(function MessageRow({
   }
 
   // For regular user/assistant messages without thoughts: render avatar+header
-  // above the bubble. MessageItem renders only the bubble (hideAvatar + isInContainer
-  // suppress its own avatar/wrapper) so the row controls alignment consistently.
+  // above the bubble. Both user and assistant messages are left-aligned with
+  // avatar on the left, creating a consistent chat log reading experience.
   return (
     <div className={`pb-4 ${className}`}>
-      <div className={`flex items-start gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-        {message.role === 'user' && (
-          <div className="w-[85%] flex flex-col items-end">
-            <MessageHeader isUser={true} timestamp={message.timestamp} />
-            <MessageItem
-              message={message}
-              previousCost={previousCost}
-              hideBrowserViewButton={hideBrowserViewButton}
-              isInContainer
-              hideAvatar
-            />
-          </div>
-        )}
-        {message.role === 'user' && <MessageAvatar isUser={true} />}
-        {message.role === 'assistant' && <MessageAvatar isUser={false} />}
-        {message.role === 'assistant' && (
-          <div className="w-[85%]">
-            <MessageHeader isUser={false} timestamp={message.timestamp} />
-            <MessageItem
-              message={message}
-              previousCost={previousCost}
-              hideBrowserViewButton={hideBrowserViewButton}
-              isInContainer
-              hideAvatar
-            />
-          </div>
-        )}
+      <div className="flex items-start gap-2 justify-start">
+        <MessageAvatar isUser={message.role === 'user'} />
+        <div className="w-[85%]">
+          <MessageHeader isUser={message.role === 'user'} timestamp={message.timestamp} />
+          <MessageItem
+            message={message}
+            previousCost={previousCost}
+            hideBrowserViewButton={hideBrowserViewButton}
+            isInContainer
+            hideAvatar
+          />
+        </div>
       </div>
     </div>
   )

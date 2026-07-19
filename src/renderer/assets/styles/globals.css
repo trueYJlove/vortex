@@ -744,8 +744,23 @@ input, textarea, [contenteditable], [data-message-content],
    ============================================ */
 
 .message-user {
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.1));
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.28), hsl(var(--primary) / 0.14));
   border: 1px solid hsl(var(--primary) / 0.3);
+  position: relative;
+}
+
+/* Left accent bar for user messages — helps distinguish from assistant
+   messages in left-aligned layout without relying on spatial cues. */
+.message-user::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 0 2px 2px 0;
+  pointer-events: none;
 }
 
 .message-assistant {
