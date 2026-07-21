@@ -18,6 +18,9 @@
         // Background color map for known themes (avoids importing registry)
         // MUST stay in sync with src/renderer/themes/builtins/*.ts preview.background values
         var BG = { dark: '#161822', light: '#ffffff', dracula: '#282a36', 'tokyo-night': '#1a1b26', 'one-dark-pro': '#282c34', nord: '#2e3440', 'catppuccin-mocha': '#1e1e2e' };
+        // Light theme ids (anything else is treated as dark). MUST stay in sync
+        // with src/renderer/themes/registry.ts BUILTIN_THEMES type:'light'.
+        var LIGHT_IDS = { light: 1, 'light-owl': 1, 'tokyo-night-day': 1, 'github-light': 1, 'catppuccin-latte': 1, 'solarized-light': 1, 'winter-is-coming-light': 1, 'ayu-light': 1 };
         try {
           var stored = localStorage.getItem('vortex-theme');
           var themeId = stored || 'dark';
@@ -25,9 +28,11 @@
             themeId = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
           }
           document.documentElement.setAttribute('data-theme', themeId);
+          var mode = LIGHT_IDS[themeId] ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme-mode', mode);
           var bg = BG[themeId];
           if (bg) {
-            document.documentElement.style.cssText = 'background-color:' + bg + ';color-scheme:' + (themeId === 'light' ? 'light' : 'dark');
+            document.documentElement.style.cssText = 'background-color:' + bg + ';color-scheme:' + mode;
           }
         } catch (e) {}
         // Platform class for conditional CSS (e.g. backdrop-filter only on GPU-enabled platforms)

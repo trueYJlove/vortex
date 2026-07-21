@@ -36,6 +36,7 @@ import { CsvViewer } from './viewers/CsvViewer'
 import { TextViewer } from './viewers/TextViewer'
 import { KnowledgeBaseViewer } from './viewers/KnowledgeBaseViewer'
 import { BrowserViewer, BrowserViewerFallback } from './viewers/BrowserViewer'
+import { TerminalViewer } from './viewers/TerminalViewer'
 import { api } from '../../api'
 import { useTranslation } from '../../i18n'
 import { getBrowserHomepage } from '../../utils/browser-homepage'
@@ -288,15 +289,7 @@ function TabContent({ tab, onScrollChange, onContentChange, onSaveComplete, onEd
       return <KnowledgeBaseViewer tab={tab} />
 
     case 'terminal':
-      // Terminal view placeholder (future feature)
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <p className="text-lg font-medium mb-2">{t('Terminal output')}</p>
-            <p className="text-sm text-muted-foreground">{t('This feature is coming soon')}</p>
-          </div>
-        </div>
-      )
+      return <TerminalViewer tab={tab} />
 
     default:
       return <TextViewer tab={tab} onScrollChange={onScrollChange} />

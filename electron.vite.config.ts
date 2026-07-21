@@ -61,13 +61,16 @@ const buildMetaDefine = {
 export default defineConfig({
   main: {
     plugins: [
-      externalizeDepsPlugin()
+      // Bundle @xterm/headless (pure-JS CommonJS) instead of externalizing it —
+      // its named exports are not reachable via ESM interop when left external.
+      // node-pty stays external (native addon).
+      externalizeDepsPlugin({ exclude: ['@xterm/headless'] })
     ],
     define: analyticsDefine,
     build: {
       sourcemap: true,
       rollupOptions: {
-        external: ['@hello-halo/agent-sdk', '@mimo-ai/sdk', '@openai/codex-sdk'],
+        external: ['@hello-halo/agent-sdk', '@openai/codex-sdk'],
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           // File watcher worker — runs in a separate child process

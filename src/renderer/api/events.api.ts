@@ -14,6 +14,7 @@ import {
   onEvent,
   onWsStateChange,
   restoreServerUrl,
+  sendWsMessage,
   setServerUrl,
   subscribeToConversation,
   unsubscribeFromConversation,
@@ -47,6 +48,14 @@ export const eventsApi = {
     onEvent('agent:turn-start', callback),
   onAgentTokenUsage: (callback: (data: unknown) => void) =>
     onEvent('agent:token-usage', callback),
+  onToolsetsChanged: (callback: (data: unknown) => void) =>
+    onEvent('toolsets:changed', callback),
+  onToolsetsRequested: (callback: (data: unknown) => void) =>
+    onEvent('toolsets:requested', callback),
+  onTerminalData: (callback: (data: unknown) => void) =>
+    onEvent('terminal:data', callback),
+  onTerminalLifecycle: (callback: (data: unknown) => void) =>
+    onEvent('terminal:lifecycle', callback),
   onRemoteStatusChange: (callback: (data: unknown) => void) =>
     onEvent('remote:status-change', callback),
   onConfigChanged: (callback: (data: unknown) => void) =>
@@ -67,6 +76,7 @@ export const eventsApi = {
   unsubscribeFromConversation,
   onWsStateChange,
   onEvent,
+  sendWsMessage,
 
   // ===== Telemetry (fire-and-forget) =====
   /**

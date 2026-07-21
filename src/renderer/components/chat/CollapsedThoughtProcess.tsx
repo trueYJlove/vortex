@@ -5,7 +5,7 @@
  * TodoWrite is rendered separately at the bottom (only one instance)
  */
 
-import { useState, useMemo, useRef, type RefObject } from 'react'
+import { useState, useMemo, useRef, memo, type RefObject } from 'react'
 import {
   Lightbulb,
   Loader2,
@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Braces,
 } from 'lucide-react'
+import { TodoCard } from '../tool/TodoCard'
 import { ToolResultViewer } from './tool-result'
 import { SubAgentTimeline } from './SubAgentTimeline'
 import { TeamSnapshotPanel } from './TeamPanel'
@@ -26,6 +27,7 @@ import {
   getToolFriendlyFormat,
 } from './thought-utils'
 import { useLazyVisible } from '../../hooks/useLazyVisible'
+import { useLatestTodos } from '../../hooks/useLatestTodos'
 import type { Thought, ThoughtsSummary } from '../../types'
 import { getCurrentLanguage, useTranslation } from '../../i18n'
 
@@ -38,7 +40,7 @@ interface CollapsedThoughtProcessProps {
 
 
 // Single thought item in expanded view
-function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?: Thought[] }) {
+const ThoughtItem = memo(function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?: Thought[] }) {
   const { t } = useTranslation()
   const [showRawJson, setShowRawJson] = useState(false)
   const [showResult, setShowResult] = useState(true)  // Default show result
@@ -172,7 +174,7 @@ function ThoughtItem({ thought, allThoughts }: { thought: Thought; allThoughts?:
       )}
     </div>
   )
-}
+})
 
 // Lazy wrapper for historical thought items — defers rendering until scrolled into view
 const COLLAPSED_THOUGHT_ESTIMATED_HEIGHT = 36
@@ -203,6 +205,8 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
   const [isMaximized, setIsMaximized] = useState(defaultMaximized)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
+  const latestTodos = useLatestTodos(thoughts)
+
   // Filter thoughts for display (exclude TodoWrite, results, and sub-agent thoughts)
   // Sub-agent thoughts are rendered nested inside their parent Task thought via SubAgentTimeline
   const displayThoughts = useMemo(() => {
@@ -215,7 +219,7 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
   }, [thoughts])
 
   // Check if there's anything to show
-  const hasContent = displayThoughts.length > 0
+  const hasContent = displayThoughts.length > 0 || (latestTodos && latestTodos.length > 0)
   if (!hasContent) return null
 
   // Only count system-level errors, not tool execution failures
@@ -288,6 +292,13 @@ export function CollapsedThoughtProcess({ thoughts, defaultExpanded = false, def
           <div className="px-3 mt-2">
             <TeamSnapshotPanel thoughts={thoughts} />
           </div>
+
+          {/* TodoCard at bottom - only one instance */}
+          {latestTodos && latestTodos.length > 0 && (
+            <div className={`px-3 ${displayThoughts.length > 0 ? 'mt-2 pt-2 border-t border-border/20' : ''}`}>
+              <TodoCard todos={latestTodos} isAgentActive={false} />
+            </div>
+          )}
 
           {/* Maximize toggle - bottom right, heuristic: show when likely to overflow */}
           {(displayThoughts.length > 8 || isMaximized) && (

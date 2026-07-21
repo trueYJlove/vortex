@@ -71,6 +71,7 @@ function forkWorker(): ChildProcess {
   const child = fork(workerPath, [], {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
     env: { ...process.env },
+    windowsHide: true,
   })
 
   // Handle messages from worker

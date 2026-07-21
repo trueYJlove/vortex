@@ -20,6 +20,7 @@ import { Header } from '../components/layout/Header'
 import { CommandPaletteButton } from '../components/layout/CommandPaletteButton'
 import { SpaceGuide } from '../components/space/SpaceGuide'
 import { CreateSpaceDialog } from '../components/space/CreateSpaceDialog'
+import { SortableSpaceList } from '../components/space/SortableSpaceList'
 import { Blocks, ArrowRight, AlertCircle, SendHorizontal, Unplug } from 'lucide-react'
 import { api } from '../api'
 import { useTranslation } from '../i18n'
@@ -31,7 +32,7 @@ import type { AppType } from '../../shared/apps/spec-types'
 export function HomePage() {
   const { t } = useTranslation()
   const { setView } = useAppStore()
-  const { haloSpace, spaces, loadSpaces, setCurrentSpace, refreshCurrentSpace, updateSpace, deleteSpace } = useSpaceStore()
+  const { haloSpace, spaces, loadSpaces, setCurrentSpace, refreshCurrentSpace, updateSpace, deleteSpace, reorderSpaces } = useSpaceStore()
   const { apps, loadApps } = useAppsStore()
   const { setInitialAppId, setCurrentTab, setShowInstallDialog, openMarketplaceFilteredBy } = useAppsPageStore()
 
@@ -234,16 +235,18 @@ export function HomePage() {
             <p className="text-sm">{t('No workspaces yet')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {spaces.map((space, i) => (
+          <SortableSpaceList
+            items={spaces}
+            onReorder={(ids) => { void reorderSpaces(ids) }}
+            className="grid grid-cols-2 gap-4"
+            renderItem={(space) => (
               <div
-                key={`${space.id}-${i}`}
                 onClick={() => handleSpaceClick(space)}
                 className={`space-card p-4 group animate-fade-in ${
                   space.isMissing ? 'opacity-70 cursor-not-allowed border-dashed' : ''
                 }`}
               >
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <SpaceIcon iconId={space.icon} size={20} />
                     <span className="font-medium truncate">{space.name}</span>
@@ -254,7 +257,7 @@ export function HomePage() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="flex items-center gap-2 sm:gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0">
                     <button
                       onClick={(e) => handleEditSpace(e, space)}
                       className="p-1 hover:bg-secondary rounded transition-all"
@@ -277,8 +280,8 @@ export function HomePage() {
                     : `${formatTimeAgo(space.lastActiveAt || space.updatedAt)}${t('active')}`}
                 </p>
               </div>
-            ))}
-          </div>
+            )}
+          />
         )}
       </main>
 

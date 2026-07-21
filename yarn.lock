@@ -543,6 +543,37 @@
     ajv "^6.12.0"
     ajv-keywords "^3.4.1"
 
+"@dnd-kit/accessibility@^3.1.1":
+  version "3.1.1"
+  resolved "https://registry.npmmirror.com/@dnd-kit/accessibility/-/accessibility-3.1.1.tgz"
+  integrity sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw==
+  dependencies:
+    tslib "^2.0.0"
+
+"@dnd-kit/core@^6.3.1":
+  version "6.3.1"
+  resolved "https://registry.npmmirror.com/@dnd-kit/core/-/core-6.3.1.tgz"
+  integrity sha512-xkGBRQQab4RLwgXxoqETICr6S5JlogafbhNsidmrkVv2YRs5MLwpjoF2qpiGjQt8S9AoxtIV603s0GIUpY5eYQ==
+  dependencies:
+    "@dnd-kit/accessibility" "^3.1.1"
+    "@dnd-kit/utilities" "^3.2.2"
+    tslib "^2.0.0"
+
+"@dnd-kit/sortable@^10.0.0":
+  version "10.0.0"
+  resolved "https://registry.npmmirror.com/@dnd-kit/sortable/-/sortable-10.0.0.tgz"
+  integrity sha512-+xqhmIIzvAYMGfBYYnbKuNicfSsk4RksY2XdmJhT+HAC01nix6fHCztU68jooFiMUB01Ky3F0FyOvhG/BZrWkg==
+  dependencies:
+    "@dnd-kit/utilities" "^3.2.2"
+    tslib "^2.0.0"
+
+"@dnd-kit/utilities@^3.2.2":
+  version "3.2.2"
+  resolved "https://registry.npmmirror.com/@dnd-kit/utilities/-/utilities-3.2.2.tgz"
+  integrity sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg==
+  dependencies:
+    tslib "^2.0.0"
+
 "@electron-toolkit/preload@^3.0.0":
   version "3.0.2"
   resolved "https://registry.npmmirror.com/@electron-toolkit/preload/-/preload-3.0.2.tgz"
@@ -1079,13 +1110,6 @@
   resolved "https://registry.npmmirror.com/@marijn/find-cluster-break/-/find-cluster-break-1.0.2.tgz"
   integrity sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==
 
-"@mimo-ai/sdk@^0.1.4":
-  version "0.1.4"
-  resolved "https://registry.npmmirror.com/@mimo-ai/sdk/-/sdk-0.1.4.tgz"
-  integrity sha512-nZHJthemyVb8iQLh/ZomyvSAKRXM1NouquBdvrDDiGD7euyx3IPeyamwX1uhbPIYzn/P0U1KIAsmk18jMJ/zVg==
-  dependencies:
-    cross-spawn "7.0.6"
-
 "@modelcontextprotocol/sdk@^1.12.0", "@modelcontextprotocol/sdk@^1.27.1", "@modelcontextprotocol/sdk@^1.29.0":
   version "1.29.0"
   resolved "https://registry.npmmirror.com/@modelcontextprotocol/sdk/-/sdk-1.29.0.tgz"
@@ -1474,11 +1498,6 @@
     "@types/d3-interpolate" "*"
     "@types/d3-selection" "*"
 
-"@types/dagre@^0.7.52":
-  version "0.7.52"
-  resolved "https://registry.npmmirror.com/@types/dagre/-/dagre-0.7.52.tgz"
-  integrity sha512-XKJdy+OClLk3hketHi9Qg6gTfe1F3y+UFnHxKA2rn9Dw+oXa4Gb378Ztz9HlMgZKSxpPmn4BNVh9wgkpvrK1uw==
-
 "@types/debug@^4.0.0", "@types/debug@^4.1.6":
   version "4.1.12"
   resolved "https://registry.npmmirror.com/@types/debug/-/debug-4.1.12.tgz"
@@ -1787,6 +1806,21 @@
   version "0.8.11"
   resolved "https://registry.npmmirror.com/@xmldom/xmldom/-/xmldom-0.8.11.tgz"
   integrity sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==
+
+"@xterm/addon-fit@^0.10.0":
+  version "0.10.0"
+  resolved "https://registry.npmmirror.com/@xterm/addon-fit/-/addon-fit-0.10.0.tgz"
+  integrity sha512-UFYkDm4HUahf2lnEyHvio51TNGiLK66mqP2JoATy7hRZeXaGMRDr00JiSF7m63vR5WKATF605yEggJKsw0JpMQ==
+
+"@xterm/headless@^5.5.0":
+  version "5.5.0"
+  resolved "https://registry.npmmirror.com/@xterm/headless/-/headless-5.5.0.tgz"
+  integrity sha512-5xXB7kdQlFBP82ViMJTwwEc3gKCLGKR/eoxQm4zge7GPBl86tCdI0IdPJjoKd8mUSFXz5V7i/25sfsEkP4j46g==
+
+"@xterm/xterm@^5.5.0":
+  version "5.5.0"
+  resolved "https://registry.npmmirror.com/@xterm/xterm/-/xterm-5.5.0.tgz"
+  integrity sha512-hqJHYaQb5OptNunnyAnkHyM8aCjZ1MEIDTQu1iIbbTD/xops91NB5yq1ZK/dC2JDbVWtF23zUtl9JE2NqwT87A==
 
 "@xyflow/react@^12.11.2":
   version "12.11.2"
@@ -2896,7 +2930,7 @@ cross-env@^10.1.0:
     "@epic-web/invariant" "^1.0.0"
     cross-spawn "^7.0.6"
 
-cross-spawn@^7.0.1, cross-spawn@^7.0.3, cross-spawn@^7.0.5, cross-spawn@^7.0.6, cross-spawn@7.0.6:
+cross-spawn@^7.0.1, cross-spawn@^7.0.3, cross-spawn@^7.0.5, cross-spawn@^7.0.6:
   version "7.0.6"
   resolved "https://registry.npmmirror.com/cross-spawn/-/cross-spawn-7.0.6.tgz"
   integrity sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==
@@ -8381,7 +8415,7 @@ ts-interface-checker@^0.1.9:
   resolved "https://registry.npmmirror.com/ts-interface-checker/-/ts-interface-checker-0.1.13.tgz"
   integrity sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==
 
-tslib@^2.0.1, tslib@^2.1.0, tslib@^2.6.2, tslib@^2.8.1:
+tslib@^2.0.0, tslib@^2.0.1, tslib@^2.1.0, tslib@^2.6.2, tslib@^2.8.1:
   version "2.8.1"
   resolved "https://registry.npmmirror.com/tslib/-/tslib-2.8.1.tgz"
   integrity sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==

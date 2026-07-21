@@ -23,7 +23,10 @@
 /* ============================================
    Theme System
    - CSS color variables are injected at runtime by applyTheme()
-   - Use [data-theme="xxx"] selectors for theme-specific overrides
+   - [data-theme="<id>"] targets a specific theme (e.g. tokyo-night-day).
+   - [data-theme-mode="light|dark"] targets all themes of a mode — use this
+     for light/dark-variant styling so every light theme is covered, not just
+     the one literally named "light".
    ============================================ */
 
 :root {
@@ -263,7 +266,7 @@ input, textarea, [contenteditable], [data-message-content],
 /* Light mode: Shiki themes are ['github-dark', 'github-light'].
    Inline style `color` always uses the first (dark) theme.
    In light themes, override with --shiki-dark which holds the light theme colors. */
-[data-theme="light"] [data-streamdown="code-block-body"] span[style] {
+[data-theme-mode="light"] [data-streamdown="code-block-body"] span[style] {
   color: var(--shiki-dark, inherit) !important;
 }
 
@@ -272,7 +275,7 @@ input, textarea, [contenteditable], [data-message-content],
   filter: saturate(0.6);
 }
 
-[data-theme="light"] .thought-content .hljs {
+[data-theme-mode="light"] .thought-content .hljs {
   filter: none;
 }
 
@@ -336,6 +339,20 @@ input, textarea, [contenteditable], [data-message-content],
 
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
+}
+
+/* Toolset pill pulse — draws attention when the AI opens a toolset itself */
+@keyframes pulse-highlight {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.35);
+  }
+}
+
+.animate-pulse-highlight {
+  animation: pulse-highlight 1s ease-in-out 2;
 }
 
 /* Fade out animation */
@@ -727,8 +744,23 @@ input, textarea, [contenteditable], [data-message-content],
    ============================================ */
 
 .message-user {
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.1));
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.28), hsl(var(--primary) / 0.14));
   border: 1px solid hsl(var(--primary) / 0.3);
+  position: relative;
+}
+
+/* Left accent bar for user messages — helps distinguish from assistant
+   messages in left-aligned layout without relying on spatial cues. */
+.message-user::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: hsl(var(--primary) / 0.5);
+  border-radius: 0 2px 2px 0;
+  pointer-events: none;
 }
 
 .message-assistant {

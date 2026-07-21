@@ -1,5 +1,6 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
+import { join, isAbsolute, normalize } from 'path'
 import type { GitFileStatus, GitStatusResult, GitDiffResult } from '../../shared/rpc/contracts/git.contract'
 
 const execAsync = promisify(exec)
@@ -167,6 +168,12 @@ export async function getGitStatus(spacePath: string): Promise<GitStatusResult> 
         file.insertions = unstagedStats.insertions
         file.deletions = unstagedStats.deletions
       }
+    }
+
+    // Resolve `path` to absolute so consumers (e.g. shell.showItemInFolder) can locate the file.
+    // `parseGitStatusPorcelain` emits repo-relative paths; `relativePath` stays as-is for display.
+    for (const file of result.files) {
+      file.path = isAbsolute(file.path) ? normalize(file.path) : normalize(join(spacePath, file.path))
     }
 
     return result

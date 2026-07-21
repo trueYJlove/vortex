@@ -40,6 +40,7 @@ import { getApiCredentials, getApiCredentialsForSource, getHeadlessElectronPath,
 import { resolveCredentialsForSdk, buildBaseSdkOptions } from '../../services/agent/sdk-config'
 import { getOrCreateV2Session } from '../../services/agent/session-manager'
 import { createAIBrowserMcpServer, createScopedBrowserContext } from '../../services/ai-browser'
+import { createTerminalMcpServer, getGlobalTerminalContext, isTerminalAvailable } from '../../services/ai-terminal'
 import { createWebSearchMcpServer } from '../../services/web-search'
 import { createEmailMcpServer } from '../../services/email-mcp'
 import { getConfig, resolveClaudeConfigDir } from '../../foundation/config.service'
@@ -278,6 +279,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     // ── 2. Build system prompt ─────────────────────────────
     const memoryInstructions = memory.getPromptInstructions()
     const usesAIBrowser = resolvePermission(app, 'ai-browser')
+    const usesTerminal = resolvePermission(app, 'ai-terminal', false) && isTerminalAvailable() // default off
     const usesEmail = resolvePermission(app, 'email', false) // default false — higher trust
     const usesImPush = resolvePermission(app, 'im-push') // default true — AI-driven IM push
 
@@ -303,6 +305,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
       triggerContext: trigger.description,
       userConfig: mergedConfig,
       usesAIBrowser,
+      usesTerminal,
       workDir,
       modelInfo: resolvedCreds.displayModel,
       autoSyncSessions,
@@ -377,7 +380,7 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     //    Scoped context isolates activeViewId from user's interactive browser
     //    and other concurrent runs, while sharing the same session/cookies.
     scopedBrowserCtx = usesAIBrowser
-      ? createScopedBrowserContext(null)
+      ? createScopedBrowserContext()
       : undefined
 
     // ── 4. Create MCP servers ──────────────────────────────
@@ -465,6 +468,9 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
         'web-search': createWebSearchMcpServer(), // built-in: web search
         ...(knowledgeMcpServer ? { 'knowledge-search': knowledgeMcpServer } : {}),
         ...(usesAIBrowser ? { 'ai-browser': createAIBrowserMcpServer(scopedBrowserCtx, workDir) } : {}),
+        ...(usesTerminal
+          ? { 'ai-terminal': createTerminalMcpServer(getGlobalTerminalContext(workDir), { spaceId: app.spaceId!, workDir }) }
+          : {}),
         ...(usesEmail && config.notificationChannels?.email?.enabled
           ? { 'halo-email': createEmailMcpServer(config.notificationChannels.email) }
           : {}),
@@ -498,6 +504,10 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
     const escalationResumeId = trigger.escalation?.sessionId
     const continueResumeId = trigger.continue?.sessionId
 
+    // No displayModel: automation runs drive their own processStream(), so they
+    // must not start a persistent session consumer (that would fight over the
+    // stream). workDir is the 5th positional arg — passing it as displayModel
+    // would silently spawn a consumer.
     if (trigger.type === 'escalation_followup' && escalationResumeId) {
       console.log(`[Runtime][${runTag}] Restoring session for escalation followup: ${escalationResumeId}`)
       session = await getOrCreateV2Session(
@@ -505,7 +515,6 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
         sessionKey,
         sdkOptions,
         escalationResumeId,
-        undefined,
         workDir
       )
     } else if (trigger.type === 'continue_followup' && continueResumeId) {
@@ -515,7 +524,6 @@ export async function executeRun(options: ExecuteRunOptions): Promise<AppRunResu
         sessionKey,
         sdkOptions,
         continueResumeId,
-        undefined,
         workDir
       )
     } else {

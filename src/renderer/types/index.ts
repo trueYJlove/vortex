@@ -44,6 +44,7 @@ export {
   AVAILABLE_MODELS,
   createEmptyAISourcesConfig,
   getCurrentSource,
+  getModelDisplayName,
   getSourceById,
   isSourceConfigured,
   createSource,
@@ -128,7 +129,7 @@ export interface SystemConfig {
 export interface AgentConfig {
   maxTurns: number;         // Maximum tool call turns per message
   promptProfile?: 'official' | 'halo';  // System prompt profile
-  sdkEngine?: 'anthropic' | 'halo' | 'codex' | 'mimo';  // Agent SDK engine (requires restart)
+  sdkEngine?: 'anthropic' | 'halo' | 'codex';  // Agent SDK engine (requires restart)
   configDirMode?: 'halo' | 'cc' | 'custom';  // Claude CLI config directory mode
   customConfigDir?: string;  // Custom config dir path (when configDirMode === 'custom')
   enableTeams?: boolean;    // Enable Agent Teams (multi-agent collaboration)
@@ -262,6 +263,7 @@ export interface NetworkConfig {
 // Browser configuration
 export interface BrowserConfig {
   customAllowlist?: string[];  // User-added allowlist patterns; only honored when the build sets browserPolicy.userExtensible
+  userAgent?: string;  // Custom User-Agent for the embedded AI Browser; overrides built-in desktop/mobile UAs (issue #124)
 }
 
 export interface HaloConfig {
@@ -283,6 +285,9 @@ export interface HaloConfig {
   network?: NetworkConfig;  // Network settings (proxy, etc.)
   browser?: BrowserConfig;  // Browser settings (user custom allowlist)
   isFirstLaunch: boolean;
+  // True when the user deferred model configuration in the first-run wizard.
+  // Suppresses the setup re-entry guard so they can reach Home and configure later.
+  modelConfigSkipped?: boolean;
 }
 
 // ============================================
@@ -312,6 +317,7 @@ export interface Space {
   preferences?: SpacePreferences;  // User preferences for this space
   workingDir?: string;  // Project directory for custom spaces (agent cwd, artifacts, file explorer)
   isMissing?: boolean;  // True when the space data path is currently unavailable
+  sortOrder?: number;  // User-defined display order (lower = earlier); absent on legacy spaces
 }
 
 export interface CreateSpaceInput {
@@ -325,7 +331,7 @@ export interface CreateSpaceInput {
 // ============================================
 
 /** Agent engine that owns a conversation. Used for the EngineBadge UI. */
-export type EngineId = 'anthropic' | 'halo' | 'codex' | 'mimo';
+export type EngineId = 'anthropic' | 'halo' | 'codex';
 
 // Lightweight metadata for conversation list (no messages)
 // Used by listConversations for fast loading
@@ -371,6 +377,14 @@ export interface Conversation extends ConversationMeta {
   messages: Message[];
   sessionId?: string;
   version?: number;  // Format version: 2 = thoughts separated into .thoughts.json
+  /**
+   * Per-conversation model pin (Cursor-style): the AI source + model this
+   * conversation uses, independent of the global selection. Stamped at creation
+   * from the active selection; read with a fallback to the global selection.
+   * `modelSourceId` is the AISource.id, `modelId` the wire model id.
+   */
+  modelSourceId?: string;
+  modelId?: string;
 }
 
 // ============================================
@@ -402,7 +416,7 @@ export interface EngineCapabilities {
   subAgent: { model: 'declarative' | 'imperative' | 'none'; visibleLifecycle: boolean };
   features: {
     skills: boolean; mcp: boolean; hooks: boolean;
-    sessionResume: boolean; midTurnInjection: boolean; interrupt: boolean;
+    sessionResume: boolean; interrupt: boolean;
     multimodalImage: boolean; contextCompaction: boolean; askUserQuestion: boolean;
   };
 }
@@ -607,16 +621,18 @@ export interface CanvasContext {
   isOpen: boolean;
   tabCount: number;
   activeTab: {
-    type: string;  // 'browser' | 'code' | 'markdown' | 'image' | 'pdf' | 'text' | 'json' | 'csv'
+    type: string;  // 'browser' | 'code' | 'markdown' | 'image' | 'pdf' | 'text' | 'json' | 'csv' | 'terminal'
     title: string;
     url?: string;   // For browser/pdf tabs
     path?: string;  // For file tabs
+    terminalSessionId?: string;  // For terminal tabs - the pty session id the AI drives via terminal_* tools
   } | null;
   tabs: Array<{
     type: string;
     title: string;
     url?: string;
     path?: string;
+    terminalSessionId?: string;  // For terminal tabs - the pty session id the AI drives via terminal_* tools
     isActive: boolean;
   }>;
 }
@@ -798,7 +814,8 @@ export const DEFAULT_CONFIG: HaloConfig = {
   },
   mcpServers: {},  // Empty by default
   agent: { maxTurns: 999 },  // Agent defaults
-  isFirstLaunch: true
+  isFirstLaunch: true,
+  modelConfigSkipped: false
 };
 
 // Helper functions hasAnyAISource and getCurrentModelName are now imported from shared module

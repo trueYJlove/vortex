@@ -32,7 +32,7 @@
  *   'anthropic' (default) → @anthropic-ai/claude-agent-sdk (CC SDK)
  *   'halo'                → @hello-halo/agent-sdk (Halo SDK)
  *   'codex'               → @openai/codex-sdk through CC protocol adapter
- *   'mimo'                → @mimo-ai/sdk through MiMo Code adapter
+ *   (removed)
  *
  * Startup requirement:
  *   initSdk() must be called once during app bootstrap, before any
@@ -104,7 +104,13 @@ export async function initSdk(): Promise<void> {
 }
 
 async function doInitSdk(): Promise<void> {
-  const engine = getConfig().agent?.sdkEngine ?? 'anthropic'
+  const rawEngine = getConfig().agent?.sdkEngine ?? 'anthropic'
+  // If sdkEngine is set to a now-removed value (e.g. 'mimo') or any unknown
+  // value, fall through to the default anthropic engine.
+  if ((rawEngine as string) === 'mimo') {
+    console.warn('[SDK] MiMo Code engine has been removed. Falling back to default anthropic engine.')
+  }
+  const engine: EngineId = rawEngine === 'halo' || rawEngine === 'codex' ? rawEngine : 'anthropic'
   console.log(`[SDK] Initializing engine: ${engine}`)
 
   const startTime = performance.now()
@@ -130,16 +136,8 @@ async function doInitSdk(): Promise<void> {
     return
   }
 
-  if (engine === 'mimo') {
-    _sdk = await loadMimoSdk()
-    _engine = 'mimo'
-    const duration = (performance.now() - startTime).toFixed(1)
-    console.log(`[SDK] Active engine: MiMo Code (@mimo-ai/sdk adapter) [${duration}ms]`)
-    return
-  }
-
   if (engine !== 'anthropic') {
-    throw new Error(`[SDK] Unknown SDK engine "${engine}". Expected "anthropic", "halo", "codex", or "mimo".`)
+    throw new Error(`[SDK] Unknown SDK engine "${engine}". Expected "anthropic", "halo", or "codex".`)
   }
 
   _sdk = await loadCcSdk()
@@ -166,7 +164,7 @@ async function loadHaloSdk(): Promise<SdkModule> {
       'The configured engine is "halo" but the package is not available.\n' +
       'Solutions:\n' +
       '  1. Install @hello-halo/agent-sdk, OR\n' +
-      '  2. Change config.agent.sdkEngine to "anthropic", "codex", or "mimo" and restart'
+      '  2. Change config.agent.sdkEngine to "anthropic", "codex" and restart'
     console.error(message)
     throw new Error(message)
   }
@@ -187,23 +185,7 @@ async function loadCodexSdk(): Promise<SdkModule> {
       'The configured engine is "codex" but the adapter could not be loaded.\n' +
       'Solutions:\n' +
       '  1. Ensure @openai/codex (CLI binary package) is installed, OR\n' +
-      '  2. Change config.agent.sdkEngine to "anthropic", "halo", or "mimo" and restart'
-    console.error(message, error)
-    throw new Error(message)
-  }
-}
-
-async function loadMimoSdk(): Promise<SdkModule> {
-  try {
-    const { createMimoSdkModule } = await import('./mimo')
-    return createMimoSdkModule() as unknown as SdkModule
-  } catch (error) {
-    const message =
-      '[SDK] Failed to load MiMo Code adapter.\n' +
-      'The configured engine is "mimo" but the adapter could not be loaded.\n' +
-      'Solutions:\n' +
-      '  1. Ensure @mimo-ai/sdk is installed, OR\n' +
-      '  2. Change config.agent.sdkEngine to "anthropic", "halo", or "codex" and restart'
+      '  2. Change config.agent.sdkEngine to "anthropic", "halo" and restart'
     console.error(message, error)
     throw new Error(message)
   }

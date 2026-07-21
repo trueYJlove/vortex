@@ -1,10 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { GitBranch, ChevronDown, X } from 'lucide-react'
+import { GitBranch, ChevronDown, X, Copy, FolderOpen } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { useGitStatus } from '../../hooks/useGitStatus'
 import { useAppStore } from '../../stores/app.store'
 import { api } from '../../api'
+import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
+import { copyToClipboard } from '../../utils/clipboard'
 import type { GitFileStatus } from '../../../shared/rpc/contracts/git.contract'
+
+const isWebMode = api.isRemoteMode()
 
 const MIN_HEIGHT = 120
 const MAX_HEIGHT = 600
@@ -66,7 +70,7 @@ export function GitChangesPanel({ spaceId, onFileClick }: GitChangesPanelProps) 
     setDiffContent('')
 
     try {
-      const result = await api.gitDiff(spaceId, file.path)
+      const result = await api.gitDiff(spaceId, file.relativePath)
       if (result.success && result.data) {
         setDiffContent(result.data.diff)
       } else {
@@ -84,6 +88,28 @@ export function GitChangesPanel({ spaceId, onFileClick }: GitChangesPanelProps) 
     setDiffContent('')
     setDiffError(null)
   }, [])
+
+  const buildFileMenuItems = useCallback((file: GitFileStatus): ContextMenuItem[] => [
+    {
+      label: t('Copy relative path'),
+      icon: <Copy className="w-4 h-4" />,
+      onClick: () => {
+        copyToClipboard(file.relativePath).catch(err =>
+          console.error('[GitChangesPanel] Failed to copy relative path:', err)
+        )
+      }
+    },
+    {
+      label: t('Show in Folder'),
+      icon: <FolderOpen className="w-4 h-4" />,
+      onClick: () => {
+        api.showArtifactInFolder(file.path).catch(err =>
+          console.error('[GitChangesPanel] Failed to show in folder:', err)
+        )
+      },
+      hidden: isWebMode
+    }
+  ], [t])
 
   // Resizable height — initialized from persisted config
   const layoutConfig = useAppStore(state => state.config?.layout)
@@ -194,30 +220,31 @@ export function GitChangesPanel({ spaceId, onFileClick }: GitChangesPanelProps) 
           ) : (
             <div className="px-2 pb-2">
               {files.map((file, index) => (
-                <button
-                  key={`${file.relativePath}-${index}`}
-                  onClick={() => handleSingleClick(file)}
-                  onDoubleClick={() => handleDoubleClick(file)}
-                  className="w-full flex items-center gap-2 px-1 py-0.5 hover:bg-secondary/60 rounded text-left transition-colors"
-                  title={gitAvailable ? t('Double-click to view diff') : t('Git is not installed')}
-                >
-                  <span className={`text-xs font-mono w-4 text-center ${STATUS_COLORS[file.status]}`}>
-                    {STATUS_LABELS[file.status]}
-                  </span>
-                  <span className="text-xs text-foreground truncate flex-1" title={file.relativePath}>
-                    {file.relativePath}
-                  </span>
-                  {(file.insertions != null || file.deletions != null) && (
-                    <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
-                      {file.insertions != null && file.insertions > 0 && (
-                        <span className="text-green-500">+{file.insertions}</span>
-                      )}
-                      {file.deletions != null && file.deletions > 0 && (
-                        <span className="text-red-500 ml-1">-{file.deletions}</span>
-                      )}
+                <ContextMenu key={`${file.relativePath}-${index}`} items={buildFileMenuItems(file)}>
+                  <button
+                    onClick={() => handleSingleClick(file)}
+                    onDoubleClick={() => handleDoubleClick(file)}
+                    className="w-full flex items-center gap-2 px-1 py-0.5 hover:bg-secondary/60 rounded text-left transition-colors"
+                    title={gitAvailable ? t('Double-click to view diff') : t('Git is not installed')}
+                  >
+                    <span className={`text-xs font-mono w-4 text-center ${STATUS_COLORS[file.status]}`}>
+                      {STATUS_LABELS[file.status]}
                     </span>
-                  )}
-                </button>
+                    <span className="text-xs text-foreground truncate flex-1" title={file.relativePath}>
+                      {file.relativePath}
+                    </span>
+                    {(file.insertions != null || file.deletions != null) && (
+                      <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
+                        {file.insertions != null && file.insertions > 0 && (
+                          <span className="text-green-500">+{file.insertions}</span>
+                        )}
+                        {file.deletions != null && file.deletions > 0 && (
+                          <span className="text-red-500 ml-1">-{file.deletions}</span>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                </ContextMenu>
               ))}
             </div>
           )}

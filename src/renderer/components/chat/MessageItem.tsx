@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { getToolIcon } from '../icons/ToolIcons'
 import { BrowserTaskCard, isBrowserTool } from '../tool/BrowserTaskCard'
+import { TerminalTaskCard, isTerminalTool } from '../tool/TerminalTaskCard'
 import { MarkdownRenderer } from './MarkdownRenderer'
 import { FileChangesFooter } from '../diff'
 import { normalizeFileChangesSummary } from '../../../shared/file-changes'
@@ -35,6 +36,7 @@ import { truncateText, getToolFriendlyFormat } from './thought-utils'
 import type { Message, Thought, ThoughtsSummary } from '../../types'
 import { useTranslation } from '../../i18n'
 import { copyToClipboard } from '../../utils/clipboard'
+import { formatMessageTimeShort } from '../../lib/utils'
 import { useChatStore } from '../../stores/chat.store'
 
 interface MessageItemProps {
@@ -241,18 +243,29 @@ function ThoughtItem({ thought }: { thought: Thought }) {
 }
 
 export function MessageAvatar({ isUser }: { isUser: boolean }) {
-  const { t } = useTranslation()
   return (
-    <div className="flex flex-col items-center gap-1 shrink-0">
-      <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center">
-        {isUser
-          ? <User size={12} className="text-primary" />
-          : <Bot size={12} className="text-primary" />
-        }
-      </div>
-      <span className="text-[10px] sm:text-xs text-primary font-medium whitespace-nowrap">
-        {isUser ? t('You') : t('Vortex')}
-      </span>
+    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+      {isUser
+        ? <User size={17} className="text-primary" />
+        : <Bot size={17} className="text-primary" />
+      }
+    </div>
+  )
+}
+
+/**
+ * Name + time header shown above thought process / bubble.
+ * Avatar sits at the same vertical level as this header.
+ */
+export function MessageHeader({ isUser, timestamp }: { isUser: boolean; timestamp?: string }) {
+  const { t } = useTranslation()
+  const name = isUser ? t('You') : t('Vortex')
+  return (
+    <div className="flex items-baseline gap-1.5 h-7 sm:h-8">
+      <span className="text-sm font-semibold text-primary whitespace-nowrap">{name}</span>
+      {timestamp && (
+        <span className="text-xs text-muted-foreground/60 select-none">{formatMessageTimeShort(timestamp)}</span>
+      )}
     </div>
   )
 }
@@ -312,6 +325,19 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
   // Check if there are running browser tools (based on isWorking state)
   const hasBrowserActivity = isWorking && browserToolCalls.length > 0
 
+  // Extract terminal tool calls from thoughts (same pattern as browser tools)
+  const terminalToolCalls = useMemo(() => {
+    if (!Array.isArray(message.thoughts)) return []
+    return message.thoughts
+      .filter(t => t.type === 'tool_use' && t.toolName && isTerminalTool(t.toolName))
+      .map(t => ({
+        id: t.id,
+        name: t.toolName!,
+        status: 'success' as const,
+        input: t.toolInput || {},
+      }))
+  }, [message.thoughts])
+
   // Error-only message (no content): render standalone error block without bubble wrapper.
   // Treat whitespace-only content as empty — the empty-response repair placeholder
   // (a single space) must not mask the error block behind a blank bubble.
@@ -332,8 +358,8 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
     </div>
   ) : (
     <div
-      className={`px-4 py-3 ${
-        isUser ? 'message-user rounded-[16px_16px_16px_4px]' : 'message-assistant rounded-[16px_16px_4px_16px]'
+      className={`px-4 py-3 rounded-[16px] ${
+        isUser ? 'message-user' : 'message-assistant'
       } ${isStreaming ? 'streaming-message' : ''} ${isWorking ? 'message-working' : ''}`}
     >
       {/* Working indicator - shows when AI is working */}
@@ -415,6 +441,15 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
         />
       )}
 
+      {/* Terminal task card - terminal tools displayed separately */}
+      {terminalToolCalls.length > 0 && (
+        <TerminalTaskCard
+          terminalToolCalls={terminalToolCalls}
+          isActive={isWorking}
+          showOpenButton={!hideBrowserViewButton}
+        />
+      )}
+
       {/* Thought history - only for assistant messages with thoughts (when not hidden) */}
       {/* Supports both inline thoughts (v1/loaded) and separated thoughts (v2, lazy loaded on expand) */}
       {!hideThoughts && !isUser && (hasThoughts || hasSeparatedThoughts) && (
@@ -467,6 +502,7 @@ export const MessageItem = memo(function MessageItem({ message, previousCost = 0
           </button>
         </div>
       )}
+
     </div>
   )
 

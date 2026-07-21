@@ -17,7 +17,7 @@
  * new fields is safe — renderer fallbacks tolerate missing flags.
  */
 
-export type EngineId = 'anthropic' | 'halo' | 'codex' | 'mimo'
+export type EngineId = 'anthropic' | 'halo' | 'codex'
 
 /**
  * Logical tool kinds Halo's UI knows how to render. The renderer maps tool
@@ -108,7 +108,6 @@ export interface EngineCapabilities {
     mcp: boolean
     hooks: boolean
     sessionResume: boolean
-    midTurnInjection: boolean
     interrupt: boolean
     multimodalImage: boolean
     contextCompaction: boolean
@@ -149,7 +148,6 @@ export const ANTHROPIC_CAPABILITIES: EngineCapabilities = {
     mcp: true,
     hooks: true,
     sessionResume: true,
-    midTurnInjection: true,
     interrupt: true,
     multimodalImage: true,
     contextCompaction: true,
@@ -174,10 +172,8 @@ export const HALO_CAPABILITIES: EngineCapabilities = {
  * the descriptor.
  */
 export { CODEX_CAPABILITIES } from './codex/capabilities'
-export { MIMO_CAPABILITIES } from './mimo/capabilities'
 
 import { CODEX_CAPABILITIES } from './codex/capabilities'
-import { MIMO_CAPABILITIES } from './mimo/capabilities'
 
 /**
  * Resolve capabilities for an engine id. Used by `getEngineCapabilities()`
@@ -188,6 +184,5 @@ export function defaultCapabilitiesFor(engineId: EngineId): EngineCapabilities {
     case 'anthropic': return ANTHROPIC_CAPABILITIES
     case 'halo': return HALO_CAPABILITIES
     case 'codex': return CODEX_CAPABILITIES
-    case 'mimo': return MIMO_CAPABILITIES
   }
 }

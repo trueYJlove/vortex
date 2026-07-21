@@ -4,6 +4,8 @@
 import type { ChatSlice, ChatState } from './internal'
 import { CONVERSATION_CACHE_SIZE, api, createEmptySessionState, createEmptySpaceState } from './internal'
 import type { Conversation, ConversationMeta, Thought } from './internal'
+import { useNotificationStore } from '../notification.store'
+import i18n from '../../i18n'
 
 function toConversationMeta(conversation: Conversation): ConversationMeta {
   return {
@@ -39,7 +41,7 @@ function removeConversationRuntimeState(state: ChatState, conversationIds: Itera
   }
 }
 
-export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConversations' | 'preloadAllSpaceConversations' | 'createConversation' | 'selectConversation' | 'deleteConversation' | 'clearConversations' | 'renameConversation' | 'toggleStarConversation'> = (set, get) => ({
+export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConversations' | 'preloadAllSpaceConversations' | 'createConversation' | 'selectConversation' | 'deleteConversation' | 'clearConversations' | 'renameConversation' | 'toggleStarConversation' | 'setConversationModel'> = (set, get) => ({
   setCurrentSpace: (spaceId: string) => {
     set({ currentSpaceId: spaceId })
   },
@@ -322,6 +324,9 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
 
   // Delete conversation
   deleteConversation: async (spaceId, conversationId) => {
+    const spaceState = get().spaceStates.get(spaceId)
+    const meta = spaceState?.conversations.find((c) => c.id === conversationId)
+
     try {
       const response = await api.deleteConversation(spaceId, conversationId)
 
@@ -348,12 +353,41 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
           }
         })
 
+        // Show success toast with undo
+        const title = meta?.title || i18n.t('Untitled')
+        useNotificationStore.getState().show({
+          title: i18n.t('Conversation deleted'),
+          body: `"${title}"`,
+          variant: 'success',
+          duration: 6000,
+          action: {
+            label: i18n.t('Undo'),
+            onClick: async () => {
+              const newConv = await get().createConversation(spaceId)
+              if (newConv && meta?.title) {
+                await get().renameConversation(spaceId, newConv.id, meta.title)
+              } else if (!newConv) {
+                useNotificationStore.getState().show({
+                  title: i18n.t('Failed to undo delete'),
+                  variant: 'error',
+                  duration: 5000,
+                })
+              }
+            }
+          }
+        })
+
         return true
       }
 
       return false
     } catch (error) {
       console.error('Failed to delete conversation:', error)
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to delete conversation'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     }
   },
@@ -418,6 +452,12 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         }
       })
 
+      useNotificationStore.getState().show({
+        title: i18n.t('All conversations cleared'),
+        variant: 'success',
+        duration: 4000,
+      })
+
       if (!excludeConversationId) {
         const newConversation = await get().createConversation(spaceId)
         if (!newConversation) {
@@ -477,9 +517,20 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
         return true
       }
 
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to rename conversation'),
+        variant: 'error',
+        duration: 5000,
+      })
+
       return false
     } catch (error) {
       console.error('Failed to rename conversation:', error)
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to rename conversation'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     }
   },
@@ -516,6 +567,47 @@ export const createConversationsSlice: ChatSlice<'setCurrentSpace' | 'loadConver
       return false
     } catch (error) {
       console.error('Failed to toggle star:', error)
+      return false
+    }
+  },
+
+  // Set the per-conversation model pin (Cursor-style). Persists the source +
+  // model to the conversation and updates the cache so the selector reflects it
+  // immediately. The session rebuilds lazily on the next send (credential
+  // fingerprint change), matching the historical global model-switch behavior.
+  setConversationModel: async (spaceId, conversationId, modelSourceId, modelId) => {
+    try {
+      const response = await api.updateConversation(spaceId, conversationId, { modelSourceId, modelId })
+      if (response.success) {
+        set((state) => {
+          const newCache = new Map(state.conversationCache)
+          if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+            // Use the full conversation from the server response (HTTP remote mode)
+            newCache.set(conversationId, response.data as Conversation)
+          } else {
+            // Electron IPC: fall back to local update
+            const cached = newCache.get(conversationId)
+            if (cached) {
+              newCache.set(conversationId, { ...cached, modelSourceId, modelId })
+            }
+          }
+          return { conversationCache: newCache }
+        })
+        return true
+      }
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to switch model'),
+        variant: 'error',
+        duration: 5000,
+      })
+      return false
+    } catch (error) {
+      console.error('Failed to set conversation model:', error)
+      useNotificationStore.getState().show({
+        title: i18n.t('Failed to switch model'),
+        variant: 'error',
+        duration: 5000,
+      })
       return false
     }
   },
